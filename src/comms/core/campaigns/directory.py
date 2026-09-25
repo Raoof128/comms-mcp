@@ -53,7 +53,7 @@ __all__ = [
 
 Normalizer = Callable[[str], str]
 
-DESTINATION_TRANSPORTS = frozenset({"telegram"})
+DESTINATION_TRANSPORTS = frozenset({"telegram", "whatsapp"})
 CONTACT_TRANSPORTS = frozenset({"telegram", "whatsapp"})
 _TABLE = {
     "location": "locations",
@@ -151,6 +151,8 @@ def add_destination_in_tx(
     require_tx(conn)
     if transport not in DESTINATION_TRANSPORTS:
         raise DirectoryError("unsupported transport")
+    if transport == "whatsapp" and not is_group_identity(platform_identity):
+        raise DirectoryError("invalid platform identity")  # a WhatsApp contact is a person (G1)
     _kind(location_ref, {"location"})
     ref, stamp = refs.mint("destination"), timeutil.iso(now)
     location_id = _id(conn, "location", location_ref)

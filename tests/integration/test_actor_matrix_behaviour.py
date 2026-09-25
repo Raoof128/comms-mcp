@@ -1,11 +1,12 @@
 """Catalog amendment G6a gauntlet: the actor matrix, proved by behaviour.
 
 Every matrix tool goes through the real dispatcher, facades, services, executor and the real
-adapters' validation, once per Telegram actor with only that actor configured. The bot's context
+adapters' validation, once per actor with only that actor configured. The bot's context
 is the real ``BotContext`` over a scripted Bot API. ``A done`` must succeed; ``B`` and ``A todo``
 must be refused with no provider call (``B`` as ``PROVIDER_UNSUPPORTED``, or ``NOT_CONFIGURED``
 when the only capable actor is the other, unconfigured one). ``—`` cells are not addressed to the
-actor. WhatsApp cells are proved from G1 on, when WhatsApp groups become destinations.
+actor. From G1 the WhatsApp column is proved the same way: its group is a WhatsApp group read from
+the real archive, and its account tools run through the real template and media services.
 """
 
 import json
@@ -17,9 +18,13 @@ import httpx
 import pytest
 
 from comms.core import refs
+from comms.core.campaigns import directory as d
 from comms.core.delivery.commitment import commit_context
+from comms.core.groups import group_ref
 from comms.core.keys import rotate as rot
+from comms.core.objects import object_ref
 from comms.core.providers.capability import CapabilityState as S
+from comms.core.providers.protocols import ProviderTarget
 from comms.mcp.dispatch import AuthenticatedClient, Dispatcher
 from comms.runtime.facades import Services, build_registry
 from comms.runtime.selftest import _OneSecret
@@ -30,19 +35,24 @@ from comms.services.directory import DirectoryService
 from comms.services.groups import GroupService
 from comms.services.handles import ContextHandles
 from comms.services.identity import IdentityService
+from comms.services.media import MediaService
 from comms.services.messages import MessageService
+from comms.services.templates import TemplateService
 from comms.transports.telegram.bot.context import BotContext
 from comms.transports.telegram.bot.http import BotApi
 from comms.transports.telegram.bot.updates import BotPoller
+from comms.transports.whatsapp.numbers import wa_group_id
+from comms.transports.whatsapp.webhooks.archive import ArchiveContext, CommsArchive
 from tests.core import fakes
 from tests.core.campaign_helpers import NOW
 from tests.core.providers.test_actor_matrix import CATALOG, _rows
 from tests.services.context_fixtures import Clock, Source
-from tests.services.group_fixtures import fixtures, group_world
-from tests.services.test_templates_media_account import WebhookState
+from tests.services.group_fixtures import WA_PHONE, fixtures, group_world
+from tests.services.test_templates_media_account import ACCOUNT, Media, Templates, WebhookState
 
 CLIENT = AuthenticatedClient(client_ref="cli_" + "a" * 26, auth_kind="cml1")
-TELEGRAM = ("telegram_bot", "telegram_user")
+ACTORS = ("telegram_bot", "telegram_user", "whatsapp_cloud")
+WA_GROUP = "Y2FwaV9ncm91cDoxOTUwNTU1MDA3OToxMjAzNjMzOTQzMjAdOTY0MTUZD"
 SPECS = {name: spec for name, spec in CATALOG.items()} if isinstance(CATALOG, dict) else None
 
 
@@ -71,6 +81,20 @@ def _bot_api() -> BotApi:
     return BotApi(store, version=1, transport=httpx.MockTransport(handle))
 
 
+def _group_webhook() -> bytes:
+    messages = [
+        {"from": "61400000001", "id": f"wamid.G{n}", "timestamp": str(1758800000 + n),
+         "type": "text", "text": {"body": f"w{n}"}, "group_id": WA_GROUP}
+        for n in (1, 2, 3)
+    ] + [{"from": "61400000001", "id": "wamid.D1", "timestamp": "1758800009", "type": "text",
+          "text": {"body": "dm"}}]  # fmt: skip
+    return json.dumps({"object": "whatsapp_business_account", "entry": [{"id": "waba", "changes": [{
+        "field": "messages", "value": {
+            "messaging_product": "whatsapp", "metadata": {"phone_number_id": "1234567890"},
+            "contacts": [{"wa_id": "61400000001", "profile": {"name": "S"}}],
+            "messages": messages}}]}]}).encode()  # fmt: skip
+
+
 def _world(actor, tmp_path):
     from comms.mcp.catalog import TOOL_CATALOG
 
@@ -79,35 +103,55 @@ def _world(actor, tmp_path):
         rot.rotate(
             w["writer"], w["store"], purpose, material=os.urandom(32), prove=lambda m: None, now=NOW
         )
-    other = "telegram_user" if actor == "telegram_bot" else "telegram_bot"
-    states = {actor: S.AVAILABLE, other: S.NOT_CONFIGURED, "whatsapp_cloud": S.NOT_CONFIGURED}
+    states = dict.fromkeys(ACTORS, S.NOT_CONFIGURED) | {actor: S.AVAILABLE}
     capability, executor, admins = fixtures(w, states=states)
     conn = w["conn"]
-    if actor == "telegram_bot":
+    if actor == "whatsapp_cloud":  # its group is a WhatsApp group, read from the archive (G1)
+        loc = d.add_location(conn, "WA", now=NOW)
+        dst = d.add_destination(
+            conn, loc, "whatsapp", f"group:{WA_GROUP}", "W", normalize=wa_group_id, now=NOW
+        )
+        w["grp"] = group_ref(conn, dst, now=NOW)
+        CommsArchive(conn, clock=lambda: NOW).ingest(_group_webhook())
+        source: Any = ArchiveContext(conn, clock=lambda: NOW)
+    elif actor == "telegram_bot":
         api = _bot_api()
         BotPoller(api, conn, clock=lambda: NOW).poll_once()
-        source: Any = BotContext(api, conn, clock=lambda: NOW)
+        source = BotContext(api, conn, clock=lambda: NOW)
     else:
         source = Source(provenance="telegram_live")
+    context = ContextEngine(conn, {actor: source}, clock=lambda: NOW, monotonic=Clock(),
+                            capability=capability)  # fmt: skip
+    templates = media = account = None
+    if actor == "whatsapp_cloud":  # the account tools run through the real services too
+        templates = TemplateService(conn, capability, executor, Templates())
+        media, account = MediaService(conn, capability, executor, Media()), ACCOUNT
+        w["media"] = object_ref(conn, "media", "whatsapp", "whatsapp_cloud", None, "7788990011",
+                                now=NOW)  # fmt: skip
+        dm = ProviderTarget("whatsapp", "whatsapp_cloud", w["rcp"], WA_PHONE)
+        w["dm_message"] = context.archive(w["rcp"], dm, limit=1)["items"][0]["message_ref"]
     services = Services(
-        conn=conn, capability=capability,
-        context=ContextEngine(conn, {actor: source}, clock=lambda: NOW, monotonic=Clock(), capability=capability),
+        conn=conn, capability=capability, context=context,
         handles=ContextHandles(conn, w["store"], clock=lambda: NOW),
         groups=GroupService(conn, capability, executor), messages=MessageService(conn, capability, executor),
         campaigns=CampaignService(w["writer"], executor, {"whatsapp": fakes.FakeWhatsApp(conn=conn)},
                                   commit=lambda: commit_context(w["writer"], w["store"])),
-        directory=DirectoryService(w["writer"], executor), templates=None, media=None,
+        directory=DirectoryService(w["writer"], executor), templates=templates, media=media,
         account=AccountService(capability, webhooks=WebhookState()), identity=IdentityService(conn),
-        actors=(actor,),
+        actors=(actor,), account_target=account,
     )  # fmt: skip
     dispatcher = Dispatcher(build_registry(services))
     specs = {spec.name: spec for spec in TOOL_CATALOG}
     return w, dispatcher, admins[actor], specs
 
 
-def _fresh(dispatcher, name, w, actor):
+def _fresh(dispatcher, name, w, actor, kind):
+    """A fresh object for a tool that acts on one; an unknown ref where the actor cannot create
+    it (a WhatsApp topic), since that tool's cell is B and must refuse anyway."""
     created = dispatcher.call(CLIENT, name, {"group": w["grp"], "actor": actor, "name": "T",
                                              "request_id": refs.mint("request")})  # fmt: skip
+    if actor == "whatsapp_cloud" and created.error_code == "PROVIDER_UNSUPPORTED":
+        return refs.mint(kind)
     assert created.error_code is None, (name, created.error_code)
     return created.structured["object"]
 
@@ -121,16 +165,31 @@ def _arguments(spec, w, actor, dispatcher, message, cursor):
         "permissions": {"can_send_messages": True}, "conversation": w["rcp"],
         "media": "med_" + "a" * 26, "file": "f", "mime": "image/png", "query": "hello",
         "scope": "everyone", "rights": {"can_pin_messages": True}, "cursor": cursor,
-        "capability": "member.ban",
+        "capability": "member.ban", "language": "en", "category": "MARKETING",
+        "components": [{"type": "BODY", "text": "Hi"}],
     }  # fmt: skip
+    if actor == "whatsapp_cloud":
+        values.update(media=w["media"])
+        if spec.name == "comms_message_mark_read":  # conversation-addressed: a direct message
+            values.update(message=w["dm_message"])
+        if spec.name.startswith("comms_whatsapp_template_"):
+            values.update(name="spring")  # the one template the source double holds
     required = set(spec.input_schema.get("required", ()))
     properties = spec.input_schema.get("properties", {})
-    if "invite" in properties:  # revoke takes one optionally (with none: G6's primary-link reset)
+    # revoke takes an invite optionally: Telegram revokes the one it names (with none: G6's
+    # primary-link reset); WhatsApp has one link per group and only resets it
+    if "invite" in properties and actor != "whatsapp_cloud":
         required.add("invite")
     if "invite" in required:
-        values["invite"] = _fresh(dispatcher, "comms_group_invite_create", w, actor)
+        values["invite"] = _fresh(dispatcher, "comms_group_invite_create", w, actor, "invite")
+    if "template" in required:
+        created = dispatcher.call(CLIENT, "comms_whatsapp_template_create", {
+            "name": "fresh", "language": "en", "category": "MARKETING",
+            "components": values["components"], "request_id": refs.mint("request")})  # fmt: skip
+        assert created.error_code is None, created.error_code
+        values["template"] = created.structured["template"]
     if "topic" in required:
-        values["topic"] = _fresh(dispatcher, "comms_group_topic_create", w, actor)
+        values["topic"] = _fresh(dispatcher, "comms_group_topic_create", w, actor, "topic")
     arguments = {k: values[k] for k in required if values.get(k) is not None}
     if spec.name.endswith("_edit") and "name" in spec.input_schema.get("properties", {}):
         arguments["name"] = "renamed"  # an edit must change something
@@ -139,8 +198,8 @@ def _arguments(spec, w, actor, dispatcher, message, cursor):
     return arguments
 
 
-@pytest.mark.parametrize("actor", TELEGRAM)
-def test_every_telegram_cell_behaves_as_the_matrix_says(actor, tmp_path):
+@pytest.mark.parametrize("actor", ACTORS)
+def test_every_cell_behaves_as_the_matrix_says(actor, tmp_path):
     w, dispatcher, admin, specs = _world(actor, tmp_path)
     first = dispatcher.call(CLIENT, "comms_context_recent", {"group": w["grp"], "limit": 2})
     assert first.error_code is None
@@ -158,7 +217,10 @@ def test_every_telegram_cell_behaves_as_the_matrix_says(actor, tmp_path):
             before = len(admin.calls)  # after any object the arguments needed was created
             result = dispatcher.call(CLIENT, name, arguments)
             reached = len(admin.calls) > before
-            refused_right = result.error_code in ("PROVIDER_UNSUPPORTED", "NOT_CONFIGURED")
+            refused_right = result.error_code in ("PROVIDER_UNSUPPORTED", "NOT_CONFIGURED") or (
+                result.error_code is None  # P §25: a WhatsApp add answers "invite instead"
+                and result.structured.get("result") == "INVITE_REQUIRED"
+            )
             ok = (
                 (kind == "A done" and result.error_code is None)
                 or (kind == "B" and refused_right and not reached)

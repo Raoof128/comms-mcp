@@ -44,6 +44,7 @@ __all__ = ["NOT_OFFERED", "Services", "build_registry", "group_targets"]
 
 Facade = Callable[[AuthenticatedClient, dict[str, Any]], dict[str, Any]]
 _TELEGRAM = ("telegram_bot", "telegram_user")
+_WHATSAPP = "whatsapp_cloud"
 _SOURCE_ACTOR = {"telegram_live": "telegram_user", "telegram_local": "telegram_bot"}
 # Tools whose services are not offered yet (each named in the D-task that catalogued it).
 NOT_OFFERED = frozenset(
@@ -84,15 +85,18 @@ class Services:
 
 
 def group_targets(conn: Any, group: str, actors: tuple[str, ...]) -> dict[str, ProviderTarget]:
-    """The configured Telegram actors' targets for a ``grp_`` ref; ``NOT_FOUND`` if unknown."""
+    """The configured actors' targets for a ``grp_`` ref, by its destination's transport: the
+    Telegram actors for a Telegram group, ``whatsapp_cloud`` for a WhatsApp group (G1);
+    ``NOT_FOUND`` if unknown, ``NOT_CONFIGURED`` if no actor of that transport is."""
     try:
-        destination, identity = group_identity(conn, group)
+        destination, transport, identity = group_identity(conn, group)
     except GroupError:
         raise CommsError("NOT_FOUND") from None
+    capable = _TELEGRAM if transport == "telegram" else (_WHATSAPP,)
     targets = {
-        actor: ProviderTarget("telegram", actor, destination, identity)
+        actor: ProviderTarget(transport, actor, destination, identity)
         for actor in actors
-        if actor in _TELEGRAM
+        if actor in capable
     }
     if not targets:
         raise CommsError("NOT_CONFIGURED")
@@ -122,10 +126,16 @@ class _Facades:
         """The target a context read uses: the engine's rule (one copy, E11c)."""
         return self.s.context.reader(self.targets(group), capability, fallback=True)
 
-    def message_id(self, message: str, target: ProviderTarget) -> int:
+    def message_id(self, message: str, target: ProviderTarget) -> int | str:
+        """The provider id of a message ref in the target's chat: a Telegram message id, or a
+        WhatsApp ``wamid`` (the archive's key, G1); ``NOT_FOUND`` for another chat's message."""
         found = resolve_object(self.s.conn, message, "message")
         chat, _sep, message_id = found.provider_identity.rpartition(":")
-        if chat != target.identity or not message_id.isdigit():
+        if chat != target.identity or not message_id:
+            raise CommsError("NOT_FOUND")
+        if target.transport == "whatsapp":
+            return message_id
+        if not message_id.isdigit():
             raise CommsError("NOT_FOUND")
         return int(message_id)
 

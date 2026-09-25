@@ -127,8 +127,15 @@ class ContextEngine:
     def reader(
         self, targets: Mapping[str, ProviderTarget], capability: Capability, *, fallback: bool
     ) -> ProviderTarget:
-        """The target a Telegram read uses: the user account when it has a source and the
-        capability, else (with ``fallback``) the bot; the one copy of the rule (E11c)."""
+        """The target a read uses; the one copy of the rule (E11c). A WhatsApp group is read from
+        the comms webhook archive, a local source with no provider capability (G1). A Telegram
+        group: the user account when it has a source and the capability, else (with
+        ``fallback``) the bot."""
+        whatsapp = targets.get("whatsapp_cloud")
+        if whatsapp is not None:
+            if "whatsapp_cloud" not in self._sources:
+                raise CommsError("NOT_CONFIGURED")
+            return whatsapp
         user = targets.get("telegram_user")
         code = "NOT_CONFIGURED"
         if user is not None and "telegram_user" in self._sources and self._capability is not None:
@@ -184,7 +191,7 @@ class ContextEngine:
         self,
         group: str,
         target: ProviderTarget,
-        message_id: int,
+        message_id: int | str,
         *,
         before: int = 10,
         after: int = 10,
@@ -194,7 +201,7 @@ class ContextEngine:
         )
 
     def thread(
-        self, group: str, target: ProviderTarget, message_id: int, *, limit: int = 20
+        self, group: str, target: ProviderTarget, message_id: int | str, *, limit: int = 20
     ) -> dict[str, Any]:
         return self._page(
             group, target, "thread", {"message_id": message_id, "limit": _limit(limit)}

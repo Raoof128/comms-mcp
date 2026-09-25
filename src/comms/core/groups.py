@@ -120,18 +120,19 @@ def list_groups(
     )
 
 
-def group_identity(conn: Any, grp: str) -> tuple[str, str]:
-    """``(destination ref, delivery identity)`` of a group — for building provider targets only;
-    never returned to a caller (the runtime facades use it, D30)."""
+def group_identity(conn: Any, grp: str) -> tuple[str, str, str]:
+    """``(destination ref, transport, delivery identity)`` of a group — for building provider
+    targets only; never returned to a caller (the runtime facades use it, D30)."""
     try:
         refs.check(grp, "group")
     except ValueError:
         raise GroupError("unknown group") from None
     row = conn.execute(
-        "SELECT d.ref, i.identity FROM groups g JOIN destinations d ON d.id = g.destination_id"
+        "SELECT d.ref, d.transport, i.identity FROM groups g"
+        " JOIN destinations d ON d.id = g.destination_id"
         " JOIN delivery_identities i ON i.id = d.identity_id WHERE g.ref = ? AND d.enabled = 1",
         (grp,),
     ).fetchone()
     if row is None:
         raise GroupError("unknown group")
-    return str(row[0]), str(row[1])
+    return str(row[0]), str(row[1]), str(row[2])

@@ -27,6 +27,7 @@ from comms.transports.whatsapp.cloud.templates import (
     check_delete,
     check_edit,
 )
+from comms.transports.whatsapp.numbers import wa_group_id
 
 __all__ = ["GROUP_CAPABILITIES", "GroupDiscovery", "WhatsAppAdmin", "group_id_of"]
 
@@ -55,10 +56,12 @@ def contact_of(target: ProviderTarget) -> str:
 
 
 def group_id_of(target: ProviderTarget) -> str:
-    kind, sep, group_id = target.identity.partition(":")
-    if target.actor != ACTOR or kind != "group" or not sep or not group_id.isdigit():
+    if target.actor != ACTOR:
         raise ValueError("not a whatsapp group destination")
-    return group_id
+    try:
+        return wa_group_id(target.identity).partition(":")[2]
+    except ValueError:
+        raise ValueError("not a whatsapp group destination") from None
 
 
 class GroupDiscovery:

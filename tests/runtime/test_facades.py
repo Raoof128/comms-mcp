@@ -40,7 +40,7 @@ def world(tmp_path):
     return w
 
 
-def _dispatcher(w, sources):
+def _dispatcher(w, sources, *, actors=("telegram_bot", "telegram_user")):
     capability, executor, admins = fixtures(w)
     w["admins"] = admins
     conn = w["conn"]
@@ -68,7 +68,7 @@ def _dispatcher(w, sources):
         media=None,
         account=AccountService(capability, webhooks=WebhookState()),
         identity=IdentityService(conn),
-        actors=("telegram_bot", "telegram_user"),
+        actors=actors,
     )
     return Dispatcher(build_registry(services))
 

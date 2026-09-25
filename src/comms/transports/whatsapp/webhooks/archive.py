@@ -8,7 +8,7 @@ messages (the worker applies them as provider updates). A body that does not par
 ``ValueError``, which the worker counts as malformed.
 
 ``ArchiveContext`` is the ``whatsapp_webhook_archive`` context source: one conversation, newest
-first, with an opaque numeric cursor. A conversation is ``group:<group_id>`` for a message Meta
+first, with an opaque numeric cursor, or the messages around one of them (G1). A conversation is ``group:<group_id>`` for a message Meta
 marks with a ``group_id`` (the Groups API), else the contact's number: the same identities the
 directory's WhatsApp destinations and contact points use. Provider text and names go
 under ``untrusted`` (A32); the context engine drops the provider identities.
@@ -17,7 +17,7 @@ under ``untrusted`` (A32); the context engine drops the provider identities.
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from typing import Any
 
@@ -25,7 +25,7 @@ from typing import Any
 from whatsvault.ingest import normalise  # type: ignore[import-untyped]
 
 from comms.core import timeutil
-from comms.core.providers.protocols import ContextPage, ContextQuery
+from comms.core.providers.protocols import ContextPage, ContextQuery, ContextRefused
 from comms.core.storage.db import write_tx
 
 __all__ = ["PROVENANCE", "ArchiveContext", "CommsArchive"]
@@ -85,7 +85,10 @@ class CommsArchive:
 
 
 class ArchiveContext:
-    """The archive as a context source for one WhatsApp conversation."""
+    """The archive as a context source for one WhatsApp conversation: ``recent`` (paged) and
+    ``around`` one message (newest first, as Telegram's history reads are). Any other kind is
+    refused ``PROVIDER_UNSUPPORTED``: the archive has no thread or search index (G1 found every
+    kind was served as ``recent``)."""
 
     def __init__(self, conn: Any, *, clock: Callable[[], datetime]) -> None:
         self._conn, self._clock = conn, clock
@@ -96,8 +99,15 @@ class ArchiveContext:
     def read(self, query: ContextQuery) -> ContextPage:
         identity = query.target.identity
         chat = identity if identity.startswith("group:") else identity.removeprefix("+")
-        limit = min(int(query.args.get("limit") or 20), _MAX_LIMIT)
-        cursor = query.args.get("cursor")
+        if query.kind == "recent":
+            return self._recent(chat, query.args)
+        if query.kind == "around":
+            return self._around(chat, query.args)
+        raise ContextRefused("PROVIDER_UNSUPPORTED")
+
+    def _recent(self, chat: str, args: Mapping[str, Any]) -> ContextPage:
+        limit = min(int(args.get("limit") or 20), _MAX_LIMIT)
+        cursor = args.get("cursor")
         before = int(cursor) if isinstance(cursor, str) and cursor.isdigit() else None
         # page by (sent_at, id): messages can arrive out of their send order
         edge = None
@@ -108,14 +118,44 @@ class ArchiveContext:
             if edge is None:
                 return ContextPage((), PROVENANCE, None)
         rows = self._conn.execute(
-            "SELECT id, wamid, direction, type, body, sender_name, sent_at FROM whatsapp_messages"
+            f"SELECT {_COLUMNS} FROM whatsapp_messages"
             " WHERE chat = ? AND (? IS NULL OR sent_at < ? OR (sent_at = ? AND id < ?))"
             " ORDER BY sent_at DESC, id DESC LIMIT ?",
             (chat, before, *(edge or (None,)) * 2, before, limit + 1),
         ).fetchall()
         more = len(rows) > limit
+        items = self._items(rows[:limit])
+        return ContextPage(items, PROVENANCE, str(rows[limit - 1][0]) if more else None)
+
+    def _around(self, chat: str, args: Mapping[str, Any]) -> ContextPage:
+        wamid, before, after = args.get("message_id"), args.get("before", 10), args.get("after", 10)
+        if not isinstance(wamid, str) or not all(
+            type(n) is int and 0 <= n <= _MAX_LIMIT for n in (before, after)
+        ):
+            raise ValueError("around arguments refused")
+        anchor = self._conn.execute(
+            "SELECT id, sent_at FROM whatsapp_messages WHERE chat = ? AND wamid = ?",
+            (chat, wamid),
+        ).fetchone()
+        if anchor is None:
+            raise ContextRefused("TARGET_NOT_FOUND")
+        key = (anchor[1], anchor[1], anchor[0])
+        newer = self._conn.execute(
+            f"SELECT {_COLUMNS} FROM whatsapp_messages WHERE chat = ?"
+            " AND (sent_at > ? OR (sent_at = ? AND id > ?)) ORDER BY sent_at, id LIMIT ?",
+            (chat, *key, after),
+        ).fetchall()
+        older = self._conn.execute(
+            f"SELECT {_COLUMNS} FROM whatsapp_messages WHERE chat = ?"
+            " AND (sent_at < ? OR (sent_at = ? AND id <= ?)) ORDER BY sent_at DESC, id DESC"
+            " LIMIT ?",
+            (chat, *key, before + 1),
+        ).fetchall()
+        return ContextPage(self._items([*reversed(newer), *older]), PROVENANCE, None)
+
+    def _items(self, rows: list[Any]) -> tuple[dict[str, Any], ...]:
         observed = timeutil.iso(self._clock())
-        items = tuple(
+        return tuple(
             {
                 "source": PROVENANCE,
                 "observed_at": observed,
@@ -125,6 +165,8 @@ class ArchiveContext:
                 "type": kind,
                 "untrusted": {"text": body, "sender_name": name},
             }
-            for _id, wamid, direction, kind, body, name, sent_at in rows[:limit]
+            for _id, wamid, direction, kind, body, name, sent_at in rows
         )
-        return ContextPage(items, PROVENANCE, str(rows[limit - 1][0]) if more else None)
+
+
+_COLUMNS = "id, wamid, direction, type, body, sender_name, sent_at"

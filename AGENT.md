@@ -697,3 +697,19 @@ Follow the user's engineering lifecycle: design/security analysis, implementatio
 - **Files changed:** `docs/comms-spec-v0.3.md` (A46), `docs/verification/comms-v0.3-rulings.md` (a pin and R-A46), the plan (G7, G8, G9), `docs/verification/comms-v0.3-actor-matrix.md`, the ledger, `AGENT.md`, `CHANGELOG.md`.
 - **Verification:** The preflight pin and the actor-matrix tests pass; the full gate passed (GATE ok=1).
 - **Follow-ups:** Build them in G7 and G8.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Catalog amendment G1: WhatsApp groups as destinations with `grp_` refs (branch `comms-v0.3-catalog`).
+- **Summary:** A WhatsApp group (`group:<id>`, one rule `wa_group_id`) is a directory destination with a `grp_`. Group tools target it through `whatsapp_cloud`, and its context is the comms webhook archive over MCP (`recent`, pages, `get`, `message_get`, `around`).
+- **Found and fixed:**
+  - Meta's group ids are opaque, but the Graph client accepted digits only;
+  - the schema admitted Telegram destinations only (v6 rebuild);
+  - the archive answered every read kind as `recent`;
+  - two actor-matrix cells were false: `member_invite` on WhatsApp is not wired (now G8), and `member_add` answers INVITE_REQUIRED by design.
+- **Files changed:** `src/comms/transports/whatsapp/numbers.py`, `cloud/http.py`, `cloud/groups.py`, `webhooks/archive.py`, `src/comms/core/storage/migrations.py` (v6), `src/comms/core/campaigns/directory.py`, `src/comms/core/groups.py`, `src/comms/runtime/facades.py`, `src/comms/services/context.py`; tests `tests/runtime/test_whatsapp_group_destinations.py`, `tests/core/test_schema_v6.py`, `tests/integration/test_actor_matrix_behaviour.py`, `tests/runtime/test_facades.py`; the matrix, the rulings (R-G1), the plan, the ledger, `AGENT.md` and `CHANGELOG.md`.
+- **Verification:** 29 new tests; the behaviour test covers all three actors (mutation-checked); the full gate passed (GATE ok=1).
+- **Follow-ups:**
+  - G4 proves a backup round trip of a WhatsApp group's `grp_` (D5);
+  - G8 adds the invite GET, participants and `group_context` for WhatsApp;
+  - G6 adds the bot's `around` from retained updates.

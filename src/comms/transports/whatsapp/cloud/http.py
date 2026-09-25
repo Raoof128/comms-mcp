@@ -19,6 +19,7 @@ import httpx
 
 from comms.core.keys.secrets import SecretStore
 from comms.transports.net import pinned_client
+from comms.transports.whatsapp.numbers import WA_GROUP_ID
 
 __all__ = ["GRAPH_ORIGIN", "GraphApi", "GraphRefused", "GraphResponse", "GraphTransportError"]
 
@@ -28,7 +29,6 @@ TOKEN_ITEM = "meta-access-token"
 _TOKEN = re.compile(r"\A[A-Za-z0-9_.\-]{20,512}\Z")
 _NUMBER_ID = re.compile(r"\A[0-9]{5,20}\Z")
 _OBJECT_ID = re.compile(r"\A[0-9]{1,20}\Z")  # a Graph object id (a template)
-_GROUP_ID = re.compile(r"\A[0-9]{5,30}\Z")
 
 
 class GraphRefused(Exception):
@@ -148,7 +148,7 @@ class GraphApi:
 
     @staticmethod
     def _group(group_id: str) -> str:
-        if not isinstance(group_id, str) or not _GROUP_ID.match(group_id):
+        if not isinstance(group_id, str) or not WA_GROUP_ID.match(group_id):
             raise ValueError("group id refused")
         return group_id
 
