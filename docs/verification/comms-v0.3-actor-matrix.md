@@ -112,6 +112,26 @@ MTProto rows cover both a basic group (`messages.*`) and a supergroup or channel
 | `comms_whatsapp_webhook_status` | — : a local report on the WhatsApp webhook inbox | — : a local report on the WhatsApp webhook inbox | A done: the local inbox counts |
 | `comms_capability_get` / `comms_capability_for_group` / `comms_capability_for_actor` / `comms_capability_refresh` / `comms_group_capabilities` | A done: capability service | A done: capability service | A done: capability service |
 
+## Added by A46, not yet in the catalog
+
+These tools become rows here when G7 and G8 add them to the catalog. The row test requires every cited tool to exist, and G9 requires none left in this section.
+
+- `comms_group_member_tag_set`:
+  - bot: A todo:G7 [member.tag] `setChatMemberTag`;
+  - user: A todo:G7 [member.tag] `messages.editChatParticipantRank`;
+  - WhatsApp: B [member.tag], because WhatsApp groups have no member tags.
+- `comms_message_reaction_remove`:
+  - bot: A todo:G7 [reaction.remove] `deleteMessageReaction`;
+  - user: A todo:G7 [reaction.remove] `messages.deleteParticipantReaction`;
+  - WhatsApp: B [reaction.remove], because group messaging has no reaction moderation.
+- `comms_group_member_reactions_clear`:
+  - bot: A todo:G7 [reaction.clear] `deleteAllMessageReactions`;
+  - user: A todo:G7 [reaction.clear] `messages.deleteParticipantReactions`;
+  - WhatsApp: B [reaction.clear], for the same reason.
+- `comms_whatsapp_health_status`:
+  - both Telegram actors: `—`, because it is a WhatsApp account tool;
+  - WhatsApp: A todo:G8 [phone_number.health] `GET /{phone}?fields=health_status`.
+
 ## Local tools (no provider actor)
 
 `comms_capability_list`, `comms_group_list`, `comms_group_get`, every `comms_campaign_*`, `comms_location_*` and `comms_audience_*` tool, `comms_admin_identity_inspect`, and the `comms_directory_*` and `comms_context_person` tools that G2–G5 add. These read or write `comms.db` only. A campaign's delivery goes through the transports' delivery adapters, not these tools.
@@ -126,7 +146,7 @@ Every cell was re-checked against the live docs. None flipped between A and B. W
   - G6: `getChatAdministrators` needs `return_bots=True` to list other bot admins.
   - G8: WhatsApp pin needs `expiration_days`; groups cap at 8 participants.
   - G9: the Graph API pin (v21.0) expires on 21 January 2027 and must move to a current version before release.
-- **New admin surface outside the A45 catalog** (an owner decision; no tool addresses these today):
+- **New admin surface beyond A45's catalog.** The owner added it to the catalog as A46 on 2026-09-26; see "Added by A46" above.
   - member tags: Bot API `setChatMemberTag` with the `can_manage_tags` right (9.5); MTProto `messages.editChatParticipantRank`;
   - reaction moderation: Bot API `deleteMessageReaction` / `deleteAllMessageReactions` (10.0); MTProto `messages.deleteParticipantReaction(s)`;
   - WhatsApp `health_status`: a messaging-health summary for the phone number, WABA and business.

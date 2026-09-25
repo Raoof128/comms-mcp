@@ -230,6 +230,21 @@ Two further limits are not claimed:
   - **Media upload is staged.** `upl_` refs are client- and peer-bound, expiring, single-use, memory-only, capped at 16 MiB and SHA-checked; a small inline `data_b64` (≤ 512 KiB) is a convenience only.
   - **Backups keep `grp_` refs.** A compatible restore reuses them; a conflicting binding is a staged incompatibility, never a silent rebind.
 
+### Added by the owner after the 2026-docs gauntlet (2026-09-26)
+
+- **A46. The catalog gains the admin surface the 2026 docs added.** The owner decided (2026-09-26, R-G6a-docs) that the admin operations found beyond A45's catalog join it, under A45's full-admin rule. Each is built for every actor whose API implements it, and each actor's gap is B in the actor matrix. The tools are:
+  - **`comms_group_member_tag_set(group, recipient, tag, actor?, request_id)`**, capability `member.tag`. It sets a regular member's tag (0–16 characters, no emoji; an empty tag clears it). Bot: `setChatMemberTag`, which needs the `can_manage_tags` right (Bot API 9.5). User: `messages.editChatParticipantRank`. WhatsApp: B, because WhatsApp groups have no member tags. It is idempotent, since setting the same tag again is the same state.
+  - **`comms_message_reaction_remove(message, recipient, actor?, request_id)`**, capability `reaction.remove`. It removes one member's reaction from one group message. Bot: `deleteMessageReaction` with `user_id`, which needs `can_delete_messages` (Bot API 10.0). User: `messages.deleteParticipantReaction`. WhatsApp: B, because group messaging supports no reaction moderation.
+  - **`comms_group_member_reactions_clear(group, recipient, actor?, request_id)`**, capability `reaction.clear`. It removes a member's recent reactions in the group. Bot: `deleteAllMessageReactions` with `user_id`, which removes up to 10,000 recent reactions. User: `messages.deleteParticipantReactions`. WhatsApp: B.
+  - **`comms_whatsapp_health_status()`**, capability `phone_number.health`. It reads Graph `GET /{phone_number_id}?fields=health_status` and returns:
+    - the overall `can_send_message` (`AVAILABLE`, `LIMITED` or `BLOCKED`);
+    - each entity's `entity_type` and `can_send_message`;
+    - any `additional_info` or `errors` text, bounded and under `untrusted`.
+
+    Every entity `id` is dropped (A26: an id is an identity). The two Telegram actors: `—`, because this is a WhatsApp account tool.
+
+  Members are named by `rcp_` ref, as every membership write is. Reactions made by a chat (the Bot API's `actor_chat_id`) are out of scope, because comms has no ref for a sender chat. The writes are audited and replay by `req_`, as D16 requires. The pin, the egress matrix, host permissions and D39-A move with them in G9.
+
 ## Tombstones added in v0.3
 
 The 10 Telegram MCP tool names, the 6 WhatsVault MCP tool names, `tgml1`, `tg-mcp-policy-bundle/v1` and `tg-mcp-policy-signature/v1`. The legacy audit domains `telegram-mcp-audit-v1` and `telegram-mcp-audit-genesis-v1` are closed to new appends and remain valid for verification. `tests/security/test_tombstones.py` counts each one by name. None is ever reassigned.

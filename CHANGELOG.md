@@ -558,3 +558,17 @@
 - **Files changed:** `docs/verification/comms-v0.3-actor-matrix.md`, `docs/verification/comms-v0.3-rulings.md` (R-G6a-docs), `docs/superpowers/plans/2026-09-25-comms-v0.3-catalog-amendment.md` (G9), `tests/core/providers/test_actor_matrix.py` (+1 test), the ledger, `AGENT.md`, `CHANGELOG.md`.
 - **Verification:** The raw doc pages were fetched and grepped; the full gate passed (GATE ok=1).
 - **Follow-ups:** The owner rules whether member tags, reaction moderation and WhatsApp `health_status` join the catalog (they are outside A45). G9 bumps the Graph version.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Spec amendment A46. The owner added the 2026-docs admin surface to the catalog (branch `comms-v0.3-catalog`).
+- **Summary:** Four tools:
+  - `comms_group_member_tag_set`: Bot `setChatMemberTag`, MTProto `messages.editChatParticipantRank`;
+  - `comms_message_reaction_remove`: `deleteMessageReaction` / `messages.deleteParticipantReaction`;
+  - `comms_group_member_reactions_clear`: `deleteAllMessageReactions` / `messages.deleteParticipantReactions`;
+  - `comms_whatsapp_health_status`: Graph `health_status`, with entity ids dropped.
+
+  WhatsApp is B for the three Telegram tools. G7 builds the Telegram tools and G8 the health tool; G9 requires them all in the catalog.
+- **Files changed:** `docs/comms-spec-v0.3.md` (A46), `docs/verification/comms-v0.3-rulings.md` (a pin and R-A46), the plan (G7, G8, G9), `docs/verification/comms-v0.3-actor-matrix.md`, the ledger, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** The preflight pin and the actor-matrix tests pass; the full gate passed (GATE ok=1).
+- **Follow-ups:** Build them in G7 and G8.
