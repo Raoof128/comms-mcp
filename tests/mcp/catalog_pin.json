@@ -1,5 +1,5 @@
 {
-  "count": 109,
+  "count": 115,
   "names": [
     "comms_capability_list",
     "comms_context_get",
@@ -109,7 +109,13 @@
     "comms_capability_for_group",
     "comms_capability_for_actor",
     "comms_capability_refresh",
-    "comms_admin_identity_inspect"
+    "comms_admin_identity_inspect",
+    "comms_directory_recipient_list",
+    "comms_directory_recipient_get",
+    "comms_directory_recipient_create",
+    "comms_directory_recipient_update",
+    "comms_directory_recipient_enable",
+    "comms_directory_recipient_disable"
   ],
   "tools": {
     "comms_capability_list": "52c9c68aadd227b8eafb7c50d6676e6543c5e46109c51939cffc8b142737e8bb",
@@ -220,7 +226,13 @@
     "comms_capability_for_group": "49e5fff9985a522b80d71281cb168885348a85506c833d14fe78b8e41ac0b437",
     "comms_capability_for_actor": "839d2c4570c1381452be2970d64adc4aea0fd731d240d3c2f1c4ec57fa9f4990",
     "comms_capability_refresh": "d7ecba897393adec609a13b6d93df98d78a6f72d7120b675340fcbae3fe141bb",
-    "comms_admin_identity_inspect": "c0d7d16febd89555fae19660fa20e4b9d0fd95a5a092558f640ebc1f75d08ad8"
+    "comms_admin_identity_inspect": "c0d7d16febd89555fae19660fa20e4b9d0fd95a5a092558f640ebc1f75d08ad8",
+    "comms_directory_recipient_list": "e553e27b7ff8b1b2c68f81033b568ae113ef10fb8c709c3b0728d0665a877241",
+    "comms_directory_recipient_get": "a6bd1fbcbaada34f28019281ca9fd5da886ce4b266b905c1e562d259b5ecc00d",
+    "comms_directory_recipient_create": "ee9ce3e180921269872d36f4b4a3611db4ae37c7969fb48df6c4ce1304af7525",
+    "comms_directory_recipient_update": "a20dcfaf9833b685a1b2b4ad8ebfa918a0f6d91eaecb462b8c9fff059f415443",
+    "comms_directory_recipient_enable": "46a90aaab1183b203a36746bd793d42c6746ee76852fcb1feeddd4879b43d971",
+    "comms_directory_recipient_disable": "a97da62fea8b38a87b8383ed2c3c20fda3e170d34f0db681dd08a781afd3d94d"
   },
-  "catalog": "4380d08525605e6f5842a03d4c7b58fc740e73d774a73fddbe5191aff6ce6514"
+  "catalog": "7233812c49a5441bc526353b03f5bb05d539602e464096b194b2c9c24531188b"
 }

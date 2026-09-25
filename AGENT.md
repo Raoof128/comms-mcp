@@ -721,3 +721,11 @@ Follow the user's engineering lifecycle: design/security analysis, implementatio
 - **Files changed:** `src/comms/runtime/adapters.py`, `src/comms/runtime/comms_runtime.py`, `tests/runtime/test_comms_runtime_whatsapp.py`, `tests/integration/test_actor_matrix_behaviour.py`, the rulings (R-G2a), the ledger, `AGENT.md`, `CHANGELOG.md`.
 - **Verification:** 4 new composition tests; the behaviour test was mutation-checked on the actor list; the full gate passed (GATE ok=1).
 - **Follow-ups:** None.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Catalog amendment G2: the `comms_directory_recipient_*` tools (branch `comms-v0.3-catalog`).
+- **Summary:** Six tools (list, get, create, update, enable, disable) over the core directory. Labels appear under `untrusted`; contact points appear by ref and transport, never by identity; every write is audited and replays by `req_`. The catalog pin is regenerated per task, on purpose (R-G2; 109 to 115 tools). The egress rule now counts an `untrusted` object as text.
+- **Files changed:** `src/comms/mcp/tools/directory_people.py` (new), `src/comms/mcp/tools/__init__.py`, `src/comms/services/directory.py`, `src/comms/core/campaigns/directory.py`, `src/comms/core/campaigns/directory_views.py`, `src/comms/runtime/facades.py`, `src/comms/mcp/egress.py`, `tests/mcp/test_catalog_directory_people.py` (new), `tests/security/test_v03_egress.py`, `tests/mcp/catalog_pin.json`, the rulings, the plan, the ledger, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 48 new tests; the egress sweep runs the new tools; the full gate passed (GATE ok=1).
+- **Follow-ups:** G3 adds contact points.

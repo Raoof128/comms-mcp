@@ -168,6 +168,7 @@ def sweep(tmp_path_factory):
         "template": "ctp_" + "a" * 26,
         "invite": "inv_" + "a" * 26,
         "topic": "top_" + "a" * 26,
+        "display_name": "N",  # catalog amendment G2
     }
     outputs = {}
     with pytest.MonkeyPatch.context() as mp:
@@ -216,7 +217,8 @@ def test_every_tool_declares_its_egress_class():
     assert set(EGRESS_MATRIX) == {s.name for s in TOOL_CATALOG}
     assert all(classes <= CLASSES and "refs" in classes for classes in EGRESS_MATRIX.values())
     for spec in TOOL_CATALOG:  # a tool that may carry text has a schema field for it
-        carries_text = "untrusted_text" in json.dumps(spec.output_schema)
+        schema = json.dumps(spec.output_schema)  # a text field, or an untrusted object (G2)
+        carries_text = "untrusted_text" in schema or '"untrusted"' in schema
         assert (
             "body" in EGRESS_MATRIX[spec.name] or "names" in EGRESS_MATRIX[spec.name]
         ) == carries_text, spec.name

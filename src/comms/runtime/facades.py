@@ -381,6 +381,12 @@ class _Facades:
             "audience.add": lambda cl, a: s.directory.audience_add(c(cl), a["audience"], a["member"], a["request_id"]),
             "audience.remove": lambda cl, a: s.directory.audience_remove(c(cl), a["audience"], a["member"], a["request_id"]),
             "audience.resolve": lambda cl, a: s.directory.audience_resolve(a["audience"]),
+            "directory.recipient_list": lambda cl, a: s.directory.recipient_list(limit=a.get("limit", 50), cursor=a.get("cursor")),
+            "directory.recipient_get": lambda cl, a: s.directory.recipient_get(a["recipient"]),
+            "directory.recipient_create": lambda cl, a: s.directory.recipient_create(c(cl), a["display_name"], a["request_id"]),
+            "directory.recipient_update": lambda cl, a: s.directory.recipient_update(c(cl), a["recipient"], a["display_name"], a["request_id"]),
+            "directory.recipient_enable": lambda cl, a: s.directory.recipient_enable(c(cl), a["recipient"], a["request_id"]),
+            "directory.recipient_disable": lambda cl, a: s.directory.recipient_disable(c(cl), a["recipient"], a["request_id"]),
             "whatsapp.template_list": lambda cl, a: self.templates().list(limit=a.get("limit", 50), cursor=a.get("cursor")),
             "whatsapp.template_get": lambda cl, a: self.templates().get(a["name"], a["language"]),
             "whatsapp.template_create": lambda cl, a: self.templates().create(

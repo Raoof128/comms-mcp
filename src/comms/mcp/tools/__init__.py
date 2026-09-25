@@ -8,6 +8,7 @@ from comms.mcp.tools.admin import ADMIN_TOOLS
 from comms.mcp.tools.campaigns import CAMPAIGN_TOOLS
 from comms.mcp.tools.context import CONTEXT_TOOLS
 from comms.mcp.tools.directory import DIRECTORY_TOOLS
+from comms.mcp.tools.directory_people import DIRECTORY_PEOPLE_TOOLS
 from comms.mcp.tools.groups import GROUP_TOOLS
 from comms.mcp.tools.messages import MESSAGE_TOOLS
 
@@ -21,4 +22,5 @@ FAMILIES: tuple[tuple[ToolSpec, ...], ...] = (
     CAMPAIGN_TOOLS,
     DIRECTORY_TOOLS,
     ACCOUNT_TOOLS,
+    DIRECTORY_PEOPLE_TOOLS,  # catalog amendment G2, appended so earlier order holds
 )

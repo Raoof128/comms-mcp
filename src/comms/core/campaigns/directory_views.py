@@ -11,7 +11,14 @@ from typing import Any
 from comms.core import refs
 from comms.core.campaigns.directory import DirectoryNotFound
 
-__all__ = ["audience_view", "list_audiences", "list_locations", "location_view"]
+__all__ = [
+    "audience_view",
+    "list_audiences",
+    "list_locations",
+    "list_recipients",
+    "location_view",
+    "recipient_view",
+]
 
 _MEMBER_KINDS = ("location", "audience", "destination", "recipient")
 
@@ -96,3 +103,52 @@ def list_audiences(
         limit=limit,
         before=before,
     )
+
+
+def recipient_view(conn: Any, ref: str) -> dict[str, Any]:
+    """A person (G2): the label under ``untrusted``, and contact points by ref and transport."""
+    row_id = _row_id(conn, "recipients", "recipient", ref)
+    name, enabled, created = conn.execute(
+        "SELECT display_name, enabled, created_at FROM recipients WHERE id = ?", (row_id,)
+    ).fetchone()
+    contacts = [
+        {
+            "contact": r[0],
+            "transport": r[1],
+            "enabled": bool(r[2]),
+            "opted_out": r[3] is not None,
+        }
+        for r in conn.execute(
+            "SELECT ref, transport, enabled, opted_out_at FROM contact_points"
+            " WHERE recipient_id = ? ORDER BY id",
+            (row_id,),
+        )
+    ]
+    return {
+        "recipient": ref,
+        "enabled": bool(enabled),
+        "created_at": created,
+        "untrusted": {"display_name": name},
+        "contacts": contacts,
+    }
+
+
+def list_recipients(
+    conn: Any, *, limit: int, before: int | None = None
+) -> tuple[list[dict[str, Any]], int | None]:
+    items, more = _page(
+        conn,
+        "SELECT id, ref, enabled, display_name FROM recipients WHERE id < ?"
+        " ORDER BY id DESC LIMIT ?",
+        ("recipient", "enabled", "display_name"),
+        limit=limit,
+        before=before,
+    )
+    return [
+        {
+            "recipient": i["recipient"],
+            "enabled": bool(i["enabled"]),
+            "untrusted": {"display_name": i["display_name"]},
+        }
+        for i in items
+    ], more

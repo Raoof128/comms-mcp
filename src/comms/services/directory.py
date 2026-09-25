@@ -31,6 +31,13 @@ def _name(name: object) -> str:
     return name
 
 
+def _ref(value: object, prefix: str) -> str:
+    """A ref of one kind, or NOT_FOUND before anything is recorded (D16)."""
+    if not isinstance(value, str) or not value.startswith(prefix):
+        raise CommsError("NOT_FOUND")
+    return value
+
+
 class DirectoryService:
     def __init__(self, writer: AuditWriter, executor: MutationExecutor) -> None:
         self._writer, self._executor = writer, executor
@@ -143,6 +150,67 @@ class DirectoryService:
             }
 
         return mapped(resolve)  # type: ignore[no-any-return]
+
+    # -- people (catalog amendment G2) ---------------------------------------------------
+
+    def recipient_create(
+        self, ctx: CallContext, display_name: str, request_id: str
+    ) -> dict[str, Any]:
+        label = _name(display_name)
+        return run_local(
+            self._executor,
+            ctx,
+            "comms_directory_recipient_create",
+            {},
+            {"display_name": label},
+            request_id,
+            lambda tx: {
+                "recipient": d.add_recipient_in_tx(tx.conn, now=tx.now, display_name=label)
+            },
+        )
+
+    def recipient_update(
+        self, ctx: CallContext, recipient: str, display_name: str, request_id: str
+    ) -> dict[str, Any]:
+        label = _name(display_name)
+        return run_local(
+            self._executor,
+            ctx,
+            "comms_directory_recipient_update",
+            {"recipient": _ref(recipient, "rcp_")},
+            {"display_name": label},
+            request_id,
+            effect(lambda tx: d.set_display_name_in_tx(tx.conn, recipient, label)),
+        )
+
+    def recipient_enable(self, ctx: CallContext, recipient: str, request_id: str) -> dict[str, Any]:
+        return self._recipient_enabled(ctx, "enable", recipient, True, request_id)
+
+    def recipient_disable(
+        self, ctx: CallContext, recipient: str, request_id: str
+    ) -> dict[str, Any]:
+        return self._recipient_enabled(ctx, "disable", recipient, False, request_id)
+
+    def recipient_get(self, recipient: str) -> dict[str, Any]:
+        return mapped(lambda: views.recipient_view(self._writer.conn, recipient))  # type: ignore[no-any-return]
+
+    def recipient_list(self, *, limit: int = 50, cursor: str | None = None) -> dict[str, Any]:
+        size, before = page_args(limit, cursor)
+        items, more = views.list_recipients(self._writer.conn, limit=size, before=before)
+        return {"items": items, "next_cursor": next_cursor(more)}
+
+    def _recipient_enabled(
+        self, ctx: CallContext, verb: str, recipient: str, enabled: bool, request_id: str
+    ) -> dict[str, Any]:
+        return run_local(
+            self._executor,
+            ctx,
+            f"comms_directory_recipient_{verb}",
+            {"recipient": _ref(recipient, "rcp_")},
+            {},
+            request_id,
+            effect(lambda tx: d.set_enabled_in_tx(tx.conn, recipient, enabled, now=tx.now)),
+        )
 
     # -- shared ---------------------------------------------------------------------------
 

@@ -42,6 +42,9 @@ _NAMES = frozenset(
         "comms_group_admins_list",
         "comms_context_get",
         "comms_group_context",
+        # catalog amendment G2: people's labels, owner-typed but model-visible
+        "comms_directory_recipient_list",
+        "comms_directory_recipient_get",
     }
 )
 _IDENTITY = frozenset({"comms_admin_identity_inspect"})

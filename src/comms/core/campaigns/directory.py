@@ -47,6 +47,7 @@ __all__ = [
     "remove_location_member_in_tx",
     "rename",
     "rename_in_tx",
+    "set_display_name_in_tx",
     "set_enabled",
     "set_enabled_in_tx",
 ]
@@ -190,18 +191,33 @@ def add_destination(
         )
 
 
+def _display_name(display_name: object) -> str:
+    """A person's label (D7): 1–200 characters after trimming; the one rule."""
+    if not isinstance(display_name, str) or not 0 < len(display_name.strip()) <= 200:
+        raise DirectoryError("display name refused")
+    return display_name.strip()
+
+
 def add_recipient_in_tx(conn: Any, *, now: datetime, display_name: str | None = None) -> str:
     require_tx(conn)
-    if display_name is not None and (
-        not isinstance(display_name, str) or not 0 < len(display_name.strip()) <= 200
-    ):
-        raise DirectoryError("display name refused")
+    label = None if display_name is None else _display_name(display_name)
     ref, stamp = refs.mint("recipient"), timeutil.iso(now)
     conn.execute(
         "INSERT INTO recipients (ref, display_name, created_at) VALUES (?, ?, ?)",
-        (ref, display_name.strip() if display_name else None, stamp),
+        (ref, label, stamp),
     )
     return ref
+
+
+def set_display_name_in_tx(conn: Any, recipient_ref: str, display_name: str) -> None:
+    """A person's new label (G2); the ref never changes."""
+    require_tx(conn)
+    _kind(recipient_ref, {"recipient"})
+    label = _display_name(display_name)
+    conn.execute(
+        "UPDATE recipients SET display_name = ? WHERE id = ?",
+        (label, _id(conn, "recipient", recipient_ref)),
+    )
 
 
 def add_recipient(conn: Any, *, now: datetime, display_name: str | None = None) -> str:
