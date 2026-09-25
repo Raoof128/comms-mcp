@@ -545,3 +545,16 @@
   - `grp_` refs are not in backups.
   - The local tag `comms-v0.3-d39-pre` is not pushed; merge and push need the owner's approval.
   - No production claim.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Catalog amendment G6a. The last gauntlet re-checked the actor matrix against the live 2026 developer docs (branch `comms-v0.3-catalog`).
+- **Summary:** No cell flips between A and B. All 30 cited Bot API methods (10.3, 2026-08-24) and all 47 cited MTProto methods exist; the forum-topic requests are `messages.*`, matching Telethon 1.45.0 (layer 229). Meta confirms the WhatsApp gaps (edit and delete are non-supported in groups; the Message History Events API is status-only). Recorded for the builders:
+  - `getChatAdministrators(return_bots=True)`;
+  - a WhatsApp pin requires `expiration_days`;
+  - a group holds at most 8 participants.
+
+  **Found:** the Graph API pin (v21.0) expires on 2027-01-21. G9 now moves it.
+- **Files changed:** `docs/verification/comms-v0.3-actor-matrix.md`, `docs/verification/comms-v0.3-rulings.md` (R-G6a-docs), `docs/superpowers/plans/2026-09-25-comms-v0.3-catalog-amendment.md` (G9), `tests/core/providers/test_actor_matrix.py` (+1 test), the ledger, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** The raw doc pages were fetched and grepped; the full gate passed (GATE ok=1).
+- **Follow-ups:** The owner rules whether member tags, reaction moderation and WhatsApp `health_status` join the catalog (they are outside A45). G9 bumps the Graph version.

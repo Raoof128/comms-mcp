@@ -24,9 +24,9 @@ only a genuine API gap is `B`, reported by that actor's capability as `PROVIDER_
 - **by behaviour:** each tool goes through the real dispatcher for each Telegram actor alone. `A done` succeeds; `B` and `A todo` are refused with no provider call. A `B` refusal is `PROVIDER_UNSUPPORTED`, or `NOT_CONFIGURED` when the only capable actor is not configured.
 
 **Sources.**
-- **Bot API:** the Bot API 9.x method list (`core.telegram.org/bots/api`).
-- **MTProto:** Telethon 1.45.0's TL layer (`functions.*`).
-- **WhatsApp Cloud API:** Graph API v21.0 (`developers.facebook.com/documentation/business-messaging/whatsapp`). The Groups API reference (read 2026-09-25) supports:
+- **Bot API:** Bot API 10.3 (24 August 2026), `core.telegram.org/bots/api` and its changelog; re-checked 2026-09-26.
+- **MTProto:** Telethon 1.45.0's TL layer 229 (`functions.*`); every cited method re-checked against `core.telegram.org/methods` and its method page on 2026-09-26 (forum topics are `messages.*`, taking an `InputPeer`).
+- **WhatsApp Cloud API:** the code pins Graph API v21.0 (`developers.facebook.com/documentation/business-messaging/whatsapp`), which **expires 21 January 2027**; Meta's current examples use v26.0 (29 July 2026). The Groups API reference (read 2026-09-25, re-checked 2026-09-26) supports:
   - create and delete a group; get and list groups;
   - update the subject, description and photo;
   - get and reset the invite link;
@@ -34,7 +34,7 @@ only a genuine API gap is `B`, reported by that actor's capability as `PROVIDER_
   - list, approve and reject join requests;
   - send to a group (text, media, templates); pin and unpin.
 
-  It explicitly does **not** support admin promotion or demotion, or direct participant addition. Group messaging documents no reply-with-context, mark-read, edit, delete or forward.
+  It explicitly does **not** support admin promotion or demotion, or direct participant addition; its quick facts list "Non-supported actions: Admin hide group participant list, Edit message, Delete message". Group messaging documents no reply-with-context, mark-read or forward. A group holds at most 8 participants, and a removal takes at most 8. The Message History Events API (`GET /{message_history_id}/events`) returns delivery statuses only, never message content, so it is not a history method.
 
 MTProto rows cover both a basic group (`messages.*`) and a supergroup or channel (`channels.*`); the adapter picks by peer type.
 
@@ -47,7 +47,7 @@ MTProto rows cover both a basic group (`messages.*`) and a supergroup or channel
 | `comms_message_edit` | A done [message.edit]: `editMessageText` | A done [message.edit]: `messages.editMessage` | B [message.edit]: the Groups API lists edit as unsupported |
 | `comms_message_delete` | A done [message.delete]: `deleteMessage` | A done [message.delete]: `messages.deleteMessages` / `channels.deleteMessages` | B [message.delete]: the Groups API lists delete as unsupported |
 | `comms_message_forward` | A todo:G7 [message.forward]: `forwardMessage` | A todo:G7 [message.forward]: `messages.forwardMessages` (`random_id`) | B [message.forward]: the Groups API documents no forward |
-| `comms_message_pin` / `comms_message_unpin` | A done [message.pin]: `pinChatMessage` / `unpinChatMessage` | A done [message.pin]: `messages.updatePinnedMessage` | A todo:G8 [message.pin]: group message pin (Groups messaging: admin-only, max 3) |
+| `comms_message_pin` / `comms_message_unpin` | A done [message.pin]: `pinChatMessage` / `unpinChatMessage` | A done [message.pin]: `messages.updatePinnedMessage` | A todo:G8 [message.pin]: `POST /{phone}/messages` (`recipient_type: group`, `type: pin`, `pin.type` pin/unpin; `expiration_days` 1–30 is required to pin; admin-only, at most 3 pinned) |
 | `comms_message_mark_read` | — : addressed to a person's conversation; bots have no read state (`readBusinessMessage` is for business connections only) | A todo:G6 [message.mark_read]: `messages.readHistory` on the person's private chat (the tool is conversation-addressed; today only WhatsApp) | A done [message.mark_read]: `POST /{phone}/messages` `status: read` (1:1 chats; the Groups API documents no group mark-read) |
 
 ## Context (reads through `ContextEngine`)
@@ -68,7 +68,7 @@ MTProto rows cover both a basic group (`messages.*`) and a supergroup or channel
 |---|---|---|---|
 | `comms_group_members_list` | B [member.list]: the Bot API has no member list (only `getChatMember` per user, `getChatAdministrators`) | A done [member.list]: `channels.getParticipants` / `messages.getFullChat` | A todo:G8 [group.members]: `GET /{group_id}?fields=participants` |
 | `comms_group_members_get` | A todo:G6 [member.get]: `getChatMember` | A todo:G6 [member.get]: `channels.getParticipant` / `messages.getFullChat` | A todo:G8 [group.members]: `GET /{group_id}?fields=participants` (filtered) |
-| `comms_group_admins_list` | A todo:G6 [admin.list]: `getChatAdministrators` (the gauntlet found it unreachable: the engine derives admins from a member page, which the Bot API cannot produce) | A done [admin.list]: `channels.getParticipants(filter=admins)` | B [admin.list]: the Groups API exposes no admin roles |
+| `comms_group_admins_list` | A todo:G6 [admin.list]: `getChatAdministrators(return_bots=True)`, since other bots are omitted by default since Bot API 10.0 (the gauntlet found it unreachable: the engine derives admins from a member page, which the Bot API cannot produce) | A done [admin.list]: `channels.getParticipants(filter=admins)` | B [admin.list]: the Groups API exposes no admin roles |
 | `comms_group_member_add` | B [member.add]: bots cannot add users (invite links only) | A done [member.add]: `channels.inviteToChannel` / `messages.addChatUser` | B [member.add]: the Groups API has no direct participant addition (invite link only) |
 | `comms_group_member_invite` | A done [invite.create]: `createChatInviteLink` | A done [invite.create]: `messages.exportChatInvite` | A done [group.invite.get]: `GET /{group_id}/invite_link` |
 | `comms_group_member_remove` | A done [member.remove]: `banChatMember` then `unbanChatMember` (saga) | A done [member.remove]: `channels.editBanned` / `messages.deleteChatUser` | A done [group.member.remove]: `DELETE /{group_id}/participants` |
@@ -104,8 +104,8 @@ MTProto rows cover both a basic group (`messages.*`) and a supergroup or channel
 |---|---|---|---|
 | `comms_account_profile` | A todo:G8 [account.inspect]: `getMe` | A todo:G8 [account.inspect]: `users.getFullUser(self)` | A todo:G8 [account.inspect]: `GET /{phone}/whatsapp_business_profile` |
 | `comms_account_status` / `comms_account_capabilities` / `comms_telegram_*_status` / `comms_whatsapp_account_status` | A done: capability snapshot (`getMe`, rights) | A done: session readiness, `users.getUsers(self)` | A done [account.inspect]: `GET /{waba}` |
-| `comms_whatsapp_phone_status` | — : a WhatsApp account tool | — : a WhatsApp account tool | A todo:G8 [phone_number.inspect]: `GET /{phone}` (quality, status) |
-| `comms_media_upload` | B [media.upload]: the Bot API has no standalone upload (files upload only inside a send) | A todo:G8 [media.upload]: `upload.saveFilePart` → `messages.uploadMedia` | A todo:G8 [media.upload]: `POST /{phone}/media` (multipart) |
+| `comms_whatsapp_phone_status` | — : a WhatsApp account tool | — : a WhatsApp account tool | A todo:G8 [phone_number.inspect]: `GET /{phone}?fields=` (`quality_rating`, `status`, `name_status`, `code_verification_status`) |
+| `comms_media_upload` | B [media.upload]: the Bot API has no standalone upload (files upload only inside a send) | A todo:G8 [media.upload]: `upload.saveFilePart` → `messages.uploadMedia` | A todo:G8 [media.upload]: `POST /{phone}/media` (multipart; Meta allows up to 100 MB documents, but the `upl_` stage caps at 16 MiB) |
 | `comms_media_download` | A todo:G8 [media.retrieve]: `getFile` + file download | A todo:G8 [media.retrieve]: `upload.getFile` | A todo:G8 [media.retrieve]: `GET /{media_id}` → bounded Meta-URL download |
 | `comms_media_inspect` / `comms_media_delete` | — : WhatsApp media by `med_` id (Telegram files are message attachments, G8) | — : WhatsApp media by `med_` id (Telegram files are message attachments, G8) | A done [media.delete]: `GET` / `DELETE /{media_id}` |
 | `comms_whatsapp_template_*` | — : a WhatsApp account tool | — : a WhatsApp account tool | A done [template.list]/[template.get]/[template.create]/[template.edit]/[template.delete]: `/{waba}/message_templates` |
@@ -115,3 +115,18 @@ MTProto rows cover both a basic group (`messages.*`) and a supergroup or channel
 ## Local tools (no provider actor)
 
 `comms_capability_list`, `comms_group_list`, `comms_group_get`, every `comms_campaign_*`, `comms_location_*` and `comms_audience_*` tool, `comms_admin_identity_inspect`, and the `comms_directory_*` and `comms_context_person` tools that G2–G5 add. These read or write `comms.db` only. A campaign's delivery goes through the transports' delivery adapters, not these tools.
+
+## Checked against the 2026 developer docs (2026-09-26)
+
+Every cell was re-checked against the live docs. None flipped between A and B. What changed or was learned:
+
+- **Confirmed B cells.** The Bot API still has no member list, admin log, invite-link or topic listing, history or search. Cloud API edit and delete in groups are listed as non-supported.
+- **Confirmed methods.** All 30 cited bot methods and all 47 cited MTProto methods exist. `exportChatInviteLink` revokes the previous primary link, as the invite-revoke variant row assumes.
+- **Details for the builders.**
+  - G6: `getChatAdministrators` needs `return_bots=True` to list other bot admins.
+  - G8: WhatsApp pin needs `expiration_days`; groups cap at 8 participants.
+  - G9: the Graph API pin (v21.0) expires on 21 January 2027 and must move to a current version before release.
+- **New admin surface outside the A45 catalog** (an owner decision; no tool addresses these today):
+  - member tags: Bot API `setChatMemberTag` with the `can_manage_tags` right (9.5); MTProto `messages.editChatParticipantRank`;
+  - reaction moderation: Bot API `deleteMessageReaction` / `deleteAllMessageReactions` (10.0); MTProto `messages.deleteParticipantReaction(s)`;
+  - WhatsApp `health_status`: a messaging-health summary for the phone number, WABA and business.

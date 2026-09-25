@@ -132,3 +132,13 @@ def test_the_open_work_is_named_by_task():
     assert all(
         kind in ("A todo:G1", "A todo:G6", "A todo:G7", "A todo:G8") for *_x, kind in todo
     ), todo
+
+
+def test_the_matrix_names_the_pinned_graph_version():
+    """The 2026-docs gauntlet: the matrix's WhatsApp sources name the Graph version the code pins,
+    so moving the pin (G9: v21.0 expires on 2027-01-21) cannot leave the evidence behind."""
+    from comms.transports.whatsapp.cloud.http import API_VERSION
+
+    sources = MATRIX.read_text(encoding="utf-8").split("## Messages", 1)[0]
+    assert f"Graph API {API_VERSION}" in sources, API_VERSION
+    assert "Bot API 10.3" in sources
