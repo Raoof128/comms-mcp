@@ -14,7 +14,14 @@ only a genuine API gap is `B`, reported by that actor's capability as `PROVIDER_
 - `B [capability] (groups): <reason>` means the capability exists for this actor in 1:1 chats, but
   not for the group-addressed tool; the tool refuses for this actor;
 - `A done (local)` and `A todo:G<n> (local)` mean served from comms' own retained data (the bot's
-  updates, the webhook archive), with no provider capability to hold.
+  updates, the webhook archive), with no provider capability to hold;
+- `— : <reason>` means the tool is not addressed to this actor at all (a WhatsApp account tool, a
+  conversation-addressed tool); it answers by its own transport's configuration.
+
+**How it is proved.** `tests/core/providers/test_actor_matrix.py` checks the claims three ways:
+- **against `SUPPORT`;**
+- **against the libraries:** every cited Telethon request exists, every implemented bot method is one the bot adapters use, and every implemented user request is pinned;
+- **by behaviour:** each tool goes through the real dispatcher for each Telegram actor alone. `A done` succeeds; `B` and `A todo` are refused with no provider call. A `B` refusal is `PROVIDER_UNSUPPORTED`, or `NOT_CONFIGURED` when the only capable actor is not configured.
 
 **Sources.**
 - **Bot API:** the Bot API 9.x method list (`core.telegram.org/bots/api`).
@@ -41,14 +48,16 @@ MTProto rows cover both a basic group (`messages.*`) and a supergroup or channel
 | `comms_message_delete` | A done [message.delete]: `deleteMessage` | A done [message.delete]: `messages.deleteMessages` / `channels.deleteMessages` | B [message.delete]: the Groups API lists delete as unsupported |
 | `comms_message_forward` | A todo:G7 [message.forward]: `forwardMessage` | A todo:G7 [message.forward]: `messages.forwardMessages` (`random_id`) | B [message.forward]: the Groups API documents no forward |
 | `comms_message_pin` / `comms_message_unpin` | A done [message.pin]: `pinChatMessage` / `unpinChatMessage` | A done [message.pin]: `messages.updatePinnedMessage` | A todo:G8 [message.pin]: group message pin (Groups messaging: admin-only, max 3) |
-| `comms_message_mark_read` | B [message.mark_read]: bots have no read state (`readBusinessMessage` is for business connections only) | A todo:G6 [message.mark_read]: `messages.readHistory` / `channels.readHistory` | A done [message.mark_read]: `POST /{phone}/messages` `status: read` (1:1 chats; the Groups API documents no group mark-read) |
+| `comms_message_mark_read` | — : addressed to a person's conversation; bots have no read state (`readBusinessMessage` is for business connections only) | A todo:G6 [message.mark_read]: `messages.readHistory` on the person's private chat (the tool is conversation-addressed; today only WhatsApp) | A done [message.mark_read]: `POST /{phone}/messages` `status: read` (1:1 chats; the Groups API documents no group mark-read) |
 
 ## Context (reads through `ContextEngine`)
 
 | Tool | telegram_bot | telegram_user | whatsapp_cloud |
 |---|---|---|---|
 | `comms_context_recent` / `comms_context_page` / `comms_message_recent` | A done (local): the bot's retained updates (`telegram_local`; the Bot API has no history method) | A done [history.read]: `messages.getHistory` | A todo:G1 (local): the comms webhook archive (`whatsapp_webhook_archive`; the Cloud API has no history method) |
-| `comms_context_get` / `comms_message_get` / `comms_group_context` | A done (local): `getChat`, `getChatAdministrators`, `getChatMemberCount` + retained updates | A done [history.read]: `messages.getMessages` / `channels.getMessages`, participants | A todo:G1 (local): the archive + `GET /{group_id}` |
+| `comms_context_get` | A done (local): the bot's retained updates | A done [history.read]: `messages.getHistory` | A todo:G1 (local): the archive |
+| `comms_message_get` | A todo:G6 (local): one retained update by id (the gauntlet found `message.get` refused for the bot: the engine asks for a kind `BotContext` does not serve) | A done [history.read]: `messages.getMessages` / `channels.getMessages` | A todo:G1 (local): one archived message by id |
+| `comms_group_context` | A todo:G6 (local): `getChat`, `getChatAdministrators` + retained updates (the gauntlet found it refused for the bot: admins are derived from a member page the Bot API cannot produce) | A done [history.read]: `messages.getHistory`, `channels.getParticipants` | A todo:G1 (local): the archive + `GET /{group_id}` |
 | `comms_context_around_message` / `comms_context_thread` / `comms_message_context` | B [history.read]: the Bot API has no history or thread method; only retained updates, which carry no thread index | A done [history.read]: `messages.getHistory` (offset), `messages.getReplies` | B [history.read]: the Cloud API has no history method; the archive has no thread index |
 | `comms_context_search` / `comms_message_search` | B [history.search]: the Bot API has no search | A done [history.search]: `messages.search` | B [history.search]: the Cloud API has no search |
 | `comms_context_summarize_source` | A done: local (what each source can serve) | A done: local | A done: local |
@@ -59,7 +68,7 @@ MTProto rows cover both a basic group (`messages.*`) and a supergroup or channel
 |---|---|---|---|
 | `comms_group_members_list` | B [member.list]: the Bot API has no member list (only `getChatMember` per user, `getChatAdministrators`) | A done [member.list]: `channels.getParticipants` / `messages.getFullChat` | A todo:G8 [group.members]: `GET /{group_id}?fields=participants` |
 | `comms_group_members_get` | A todo:G6 [member.get]: `getChatMember` | A todo:G6 [member.get]: `channels.getParticipant` / `messages.getFullChat` | A todo:G8 [group.members]: `GET /{group_id}?fields=participants` (filtered) |
-| `comms_group_admins_list` | A done [admin.list]: `getChatAdministrators` | A done [admin.list]: `channels.getParticipants(filter=admins)` | B [admin.list]: the Groups API exposes no admin roles |
+| `comms_group_admins_list` | A todo:G6 [admin.list]: `getChatAdministrators` (the gauntlet found it unreachable: the engine derives admins from a member page, which the Bot API cannot produce) | A done [admin.list]: `channels.getParticipants(filter=admins)` | B [admin.list]: the Groups API exposes no admin roles |
 | `comms_group_member_add` | B [member.add]: bots cannot add users (invite links only) | A done [member.add]: `channels.inviteToChannel` / `messages.addChatUser` | B [member.add]: the Groups API has no direct participant addition (invite link only) |
 | `comms_group_member_invite` | A done [invite.create]: `createChatInviteLink` | A done [invite.create]: `messages.exportChatInvite` | A done [group.invite.get]: `GET /{group_id}/invite_link` |
 | `comms_group_member_remove` | A done [member.remove]: `banChatMember` then `unbanChatMember` (saga) | A done [member.remove]: `channels.editBanned` / `messages.deleteChatUser` | A done [group.member.remove]: `DELETE /{group_id}/participants` |
@@ -79,11 +88,12 @@ MTProto rows cover both a basic group (`messages.*`) and a supergroup or channel
 | `comms_group_info_set_photo` | A todo:G8 [chat.set_photo]: `setChatPhoto` (multipart) | A todo:G8 [chat.set_photo]: `upload.saveFilePart` → `channels.editPhoto` / `messages.editChatPhoto` | A todo:G8 [group.settings.update]: `POST /{group_id}` (profile photo) |
 | `comms_group_invite_create` / `comms_group_invite_edit` | A done [invite.create]/[invite.edit]: `createChatInviteLink` / `editChatInviteLink` | A done [invite.create]/[invite.edit]: `messages.exportChatInvite` / `messages.editExportedChatInvite` | B [invite.create]/[invite.edit]: one invite link per group, which the Groups API can only reset |
 | `comms_group_invite_revoke` | A done [invite.revoke]: `revokeChatInviteLink` | A done [invite.revoke]: `messages.editExportedChatInvite(revoked=True)` | A done [group.invite.reset]: `POST /{group_id}/invite_link` |
+| `comms_group_invite_revoke` (variant: no invite given, reset the primary link) | A todo:G6 [invite.revoke]: `exportChatInviteLink` (a new primary link revokes the old) | A todo:G6 [invite.revoke]: `messages.exportChatInvite(legacy_revoke_permanent=True)` | A done [group.invite.reset]: `POST /{group_id}/invite_link` |
 | `comms_group_invite_list` | B [invite.list]: the Bot API has no invite-link listing | A todo:G6 [invite.list]: `messages.getExportedChatInvites` | A todo:G8 [group.invite.get]: `GET /{group_id}/invite_link` (the one link) |
 | `comms_group_join_requests_list` | A todo:G6 (local): retained `chat_join_request` updates (`telegram_local`; the Bot API has no list method) | A todo:G6 [join_request.list]: `messages.getChatInviteImporters(requested=True)` | A todo:G8 [join_request.list]: `GET /{group_id}/join_requests` |
 | `comms_group_join_requests_approve` / `comms_group_join_requests_reject` | A done [join_request.approve]/[join_request.reject]: `approveChatJoinRequest` / `declineChatJoinRequest` | A done: `messages.hideChatJoinRequest(approved=…)` | A todo:G8 [join_request.approve]/[join_request.reject]: `POST` / `DELETE /{group_id}/join_requests` |
-| `comms_group_topic_list` / `comms_group_topic_get` | B [topic.list]: the Bot API has no forum-topic listing | A todo:G6 [topic.list]: `channels.getForumTopics` / `channels.getForumTopicsByID` | B [topic.list]: WhatsApp groups have no topics |
-| `comms_group_topic_create` / `comms_group_topic_edit` / `comms_group_topic_close` / `comms_group_topic_reopen` | A done [topic.create]/[topic.edit]/[topic.close]/[topic.reopen]: `createForumTopic` / `editForumTopic` / `closeForumTopic` / `reopenForumTopic` | A done: `channels.createForumTopic` / `channels.editForumTopic` | B [topic.create]: WhatsApp groups have no topics |
+| `comms_group_topic_list` / `comms_group_topic_get` | B [topic.list]: the Bot API has no forum-topic listing | A todo:G6 [topic.list]: `messages.getForumTopics` / `messages.getForumTopicsByID` | B [topic.list]: WhatsApp groups have no topics |
+| `comms_group_topic_create` / `comms_group_topic_edit` / `comms_group_topic_close` / `comms_group_topic_reopen` | A done [topic.create]/[topic.edit]/[topic.close]/[topic.reopen]: `createForumTopic` / `editForumTopic` / `closeForumTopic` / `reopenForumTopic` | A done [topic.create]/[topic.edit]/[topic.close]/[topic.reopen]: `messages.createForumTopic` / `messages.editForumTopic` | B [topic.create]: WhatsApp groups have no topics |
 | `comms_group_create` | B [group.create]: bots cannot create chats | A todo:G7 [group.create]: `messages.createChat` / `channels.createChannel` (+ `forum`) | A todo:G8 [group.create]: `POST /{phone}/groups` |
 | `comms_group_delete` | B [group.delete]: bots cannot delete chats | A done [group.delete]: `channels.deleteChannel` / `messages.deleteChat` | A todo:G8 [group.delete]: `DELETE /{group_id}` |
 | `comms_group_migrate` | B [group.migrate]: bots cannot migrate a group | A done [group.migrate]: `messages.migrateChat` | B [group.migrate]: WhatsApp groups have no supergroup form |
@@ -94,12 +104,12 @@ MTProto rows cover both a basic group (`messages.*`) and a supergroup or channel
 |---|---|---|---|
 | `comms_account_profile` | A todo:G8 [account.inspect]: `getMe` | A todo:G8 [account.inspect]: `users.getFullUser(self)` | A todo:G8 [account.inspect]: `GET /{phone}/whatsapp_business_profile` |
 | `comms_account_status` / `comms_account_capabilities` / `comms_telegram_*_status` / `comms_whatsapp_account_status` | A done: capability snapshot (`getMe`, rights) | A done: session readiness, `users.getUsers(self)` | A done [account.inspect]: `GET /{waba}` |
-| `comms_whatsapp_phone_status` | B [phone_number.inspect]: WhatsApp only | B [phone_number.inspect]: WhatsApp only | A todo:G8 [phone_number.inspect]: `GET /{phone}` (quality, status) |
+| `comms_whatsapp_phone_status` | — : a WhatsApp account tool | — : a WhatsApp account tool | A todo:G8 [phone_number.inspect]: `GET /{phone}` (quality, status) |
 | `comms_media_upload` | B [media.upload]: the Bot API has no standalone upload (files upload only inside a send) | A todo:G8 [media.upload]: `upload.saveFilePart` → `messages.uploadMedia` | A todo:G8 [media.upload]: `POST /{phone}/media` (multipart) |
 | `comms_media_download` | A todo:G8 [media.retrieve]: `getFile` + file download | A todo:G8 [media.retrieve]: `upload.getFile` | A todo:G8 [media.retrieve]: `GET /{media_id}` → bounded Meta-URL download |
-| `comms_media_inspect` / `comms_media_delete` | B [media.delete]: Telegram files cannot be deleted by id | B [media.delete]: as for the bot | A done [media.delete]: `GET` / `DELETE /{media_id}` |
-| `comms_whatsapp_template_*` | B [template.list]: WhatsApp only | B [template.list]: WhatsApp only | A done [template.list]/[template.get]/[template.create]/[template.edit]/[template.delete]: `/{waba}/message_templates` |
-| `comms_whatsapp_webhook_status` | B: WhatsApp only | B: WhatsApp only | A done: the local inbox counts |
+| `comms_media_inspect` / `comms_media_delete` | — : WhatsApp media by `med_` id (Telegram files are message attachments, G8) | — : WhatsApp media by `med_` id (Telegram files are message attachments, G8) | A done [media.delete]: `GET` / `DELETE /{media_id}` |
+| `comms_whatsapp_template_*` | — : a WhatsApp account tool | — : a WhatsApp account tool | A done [template.list]/[template.get]/[template.create]/[template.edit]/[template.delete]: `/{waba}/message_templates` |
+| `comms_whatsapp_webhook_status` | — : a local report on the WhatsApp webhook inbox | — : a local report on the WhatsApp webhook inbox | A done: the local inbox counts |
 | `comms_capability_get` / `comms_capability_for_group` / `comms_capability_for_actor` / `comms_capability_refresh` / `comms_group_capabilities` | A done: capability service | A done: capability service | A done: capability service |
 
 ## Local tools (no provider actor)

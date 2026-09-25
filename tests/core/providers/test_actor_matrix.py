@@ -20,7 +20,7 @@ from comms.mcp.catalog import TOOL_CATALOG
 ROOT = Path(__file__).resolve().parents[3]
 MATRIX = ROOT / "docs" / "verification" / "comms-v0.3-actor-matrix.md"
 ACTORS = ("telegram_bot", "telegram_user", "whatsapp_cloud")
-KIND = re.compile(r"^(A done|A todo:G\d+[a-z]?|B)\b")
+KIND = re.compile(r"^(A done|A todo:G\d+[a-z]?|B\b|— :)")
 CATALOG = {spec.name for spec in TOOL_CATALOG}
 
 
@@ -34,11 +34,15 @@ def _names(cell):
     return found
 
 
-def _rows():
+def _rows(*, variants=True):
+    """``(tool names, {actor: cell})``; a ``(variant: …)`` row is one way of calling a tool
+    another row already covers (its work still counts toward G9's none-left rule)."""
     text = MATRIX.read_text(encoding="utf-8")
     for line in text.splitlines():
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
         if len(cells) == 4 and cells[0].startswith("`comms_"):
+            if "(variant:" in cells[0] and not variants:
+                continue
             yield _names(cells[0]), dict(zip(ACTORS, cells[1:], strict=True))
 
 
@@ -78,6 +82,44 @@ def test_the_matrix_agrees_with_what_the_code_supports():
                     assert actor in SUPPORT[capability], (sorted(names), actor, capability)
                 elif cell.startswith("B") and "(groups)" not in cell.split(":", 1)[0]:
                     assert actor not in SUPPORT[capability], (sorted(names), actor, capability)
+
+
+def test_every_cited_method_is_real():
+    """Gauntlet layer 2: the libraries. Cited Telethon requests exist in 1.45.0; an implemented
+    bot method is one the bot adapters use; an implemented user request is pinned (A21)."""
+    from telethon.tl import functions
+
+    from comms.transports.telegram.telegram.telethon_adapter import (
+        ADMIN_RPCS,
+        READ_RPCS,
+        UPDATE_RPCS,
+        WRITE_RPCS,
+    )
+
+    pinned = {r for m in (READ_RPCS, WRITE_RPCS, ADMIN_RPCS) for rs in m.values() for r in rs}
+    pinned |= set(UPDATE_RPCS)
+    bot_src = "".join(
+        p.read_text() for p in (ROOT / "src/comms/transports/telegram/bot").glob("*.py")
+    )
+    for names, cells in _rows():
+        for actor, cell in cells.items():
+            if cell.startswith(("B", "—")):
+                continue
+            body = cell.split(":", 2)[-1] if cell.startswith("A todo") else cell.split(":", 1)[1]
+            for method in re.findall(r"`([A-Za-z_.]+)(?:\([^`]*\))?`", body):
+                if actor == "telegram_user" and "." in method and method[0].islower():
+                    module, name = method.split(".", 1)
+                    request = f"{name[0].upper()}{name[1:]}Request"
+                    assert hasattr(getattr(functions, module, None), request), (min(names), method)
+                    if cell.startswith("A done") and "(local)" not in cell:
+                        assert f"{module}.{request}" in pinned, (min(names), method)
+                if (
+                    actor == "telegram_bot"
+                    and cell.startswith("A done")
+                    and "(local)" not in cell
+                    and re.fullmatch(r"[a-z][A-Za-z]+", method)
+                ):
+                    assert f'"{method}"' in bot_src, (min(names), method)
 
 
 def test_the_open_work_is_named_by_task():
