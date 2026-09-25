@@ -221,6 +221,15 @@ Two further limits are not claimed:
   - **Message bodies** may appear **only** in the bounded `untrusted_text` fields of content-bearing read tools (context, message get, recent, around, thread, search).
   - **Bodies never appear** in logs, errors, audit, backup metadata, capability, directory or campaign-preview results, admin-operation results, or OAuth responses.
 
+### Added by the catalog amendment (owner, 2026-09-25)
+
+- **A45. The catalog amendment: a full admin bridge on both Telegram APIs.** Plan `docs/superpowers/plans/2026-09-25-comms-v0.3-catalog-amendment.md`.
+  - **Directory over MCP.** The catalog gains the `comms_directory_*` tools (people, contact points, destinations) and location membership. A provider identity (a phone number, a Telegram user or chat id, a WhatsApp group id) is a validated **input** only, encrypted at rest; it never appears in an output (A44 stands: only `comms_admin_identity_inspect` returns identities). `contact_add`, `destination_create` and `group_create` are host-confirmed consequential writes; Comms authority stays `owner_full_admin`.
+  - **WhatsApp groups are destinations** with `grp_` refs (one per provider group per installation, never re-minted; discovery never creates one), so group tools and context reach them through `whatsapp_cloud`. `comms_context_person` aggregates a person's direct communication (WhatsApp archive, Telegram private chat, campaign and delivery history) with provenance on every item; group activity only when asked, within P §71's bounds.
+  - **Full admin on both APIs.** For every catalog tool and every actor (`telegram_bot`, `telegram_user`, `whatsapp_cloud`), an operation the actor's API implements is implemented, reporting its real capability state; only a genuine API gap reports `PROVIDER_UNSUPPORTED`, named in the actor matrix (`docs/verification/comms-v0.3-actor-matrix.md`). No advertised tool answers `PROVIDER_UNSUPPORTED` unconditionally. None of the 13 tools D30 left not offered is removed.
+  - **Media upload is staged.** `upl_` refs are client- and peer-bound, expiring, single-use, memory-only, capped at 16 MiB and SHA-checked; a small inline `data_b64` (≤ 512 KiB) is a convenience only.
+  - **Backups keep `grp_` refs.** A compatible restore reuses them; a conflicting binding is a staged incompatibility, never a silent rebind.
+
 ## Tombstones added in v0.3
 
 The 10 Telegram MCP tool names, the 6 WhatsVault MCP tool names, `tgml1`, `tg-mcp-policy-bundle/v1` and `tg-mcp-policy-signature/v1`. The legacy audit domains `telegram-mcp-audit-v1` and `telegram-mcp-audit-genesis-v1` are closed to new appends and remain valid for verification. `tests/security/test_tombstones.py` counts each one by name. None is ever reassigned.
