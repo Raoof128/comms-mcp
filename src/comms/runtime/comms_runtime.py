@@ -36,13 +36,15 @@ from comms.services.directory import DirectoryService
 from comms.services.groups import GroupService
 from comms.services.handles import ContextHandles
 from comms.services.identity import IdentityService
+from comms.services.media import MediaService
 from comms.services.messages import MessageService
 from comms.services.mutations import MutationExecutor
+from comms.services.templates import TemplateService
 
 __all__ = ["CommsRuntime", "RemoteConfig", "build_comms_runtime"]
 
 Handler = Callable[[dict[str, Any]], Any]
-_TELEGRAM = ("telegram_bot", "telegram_user")
+_ACTORS = ("telegram_bot", "telegram_user", "whatsapp_cloud")
 
 
 @dataclass(frozen=True)
@@ -109,11 +111,16 @@ def build_comms_runtime(
             writer, executor, adapters.delivery, commit=lambda: commit_context(writer, store)
         ),
         directory=DirectoryService(writer, executor),
-        templates=None,
-        media=None,
+        templates=None
+        if adapters.templates is None
+        else TemplateService(conn, capability, executor, adapters.templates),
+        media=None
+        if adapters.media is None
+        else MediaService(conn, capability, executor, adapters.media),
         account=AccountService(capability, webhooks=_InboxCounts(conn, adapters)),
         identity=IdentityService(conn),
-        actors=tuple(a for a in _TELEGRAM if a in adapters.admin or a in adapters.context),
+        actors=tuple(a for a in _ACTORS if a in adapters.admin or a in adapters.context),
+        account_target=adapters.account,
     )
     dispatcher = Dispatcher(build_registry(services))
     oauth = None

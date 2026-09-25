@@ -26,8 +26,11 @@ _TEMPLATE = ("template", "template_id")
 
 
 class TemplatePageLike(Protocol):
-    items: Sequence[Mapping[str, Any]]
-    next_cursor: str | None
+    @property
+    def items(self) -> Sequence[Mapping[str, Any]]: ...
+
+    @property
+    def next_cursor(self) -> str | None: ...
 
 
 class TemplateSource(Protocol):

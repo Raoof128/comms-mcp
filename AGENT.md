@@ -713,3 +713,11 @@ Follow the user's engineering lifecycle: design/security analysis, implementatio
   - G4 proves a backup round trip of a WhatsApp group's `grp_` (D5);
   - G8 adds the invite GET, participants and `group_context` for WhatsApp;
   - G6 adds the bot's `around` from retained updates.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Catalog amendment G2a. The daemon wires the WhatsApp actor (branch `comms-v0.3-catalog`).
+- **Summary:** `build_comms_runtime` never listed `whatsapp_cloud` as an actor, nor passed WhatsApp template or media services or an account target. In production, WhatsApp groups and the WhatsApp account tools therefore answered `NOT_CONFIGURED`, while tests that built their own services passed. They are now wired from `Adapters`, and the actor-matrix behaviour test goes through the real composition root.
+- **Files changed:** `src/comms/runtime/adapters.py`, `src/comms/runtime/comms_runtime.py`, `tests/runtime/test_comms_runtime_whatsapp.py`, `tests/integration/test_actor_matrix_behaviour.py`, the rulings (R-G2a), the ledger, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 4 new composition tests; the behaviour test was mutation-checked on the actor list; the full gate passed (GATE ok=1).
+- **Follow-ups:** None.

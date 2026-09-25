@@ -19,25 +19,15 @@ import pytest
 
 from comms.core import refs
 from comms.core.campaigns import directory as d
-from comms.core.delivery.commitment import commit_context
 from comms.core.groups import group_ref
 from comms.core.keys import rotate as rot
 from comms.core.objects import object_ref
 from comms.core.providers.capability import CapabilityState as S
 from comms.core.providers.protocols import ProviderTarget
-from comms.mcp.dispatch import AuthenticatedClient, Dispatcher
-from comms.runtime.facades import Services, build_registry
+from comms.mcp.dispatch import AuthenticatedClient
+from comms.runtime.adapters import Adapters
+from comms.runtime.comms_runtime import build_comms_runtime
 from comms.runtime.selftest import _OneSecret
-from comms.services.account import AccountService
-from comms.services.campaigns import CampaignService
-from comms.services.context import ContextEngine
-from comms.services.directory import DirectoryService
-from comms.services.groups import GroupService
-from comms.services.handles import ContextHandles
-from comms.services.identity import IdentityService
-from comms.services.media import MediaService
-from comms.services.messages import MessageService
-from comms.services.templates import TemplateService
 from comms.transports.telegram.bot.context import BotContext
 from comms.transports.telegram.bot.http import BotApi
 from comms.transports.telegram.bot.updates import BotPoller
@@ -47,8 +37,8 @@ from tests.core import fakes
 from tests.core.campaign_helpers import NOW
 from tests.core.providers.test_actor_matrix import CATALOG, _rows
 from tests.services.context_fixtures import Clock, Source
-from tests.services.group_fixtures import WA_PHONE, fixtures, group_world
-from tests.services.test_templates_media_account import ACCOUNT, Media, Templates, WebhookState
+from tests.services.group_fixtures import WA_PHONE, Provider, fixtures, group_world
+from tests.services.test_templates_media_account import ACCOUNT, Media, Templates
 
 CLIENT = AuthenticatedClient(client_ref="cli_" + "a" * 26, auth_kind="cml1")
 ACTORS = ("telegram_bot", "telegram_user", "whatsapp_cloud")
@@ -104,7 +94,7 @@ def _world(actor, tmp_path):
             w["writer"], w["store"], purpose, material=os.urandom(32), prove=lambda m: None, now=NOW
         )
     states = dict.fromkeys(ACTORS, S.NOT_CONFIGURED) | {actor: S.AVAILABLE}
-    capability, executor, admins = fixtures(w, states=states)
+    _capability, _executor, admins = fixtures(w, states=states)
     conn = w["conn"]
     if actor == "whatsapp_cloud":  # its group is a WhatsApp group, read from the archive (G1)
         loc = d.add_location(conn, "WA", now=NOW)
@@ -120,27 +110,27 @@ def _world(actor, tmp_path):
         source = BotContext(api, conn, clock=lambda: NOW)
     else:
         source = Source(provenance="telegram_live")
-    context = ContextEngine(conn, {actor: source}, clock=lambda: NOW, monotonic=Clock(),
-                            capability=capability)  # fmt: skip
-    templates = media = account = None
+    adapters = Adapters(
+        delivery={"whatsapp": fakes.FakeWhatsApp(conn=conn)},
+        capability={a: Provider(states[a]) for a in ACTORS},
+        admin={actor: admins[actor]},  # only this actor is configured
+        context={actor: source},
+    )
     if actor == "whatsapp_cloud":  # the account tools run through the real services too
-        templates = TemplateService(conn, capability, executor, Templates())
-        media, account = MediaService(conn, capability, executor, Media()), ACCOUNT
+        adapters.templates, adapters.media, adapters.account = Templates(), Media(), ACCOUNT
+    # the one composition root the daemon uses (G2 found hand-built services hid its gaps)
+    built = build_comms_runtime(
+        conn, w["writer"], w["store"], adapters, clock=lambda: NOW, monotonic=Clock(),
+        host="127.0.0.1", local_port=8765,
+    )  # fmt: skip
+    assert built.services.actors == (actor,)
+    if actor == "whatsapp_cloud":
         w["media"] = object_ref(conn, "media", "whatsapp", "whatsapp_cloud", None, "7788990011",
                                 now=NOW)  # fmt: skip
         dm = ProviderTarget("whatsapp", "whatsapp_cloud", w["rcp"], WA_PHONE)
-        w["dm_message"] = context.archive(w["rcp"], dm, limit=1)["items"][0]["message_ref"]
-    services = Services(
-        conn=conn, capability=capability, context=context,
-        handles=ContextHandles(conn, w["store"], clock=lambda: NOW),
-        groups=GroupService(conn, capability, executor), messages=MessageService(conn, capability, executor),
-        campaigns=CampaignService(w["writer"], executor, {"whatsapp": fakes.FakeWhatsApp(conn=conn)},
-                                  commit=lambda: commit_context(w["writer"], w["store"])),
-        directory=DirectoryService(w["writer"], executor), templates=templates, media=media,
-        account=AccountService(capability, webhooks=WebhookState()), identity=IdentityService(conn),
-        actors=(actor,), account_target=account,
-    )  # fmt: skip
-    dispatcher = Dispatcher(build_registry(services))
+        page = built.services.context.archive(w["rcp"], dm, limit=1)
+        w["dm_message"] = page["items"][0]["message_ref"]
+    dispatcher = built.dispatcher
     specs = {spec.name: spec for spec in TOOL_CATALOG}
     return w, dispatcher, admins[actor], specs
 

@@ -24,6 +24,7 @@ from comms.core.credentials import (
 )
 from comms.core.delivery.transport import DeliveryTransport
 from comms.core.keys.secrets import SecretStore
+from comms.core.providers.protocols import ProviderTarget
 from comms.transports.telegram.bot.admin import BotAdmin
 from comms.transports.telegram.bot.capability import BotCapability
 from comms.transports.telegram.bot.context import BotContext
@@ -39,7 +40,8 @@ from comms.transports.whatsapp.cloud.account import WhatsAppCapability
 from comms.transports.whatsapp.cloud.delivery import WhatsAppDelivery
 from comms.transports.whatsapp.cloud.groups import GroupDiscovery, WhatsAppAdmin
 from comms.transports.whatsapp.cloud.http import GraphApi
-from comms.transports.whatsapp.cloud.templates import TemplateCatalog
+from comms.transports.whatsapp.cloud.media import MediaOps
+from comms.transports.whatsapp.cloud.templates import TemplateCatalog, TemplateOps
 from comms.transports.whatsapp.webhooks.archive import ArchiveContext
 from comms.transports.whatsapp.webhooks.inbox import Inbox
 from comms.transports.whatsapp.webhooks.ingress import WebhookIngress
@@ -71,6 +73,11 @@ class Adapters:
     poller: BotPoller | None = None  # D39-PRE E5: fills bot_updates, the bot's local context
     listeners: dict[str, Any] = field(default_factory=dict)
     catalog: TemplateCatalog = field(default_factory=TemplateCatalog)
+    # G2 prerequisite: the WhatsApp account's template and media sources, and the WABA target
+    # the account tools act on (templates need the business-account id; media only the number)
+    templates: TemplateOps | None = None
+    media: MediaOps | None = None
+    account: ProviderTarget | None = None
 
     def __repr__(self) -> str:
         return (
@@ -179,6 +186,12 @@ def _whatsapp(
     adapters.capability["whatsapp_cloud"] = WhatsAppCapability(api, discovery, clock=clock)
     adapters.admin["whatsapp_cloud"] = WhatsAppAdmin(api, discovery)
     adapters.delivery["whatsapp"] = WhatsAppDelivery(api, catalog=adapters.catalog)
+    adapters.media = MediaOps(api)
+    if settings.meta_waba_id is not None:
+        adapters.templates = TemplateOps(api)
+        adapters.account = ProviderTarget(
+            "whatsapp", "whatsapp_cloud", "account", f"waba:{settings.meta_waba_id}"
+        )
 
 
 def _webhooks(
