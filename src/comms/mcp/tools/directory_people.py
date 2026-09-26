@@ -1,4 +1,5 @@
-"""The directory's people and their contact points over MCP (catalog amendment G2, G3).
+"""The directory over MCP: people, contact points, destinations and location membership
+(catalog amendment G2–G4).
 
 A person is a ``rcp_`` ref with a label and contact points. Outputs carry the label under
 ``untrusted`` (owner-typed, but it can reach a model as text) and each contact point by its
@@ -158,5 +159,54 @@ DIRECTORY_PEOPLE_TOOLS: tuple[ToolSpec, ...] = (
         {"contact": ref("contact_point")},
         _done(),
         noun="contact",
+    ),
+    # -- destinations and location membership (G4) ---------------------------------------
+    _write(
+        "create",
+        "Add a chat",
+        "Add a chat campaigns and group tools can reach, in a location: a Telegram chat id as "
+        "Telegram gives it (-N a group, -100… a supergroup or channel, N a private chat) or a "
+        "WhatsApp group id as Meta gives it. The id is stored encrypted and never returned; a "
+        "group gets its grp_ ref at once. The host asks first.",
+        {
+            "location": ref("location"),
+            "transport": {"enum": ["telegram", "whatsapp"]},
+            "identity": string(1, 128),
+            "name": _LABEL,
+        },
+        _done(destination=ref("destination"), group=nullable(ref("group"))),
+        idempotent=False,
+        noun="destination",
+        open_world=True,
+    ),
+    _write(
+        "disable",
+        "Disable a chat",
+        "Stop using a chat: campaigns and group tools skip it. Nothing is deleted.",
+        {"destination": ref("destination")},
+        _done(),
+        noun="destination",
+    ),
+    write(
+        "comms_location_member_add",
+        "Add a person to a location",
+        "Add a person to a location, so its campaigns reach them.",
+        "location.member_add",
+        {"location": ref("location"), "recipient": _RECIPIENT},
+        ["location", "recipient"],
+        _done(),
+        idempotent=True,
+        failures=_FAILURES,
+    ),
+    write(
+        "comms_location_member_remove",
+        "Remove a person from a location",
+        "Remove a person from a location; they keep their other locations.",
+        "location.member_remove",
+        {"location": ref("location"), "recipient": _RECIPIENT},
+        ["location", "recipient"],
+        _done(),
+        idempotent=True,
+        failures=_FAILURES,
     ),
 )

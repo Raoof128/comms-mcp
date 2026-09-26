@@ -737,3 +737,11 @@ Follow the user's engineering lifecycle: design/security analysis, implementatio
 - **Files changed:** `src/comms/core/domains.py`, `src/comms/core/campaigns/binding.py` (new), `src/comms/core/campaigns/directory.py`, `src/comms/services/directory.py`, `src/comms/runtime/comms_runtime.py`, `src/comms/runtime/facades.py`, `src/comms/mcp/tools/directory_people.py`, `.claude/settings.json`; tests `tests/mcp/test_catalog_directory_contacts.py` (new), `tests/mcp/test_catalog_directory_people.py`, `tests/security/test_v03_egress.py`, `tests/security/test_comms_wire_frozen.py`, `tests/mcp/catalog_pin.json`; the rulings, the ledger, `AGENT.md`, `CHANGELOG.md`.
 - **Verification:** 26 new tests (the opt-out guard mutation-checked); the full gate passed (GATE ok=1).
 - **Follow-ups:** G4 adds destinations and location membership.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Catalog amendment G4: destinations, location membership and D5 (branch `comms-v0.3-catalog`).
+- **Summary:** Create and disable chats by the provider's own id (Telegram marked chat ids, Meta group ids), input only; a group gets its `grp_` at once. Add and remove location members. Backups now keep every `grp_`: a compatible restore reuses them, a conflicting binding is a staged incompatibility, and a missing provider's groups are restored disabled with refs kept.
+- **Files changed:** `src/comms/core/backup/payload.py`, `src/comms/core/backup/export_import.py`, `src/comms/services/directory.py`, `src/comms/runtime/comms_runtime.py`, `src/comms/runtime/facades.py`, `src/comms/mcp/tools/directory_people.py`, `.claude/settings.json`; tests `tests/mcp/test_catalog_directory_places.py` and `tests/core/backup/test_backup_groups.py` (both new), `tests/mcp/catalog_pin.json`; the rulings, the ledger, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 32 new tests; the full gate passed (GATE ok=1).
+- **Follow-ups:** G5 adds per-person context.

@@ -97,6 +97,13 @@ def _telegram_user(raw: str) -> str:
     return f"user:{raw}"
 
 
+def _whatsapp_group(raw: str) -> str:
+    """A WhatsApp destination is a group id as Meta gives it, stored as ``group:<id>`` (G4)."""
+    if not isinstance(raw, str) or ":" in raw:
+        raise ValueError("unrecognised whatsapp group")
+    return wa_group_id(f"group:{raw}")
+
+
 def _telegram_destination(raw: str) -> str:
     """A Telegram destination is a marked chat id: ``-N`` (a group), ``-100…`` (a supergroup or
     channel) or ``N`` (a private chat); stored in the directory's ``kind:N`` form (G4)."""
@@ -114,7 +121,7 @@ def directory_rules(
     rules = {
         ("contact", "whatsapp"): IdentityRule(e164, e164),
         ("contact", "telegram"): IdentityRule(_telegram_user, marked_chat_id),
-        ("destination", "whatsapp"): IdentityRule(wa_group_id, wa_group_id),
+        ("destination", "whatsapp"): IdentityRule(_whatsapp_group, wa_group_id),
         ("destination", "telegram"): IdentityRule(_telegram_destination, marked_chat_id),
     }
 

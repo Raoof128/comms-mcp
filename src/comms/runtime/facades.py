@@ -390,6 +390,10 @@ class _Facades:
             "directory.contact_add": lambda cl, a: s.directory.contact_add(c(cl), a["recipient"], a["transport"], a["identity"], a["request_id"]),
             "directory.contact_disable": lambda cl, a: s.directory.contact_disable(c(cl), a["contact"], a["request_id"]),
             "directory.contact_opt_out": lambda cl, a: s.directory.contact_opt_out(c(cl), a["contact"], a["request_id"]),
+            "directory.destination_create": lambda cl, a: s.directory.destination_create(c(cl), a["location"], a["transport"], a["identity"], a["name"], a["request_id"]),
+            "directory.destination_disable": lambda cl, a: s.directory.destination_disable(c(cl), a["destination"], a["request_id"]),
+            "location.member_add": lambda cl, a: s.directory.location_member_add(c(cl), a["location"], a["recipient"], a["request_id"]),
+            "location.member_remove": lambda cl, a: s.directory.location_member_remove(c(cl), a["location"], a["recipient"], a["request_id"]),
             "whatsapp.template_list": lambda cl, a: self.templates().list(limit=a.get("limit", 50), cursor=a.get("cursor")),
             "whatsapp.template_get": lambda cl, a: self.templates().get(a["name"], a["language"]),
             "whatsapp.template_create": lambda cl, a: self.templates().create(

@@ -291,6 +291,81 @@ class DirectoryService:
             effect(lambda tx: d.opt_out_in_tx(tx.conn, contact, now=tx.now)),
         )
 
+    # -- destinations and location membership (catalog amendment G4) ----------------------
+
+    def destination_create(
+        self,
+        ctx: CallContext,
+        location: str,
+        transport: str,
+        identity: str,
+        name: str,
+        request_id: str,
+    ) -> dict[str, Any]:
+        """A chat campaigns and group tools can reach; its identity is input only. A group gets
+        its ``grp_`` in the same transaction (E11b); a private chat has none."""
+        label = _name(name)
+        platform, _canonical, binding = self._identity("destination", transport, identity)
+        rule = self._rules[("destination", transport)]
+
+        def create(tx: Any) -> dict[str, Any]:
+            destination = d.add_destination_in_tx(
+                tx.conn, location, transport, platform, label, normalize=rule.canonical, now=tx.now
+            )
+            row = tx.conn.execute(
+                "SELECT g.ref FROM groups g JOIN destinations x ON x.id = g.destination_id"
+                " WHERE x.ref = ?",
+                (destination,),
+            ).fetchone()
+            return {"destination": destination, "group": None if row is None else row[0]}
+
+        return run_local(
+            self._executor,
+            ctx,
+            "comms_directory_destination_create",
+            {"location": _ref(location, "loc_")},
+            {"transport": transport, "identity_binding": binding, "name": label},
+            request_id,
+            create,
+        )
+
+    def destination_disable(
+        self, ctx: CallContext, destination: str, request_id: str
+    ) -> dict[str, Any]:
+        return run_local(
+            self._executor,
+            ctx,
+            "comms_directory_destination_disable",
+            {"destination": _ref(destination, "dst_")},
+            {},
+            request_id,
+            effect(lambda tx: d.set_enabled_in_tx(tx.conn, destination, False, now=tx.now)),
+        )
+
+    def location_member_add(
+        self, ctx: CallContext, location: str, recipient: str, request_id: str
+    ) -> dict[str, Any]:
+        return self._membership(ctx, "add", location, recipient, request_id)
+
+    def location_member_remove(
+        self, ctx: CallContext, location: str, recipient: str, request_id: str
+    ) -> dict[str, Any]:
+        return self._membership(ctx, "remove", location, recipient, request_id)
+
+    def _membership(
+        self, ctx: CallContext, verb: str, location: str, recipient: str, request_id: str
+    ) -> dict[str, Any]:
+        change = d.add_location_member_in_tx if verb == "add" else d.remove_location_member_in_tx
+        return run_local(
+            self._executor,
+            ctx,
+            f"comms_location_member_{verb}",
+            {"location": _ref(location, "loc_"), "recipient": _ref(recipient, "rcp_")},
+            {},
+            request_id,
+            effect(lambda tx: change(tx.conn, location, recipient)),
+        )
+
     # -- shared ---------------------------------------------------------------------------
 
     def _rename(

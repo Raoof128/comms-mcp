@@ -10,6 +10,7 @@
       "mcp__comms__comms_campaign_schedule",
       "mcp__comms__comms_campaign_send",
       "mcp__comms__comms_directory_contact_add",
+      "mcp__comms__comms_directory_destination_create",
       "mcp__comms__comms_group_admin_demote",
       "mcp__comms__comms_group_admin_promote",
       "mcp__comms__comms_group_admin_update_rights",
