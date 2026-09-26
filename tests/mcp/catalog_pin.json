@@ -1,5 +1,5 @@
 {
-  "count": 123,
+  "count": 126,
   "names": [
     "comms_capability_list",
     "comms_context_get",
@@ -123,7 +123,10 @@
     "comms_directory_destination_disable",
     "comms_location_member_add",
     "comms_location_member_remove",
-    "comms_context_person"
+    "comms_context_person",
+    "comms_group_member_tag_set",
+    "comms_message_reaction_remove",
+    "comms_group_member_reactions_clear"
   ],
   "tools": {
     "comms_capability_list": "52c9c68aadd227b8eafb7c50d6676e6543c5e46109c51939cffc8b142737e8bb",
@@ -248,7 +251,10 @@
     "comms_directory_destination_disable": "a42db0786d2a4adef5893d0e843a15badc3ae5bd6e0150b0d14ac3933f927332",
     "comms_location_member_add": "bf08e116e723da87279206a12db401f5f6d0f707fc0cdddbbe3548fe620e565e",
     "comms_location_member_remove": "07cdab0ad039b63c1541e5c70f5745066cd349980c1b87339d410226f3a96280",
-    "comms_context_person": "8b146afb6a24c7f8a5a5dd74fd62abe2bc12e3c29ef2aa1b58baf7255be9220f"
+    "comms_context_person": "8b146afb6a24c7f8a5a5dd74fd62abe2bc12e3c29ef2aa1b58baf7255be9220f",
+    "comms_group_member_tag_set": "fb5ba62a21071e5ab57b6522b43b323af0d8199e2cfdf855c52ca2a36b86e3e8",
+    "comms_message_reaction_remove": "c23723c70cf4cb62e3919c5134b6b943f0549dcae58e70c4e4c8d6f7d59ece3e",
+    "comms_group_member_reactions_clear": "0ce6cf04af121a2c52cefe6eca8af7997e185c729cb4f71c8095a0bfb5c026ed"
   },
-  "catalog": "b2bd613e14f00011031181ccada5e9ee7da2fc6ace7e8d6529d18afd551357ee"
+  "catalog": "c4ae8a5ac238e87377c1b10448235831613bebd6220b0694d655788cb6c6db4f"
 }

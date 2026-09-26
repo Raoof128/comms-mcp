@@ -652,3 +652,11 @@
 - **Files changed:** `src/comms/transports/telegram/user/send.py`, `src/comms/transports/telegram/user/admin.py`, `src/comms/transports/telegram/user/admin_messages.py`, `src/comms/transports/telegram/user/capability.py`, `src/comms/transports/telegram/bot/admin.py`, `src/comms/transports/telegram/bot/admin_messages.py`, `src/comms/transports/telegram/chat_specs.py`, `src/comms/transports/telegram/telegram/telethon_adapter.py`, `src/comms/services/mutations.py`, `src/comms/services/writes.py`, `src/comms/services/messages.py`, `src/comms/services/groups.py`, `src/comms/services/directory.py`, `src/comms/runtime/facades.py`, `src/comms/mcp/tools/messages.py`; tests; `tests/mcp/catalog_pin.json`; the matrix, the rulings, the ledger, `AGENT.md`, `CHANGELOG.md`.
 - **Verification:** 13 new tests; the full gate passed (GATE ok=1).
 - **Follow-ups:** G7 part 2 adds A46's three tools.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Catalog amendment G7, part 2: spec A46's Telegram tools (branch `comms-v0.3-catalog`).
+- **Summary:** `comms_group_member_tag_set`, `comms_message_reaction_remove` and `comms_group_member_reactions_clear` on both Telegram APIs, with three new capabilities, three reviewed MTProto requests and three Bot API methods, all host-confirmed. WhatsApp is B.
+- **Files changed:** `src/comms/core/providers/capability.py`, `src/comms/core/providers/semantics.py`, `src/comms/transports/telegram/chat_specs.py`, `src/comms/transports/telegram/bot/{admin_members,capability,http}.py`, `src/comms/transports/telegram/user/{admin_members,capability}.py`, `src/comms/transports/telegram/telegram/telethon_adapter.py`, `src/comms/services/groups.py`, `src/comms/runtime/facades.py`, `src/comms/mcp/tools/{groups,__init__}.py`, `.claude/settings.json`, `docs/verification/telegram-rpc-review.md`; tests; `tests/mcp/catalog_pin.json`; the matrix, the rulings, the ledger, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 16 new tests; the full gate passed (GATE ok=1).
+- **Follow-ups:** G8: WhatsApp group writes, account and media, and A46's health status.

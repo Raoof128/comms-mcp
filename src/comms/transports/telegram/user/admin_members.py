@@ -13,6 +13,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from comms.core.providers.capability import Capability as C
+from comms.transports.telegram import chat_specs as specs
 from comms.transports.telegram.admin_profiles import ADMIN_RIGHTS, promotion
 from comms.transports.telegram.args import (
     boolean,
@@ -60,4 +61,7 @@ MEMBER_SPECS = {
     C.MEMBER_RESTRICT: _restrict,
     C.ADMIN_PROMOTE: _promote,
     C.ADMIN_DEMOTE: _demote,
+    C.MEMBER_TAG: specs.member_tag,  # A46
+    C.REACTION_REMOVE: specs.member_reaction,
+    C.REACTION_CLEAR: specs.member,
 }

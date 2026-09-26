@@ -488,6 +488,9 @@ class _Facades:
             "group.admins_list": lambda cl, a: {**(g := self.context_get(cl, {**a, "include": ["admins"]}))["admins"]},
             **{f"group.member_{t}": self.member(f"group.member.{t}")
                for t in ("add", "invite", "remove", "ban", "unban", "restrict", "unrestrict")},
+            "group.member_tag_set": self.member("group.member.tag_set"),  # A46
+            "group.member_reactions_clear": self.member("group.member.reactions_clear"),
+            "message.reaction_remove": self.member("message.reaction_remove"),
             "group.admin_promote": self.member("group.admin.promote"),
             "group.admin_update_rights": self.member("group.admin.update_rights"),
             "group.admin_demote": self.member("group.admin.demote"),

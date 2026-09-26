@@ -57,6 +57,9 @@ REVIEWED_RPCS: frozenset[str] = frozenset(
         "messages.DeleteMessagesRequest",
         "messages.EditChatAboutRequest",
         "messages.EditChatAdminRequest",
+        "messages.EditChatParticipantRankRequest",  # spec A46
+        "messages.DeleteParticipantReactionRequest",  # spec A46
+        "messages.DeleteParticipantReactionsRequest",  # spec A46
         "messages.EditChatDefaultBannedRightsRequest",
         "messages.EditChatPhotoRequest",
         "messages.EditChatTitleRequest",

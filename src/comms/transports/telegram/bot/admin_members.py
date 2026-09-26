@@ -11,6 +11,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from comms.core.providers.capability import Capability as C
+from comms.transports.telegram import chat_specs as specs
 from comms.transports.telegram.args import (
     boolean,
     lifted,
@@ -39,4 +40,23 @@ def _restrict(chat_id: int, args: Mapping[str, Any]) -> tuple[str, dict[str, Any
     return "restrictChatMember", {"chat_id": chat_id, **fields}
 
 
-MEMBER_REQUESTS = {C.MEMBER_BAN: _ban, C.MEMBER_UNBAN: _unban, C.MEMBER_RESTRICT: _restrict}
+def _tag(chat_id: int, args: Mapping[str, Any]) -> tuple[str, dict[str, Any]]:
+    return "setChatMemberTag", {"chat_id": chat_id, **specs.member_tag(args)}
+
+
+def _reaction(chat_id: int, args: Mapping[str, Any]) -> tuple[str, dict[str, Any]]:
+    return "deleteMessageReaction", {"chat_id": chat_id, **specs.member_reaction(args)}
+
+
+def _reactions(chat_id: int, args: Mapping[str, Any]) -> tuple[str, dict[str, Any]]:
+    return "deleteAllMessageReactions", {"chat_id": chat_id, **specs.member(args)}
+
+
+MEMBER_REQUESTS = {
+    C.MEMBER_BAN: _ban,
+    C.MEMBER_UNBAN: _unban,
+    C.MEMBER_RESTRICT: _restrict,
+    C.MEMBER_TAG: _tag,  # A46
+    C.REACTION_REMOVE: _reaction,
+    C.REACTION_CLEAR: _reactions,
+}

@@ -156,6 +156,9 @@ ADMIN_RPCS: Mapping[Capability, frozenset[str]] = MappingProxyType(
         Capability.INVITE_EDIT: _EDIT_INVITE,
         Capability.INVITE_REVOKE: _EDIT_INVITE,
         Capability.GROUP_INVITE_RESET: frozenset({"messages.ExportChatInviteRequest"}),  # G6
+        Capability.MEMBER_TAG: frozenset({"messages.EditChatParticipantRankRequest"}),  # A46
+        Capability.REACTION_REMOVE: frozenset({"messages.DeleteParticipantReactionRequest"}),
+        Capability.REACTION_CLEAR: frozenset({"messages.DeleteParticipantReactionsRequest"}),
         Capability.JOIN_REQUEST_APPROVE: _JOIN_REQUEST,
         Capability.JOIN_REQUEST_REJECT: _JOIN_REQUEST,
         Capability.CHAT_SET_TITLE: frozenset(
@@ -573,6 +576,43 @@ def _invite_reset(
     return functions.messages.ExportChatInviteRequest(peer, legacy_revoke_permanent=True)
 
 
+def _member_peer(session: TelethonSession, user_id: int) -> Any:
+    try:
+        return session.input_peer("user", user_id)
+    except GatewayError:
+        raise _PeerMissing("TARGET_NOT_FOUND") from None
+
+
+def _member_tag(
+    session: TelethonSession, peer_type: str, peer_id: int, spec: Mapping[str, Any]
+) -> Any:
+    """A regular member's tag (A46); an empty tag clears it."""
+    return functions.messages.EditChatParticipantRankRequest(
+        peer=session._admin_peer(peer_type, peer_id),
+        participant=_member_peer(session, spec["user_id"]),
+        rank=spec["tag"],
+    )
+
+
+def _reaction_remove(
+    session: TelethonSession, peer_type: str, peer_id: int, spec: Mapping[str, Any]
+) -> Any:
+    return functions.messages.DeleteParticipantReactionRequest(
+        peer=session._admin_peer(peer_type, peer_id),
+        msg_id=spec["message_id"],
+        participant=_member_peer(session, spec["user_id"]),
+    )
+
+
+def _reactions_clear(
+    session: TelethonSession, peer_type: str, peer_id: int, spec: Mapping[str, Any]
+) -> Any:
+    return functions.messages.DeleteParticipantReactionsRequest(
+        peer=session._admin_peer(peer_type, peer_id),
+        participant=_member_peer(session, spec["user_id"]),
+    )
+
+
 def _invite_edit(
     session: TelethonSession, peer_type: str, peer_id: int, spec: Mapping[str, Any]
 ) -> Any:
@@ -729,6 +769,9 @@ _ADMIN_BUILDERS: Mapping[Capability, Callable[..., Any]] = MappingProxyType(
         Capability.INVITE_EDIT: _invite_edit,
         Capability.INVITE_REVOKE: _invite_revoke,
         Capability.GROUP_INVITE_RESET: _invite_reset,
+        Capability.MEMBER_TAG: _member_tag,  # A46
+        Capability.REACTION_REMOVE: _reaction_remove,
+        Capability.REACTION_CLEAR: _reactions_clear,
         Capability.JOIN_REQUEST_APPROVE: _join(True),
         Capability.JOIN_REQUEST_REJECT: _join(False),
         Capability.TOPIC_CREATE: _topic_create,

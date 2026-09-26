@@ -77,6 +77,9 @@ MTProto rows cover both a basic group (`messages.*`) and a supergroup or channel
 | `comms_group_member_remove` | A done [member.remove]: `banChatMember` then `unbanChatMember` (saga) | A done [member.remove]: `channels.editBanned` / `messages.deleteChatUser` | A done [group.member.remove]: `DELETE /{group_id}/participants` |
 | `comms_group_member_ban` / `comms_group_member_unban` | A done [member.ban]/[member.unban]: `banChatMember` / `unbanChatMember` | A done [member.ban]/[member.unban]: `channels.editBanned` | B [member.ban]: the Groups API has no ban (removal only) |
 | `comms_group_member_restrict` / `comms_group_member_unrestrict` | A done [member.restrict]: `restrictChatMember` | A done [member.restrict]: `channels.editBanned` (rights) | B [member.restrict]: the Groups API has no per-member rights |
+| `comms_group_member_tag_set` | A done [member.tag]: `setChatMemberTag` (`can_manage_tags`; A46) | A done [member.tag]: `messages.editChatParticipantRank` (`manage_ranks`; A46) | B [member.tag]: WhatsApp groups have no member tags |
+| `comms_message_reaction_remove` | A done [reaction.remove]: `deleteMessageReaction` (`can_delete_messages`; A46) | A done [reaction.remove]: `messages.deleteParticipantReaction` (A46) | B [reaction.remove]: group messaging supports no reaction moderation |
+| `comms_group_member_reactions_clear` | A done [reaction.clear]: `deleteAllMessageReactions` (A46) | A done [reaction.clear]: `messages.deleteParticipantReactions` (A46) | B [reaction.clear]: group messaging supports no reaction moderation |
 | `comms_group_admin_promote` / `comms_group_admin_update_rights` / `comms_group_admin_demote` | A done [admin.promote]/[admin.demote]: `promoteChatMember` | A done [admin.promote]/[admin.demote]: `channels.editAdmin` / `messages.editChatAdmin` | B [admin.promote]: the Groups API explicitly has no admin promotion or demotion |
 | `comms_group_admin_log` | B [admin.log.read]: the Bot API has no admin log | A done [admin.log.read]: `channels.getAdminLog` (event kinds and actors by ref, no content; G6) | B [admin.log.read]: the Groups API has no admin log |
 
@@ -117,20 +120,8 @@ MTProto rows cover both a basic group (`messages.*`) and a supergroup or channel
 
 ## Added by A46, not yet in the catalog
 
-These tools become rows here when G7 and G8 add them to the catalog. The row test requires every cited tool to exist, and G9 requires none left in this section.
+These tools become rows when their task adds them to the catalog. The row test requires every cited tool to exist, and G9 requires this section to be empty.
 
-- `comms_group_member_tag_set`:
-  - bot: A todo:G7 [member.tag] `setChatMemberTag`;
-  - user: A todo:G7 [member.tag] `messages.editChatParticipantRank`;
-  - WhatsApp: B [member.tag], because WhatsApp groups have no member tags.
-- `comms_message_reaction_remove`:
-  - bot: A todo:G7 [reaction.remove] `deleteMessageReaction`;
-  - user: A todo:G7 [reaction.remove] `messages.deleteParticipantReaction`;
-  - WhatsApp: B [reaction.remove], because group messaging has no reaction moderation.
-- `comms_group_member_reactions_clear`:
-  - bot: A todo:G7 [reaction.clear] `deleteAllMessageReactions`;
-  - user: A todo:G7 [reaction.clear] `messages.deleteParticipantReactions`;
-  - WhatsApp: B [reaction.clear], for the same reason.
 - `comms_whatsapp_health_status`:
   - both Telegram actors: `—`, because it is a WhatsApp account tool;
   - WhatsApp: A todo:G8 [phone_number.health] `GET /{phone}?fields=health_status`.

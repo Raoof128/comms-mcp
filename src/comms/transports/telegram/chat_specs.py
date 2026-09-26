@@ -7,6 +7,7 @@ method; the adapter builds the MTProto request from the same spec.
 
 from __future__ import annotations
 
+import unicodedata
 from collections.abc import Callable, Mapping
 from typing import Any
 
@@ -79,6 +80,23 @@ def _group_chat(value: object) -> bool:
 def forward(args: Mapping[str, Any]) -> Spec:
     """One message of another group, by its marked chat id and message id (G7)."""
     return take(args, {"from_chat": _group_chat, "message_id": positive_int}, {})
+
+
+def _tag(value: object) -> bool:
+    """A member tag (A46): 0–16 characters, no emoji or other symbols; empty clears it."""
+    return (
+        isinstance(value, str)
+        and len(value) <= 16
+        and all(unicodedata.category(ch)[0] not in "SC" for ch in value)
+    )
+
+
+def member_tag(args: Mapping[str, Any]) -> Spec:
+    return take(args, {"user_id": positive_int, "tag": _tag}, {})
+
+
+def member_reaction(args: Mapping[str, Any]) -> Spec:
+    return take(args, {"user_id": positive_int, "message_id": positive_int}, {})
 
 
 def no_args(args: Mapping[str, Any]) -> Spec:

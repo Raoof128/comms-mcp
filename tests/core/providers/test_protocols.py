@@ -38,10 +38,22 @@ def test_capability_states_are_p_section_9():
     ]
 
 
+def _a46_ids() -> set[str]:
+    """The capabilities spec amendment A46 adds (owner, 2026-09-26), named in its text."""
+    spec = (PROPOSAL.parents[1] / "comms-spec-v0.3.md").read_text(encoding="utf-8")
+    start = spec.index("- **A46.")
+    section = spec[start : spec.index("\n## ", start)]
+    return set(re.findall(r"capability `([a-z_.]+)`", section))
+
+
 def test_capability_ids_match_p_sections():
     expected = _section_ids(11) | _section_ids(14) | _section_ids(16)
     assert len(expected) > 60
-    assert {c.value for c in Capability} == expected
+    a46 = _a46_ids()
+    assert a46 == {"member.tag", "reaction.remove", "reaction.clear", "phone_number.health"}
+    assert {c.value for c in Capability} <= expected | a46
+    assert expected <= {c.value for c in Capability}
+    # A46's capabilities arrive with the task that builds them (G7; phone_number.health in G8)
     assert all(c.name == c.value.upper().replace(".", "_") for c in Capability)
 
 

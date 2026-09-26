@@ -166,7 +166,7 @@ def _arguments(spec, w, actor, dispatcher, message, cursor):
         "permissions": {"can_send_messages": True}, "conversation": w["rcp"],
         "media": "med_" + "a" * 26, "file": "f", "mime": "image/png", "query": "hello",
         "scope": "everyone", "rights": {"can_pin_messages": True}, "cursor": cursor,
-        "capability": "member.ban", "language": "en", "category": "MARKETING",
+        "capability": "member.ban", "tag": "vip", "language": "en", "category": "MARKETING",
         "components": [{"type": "BODY", "text": "Hi"}],
     }  # fmt: skip
     if actor == "whatsapp_cloud":

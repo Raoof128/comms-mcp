@@ -54,6 +54,9 @@ BOT_METHODS = frozenset(
         "editChatInviteLink",
         "revokeChatInviteLink",
         "exportChatInviteLink",  # G6: a new primary link revokes the old
+        "setChatMemberTag",  # A46 (Bot API 9.5)
+        "deleteMessageReaction",  # A46 (Bot API 10.0)
+        "deleteAllMessageReactions",
         "approveChatJoinRequest",
         "declineChatJoinRequest",
         "createForumTopic",

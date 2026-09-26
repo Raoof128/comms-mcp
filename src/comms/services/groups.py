@@ -42,6 +42,9 @@ MEMBERSHIP: Mapping[str, Mapping[str, C]] = MappingProxyType(
         "group.member.remove": {"telegram": C.MEMBER_REMOVE, "whatsapp": C.GROUP_MEMBER_REMOVE},
         "group.member.ban": {"telegram": C.MEMBER_BAN},
         "group.member.unban": {"telegram": C.MEMBER_UNBAN},
+        "group.member.tag_set": {"telegram": C.MEMBER_TAG},  # A46
+        "group.member.reactions_clear": {"telegram": C.REACTION_CLEAR},
+        "message.reaction_remove": {"telegram": C.REACTION_REMOVE},
         "group.member.restrict": {"telegram": C.MEMBER_RESTRICT},
         "group.member.unrestrict": {"telegram": C.MEMBER_RESTRICT},
         "group.admin.promote": {"telegram": C.ADMIN_PROMOTE},
@@ -169,7 +172,10 @@ class GroupService:
             if identity is None:
                 raise CommsError("NOT_FOUND")
             member = _MEMBER_ARG[transport](identity)
-        call = {**args, **_FIXED.get(tool, {}), **member}
+        call = {k: v for k, v in args.items() if k != "message"}
+        call = {**call, **_FIXED.get(tool, {}), **member}
+        # A46: a message ref names the message the member's reaction is on (this group's only)
+        objects = {("message", "message_id"): args["message"]} if "message" in args else {}
         chosen, target, outcome = self._writes.write(
             ctx,
             tool,
@@ -178,6 +184,7 @@ class GroupService:
             call,
             request_id,
             actor,
+            objects=objects,
             object_kind=_CREATES.get(capability),
         )
         result = {**head, **summary(chosen, outcome)}

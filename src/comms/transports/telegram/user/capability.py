@@ -55,6 +55,9 @@ _RIGHT = {
     C.INVITE_EDIT: "invite_users",
     C.INVITE_REVOKE: "invite_users",
     C.GROUP_INVITE_RESET: "invite_users",
+    C.MEMBER_TAG: "manage_ranks",  # A46
+    C.REACTION_REMOVE: "delete_messages",
+    C.REACTION_CLEAR: "delete_messages",
     C.INVITE_LIST: "invite_users",
     C.JOIN_REQUEST_LIST: "invite_users",
     C.JOIN_REQUEST_APPROVE: "invite_users",

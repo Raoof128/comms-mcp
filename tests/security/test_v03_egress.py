@@ -173,6 +173,7 @@ def sweep(tmp_path_factory):
         "invite": "inv_" + "a" * 26,
         "topic": "top_" + "a" * 26,
         "display_name": "N",  # catalog amendment G2
+        "tag": "vip",  # A46
         "transport": "whatsapp",  # G3: contact_add runs for real with the canary
         "identity": CONTACT,
         "contact": "rct_" + "a" * 26,

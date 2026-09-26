@@ -77,6 +77,9 @@ dropped link fails the in-flight call and only the daemon's keeper reconnects.
 | `cap.member.ban` | `channels.EditBannedRequest` | https://core.telegram.org/method/channels.editBanned | sets a chat or member state | `SET_STATE`, `retry_same_key` |
 | `cap.member.unban` | `channels.EditBannedRequest` | https://core.telegram.org/method/channels.editBanned | sets a chat or member state | `SET_STATE`, `retry_same_key` |
 | `cap.member.restrict` | `channels.EditBannedRequest` | https://core.telegram.org/method/channels.editBanned | sets a chat or member state | `SET_STATE`, `retry_same_key` |
+| `cap.member.tag` | `messages.EditChatParticipantRankRequest` | https://core.telegram.org/method/messages.editChatParticipantRank | sets a chat or member state | `SET_STATE`, `retry_same_key`; spec A46: a regular member's tag (reviewed 2026-09-26) |
+| `cap.reaction.remove` | `messages.DeleteParticipantReactionRequest` | https://core.telegram.org/method/messages.deleteParticipantReaction | removes one member's reaction from one message | `SET_STATE`, `retry_same_key`; spec A46 (reviewed 2026-09-26) |
+| `cap.reaction.clear` | `messages.DeleteParticipantReactionsRequest` | https://core.telegram.org/method/messages.deleteParticipantReactions | removes a member's reactions in the group | `SET_STATE`, `retry_same_key`; spec A46 (reviewed 2026-09-26) |
 | `cap.admin.promote` | `channels.EditAdminRequest` | https://core.telegram.org/method/channels.editAdmin | sets a chat or member state | `SET_STATE`, `retry_same_key` |
 | `cap.admin.promote` | `messages.EditChatAdminRequest` | https://core.telegram.org/method/messages.editChatAdmin | sets a chat or member state | `SET_STATE`, `retry_same_key` |
 | `cap.admin.demote` | `channels.EditAdminRequest` | https://core.telegram.org/method/channels.editAdmin | sets a chat or member state | `SET_STATE`, `retry_same_key` |

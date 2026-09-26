@@ -30,7 +30,7 @@ from comms.mcp.schemas import (
 from comms.mcp.spec import ToolSpec
 from comms.mcp.tools.context import CONTEXT_FAILURES, CURSOR, PAGE
 
-__all__ = ["GROUP_TOOLS"]
+__all__ = ["A46_TOOLS", "GROUP_TOOLS"]
 
 _GROUP = ref("group")
 _RECIPIENT = ref("recipient")
@@ -212,5 +212,33 @@ GROUP_TOOLS: tuple[ToolSpec, ...] = (
         "Lift a restriction",
         "Grant a restricted recipient every permission again.",
         C.MEMBER_RESTRICT,
+    ),
+)
+
+# Spec A46 (owner, 2026-09-26): the admin surface the 2026 docs added. Its own family, appended.
+A46_TOOLS: tuple[ToolSpec, ...] = (
+    _member_write(
+        "tag_set",
+        "Set a member's tag",
+        "Set a regular member's tag: up to 16 characters, no emoji; an empty tag clears it.",
+        C.MEMBER_TAG,
+        {"tag": string(0, 16)},
+        required=["tag"],
+    ),
+    write(
+        "comms_message_reaction_remove",
+        "Remove a member's reaction",
+        "Remove one member's reaction from one message in the group.",
+        "message.reaction_remove",
+        {"group": _GROUP, "message": ref("message"), "recipient": _RECIPIENT, "actor": ACTOR},
+        ["group", "message", "recipient"],
+        _MEMBER,
+        capability=C.REACTION_REMOVE,
+    ),
+    _member_write(
+        "reactions_clear",
+        "Clear a member's reactions",
+        "Remove a member's recent reactions in the group (Telegram removes up to 10,000).",
+        C.REACTION_CLEAR,
     ),
 )
