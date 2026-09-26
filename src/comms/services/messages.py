@@ -40,7 +40,7 @@ _OPERATIONS: Mapping[str, Mapping[str, C]] = {
     "message.pin": {"telegram": C.MESSAGE_PIN},
     "message.unpin": {"telegram": C.MESSAGE_PIN},
     "message.mark_read": {"whatsapp": C.MESSAGE_MARK_READ},
-    "message.forward": {},
+    "message.forward": {"telegram": C.MESSAGE_FORWARD},  # G7
 }
 
 
@@ -156,12 +156,23 @@ class MessageService:
     def forward(
         self,
         ctx: CallContext,
-        group: str,
+        to_group: str,
         targets: Mapping[str, ProviderTarget],
-        message: str,
+        from_chat: str,
+        message_id: int,
         request_id: str,
+        *,
+        actor: str | None = None,
     ) -> dict[str, Any]:
-        raise CommsError("PROVIDER_UNSUPPORTED")  # not offered yet (D14 ruling)
+        """``message.forward`` (G7): one message of another group, as a new message in this one.
+        ``targets`` are the actors present in both groups; the new message gets a ``cmg_`` ref
+        in this group."""
+        chosen, outcome = self._run(
+            ctx, "message.forward", targets, {"from_chat": from_chat, "message_id": message_id},
+            request_id, actor, {}, "message",
+        )  # fmt: skip
+        return {**self._head(to_group, "message.forward", chosen, outcome),
+                "message": _made(outcome)}  # fmt: skip
 
     def _run(
         self,

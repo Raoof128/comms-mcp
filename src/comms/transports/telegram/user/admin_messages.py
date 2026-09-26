@@ -12,6 +12,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from comms.core.providers.capability import Capability as C
+from comms.transports.telegram import chat_specs as specs
 from comms.transports.telegram.args import boolean, positive_int, take, text
 
 __all__ = ["MESSAGE_SPECS", "TEXT_MAX"]
@@ -41,4 +42,5 @@ MESSAGE_SPECS = {
     C.MESSAGE_EDIT: _edit,
     C.MESSAGE_DELETE: _delete,
     C.MESSAGE_PIN: _pin,
+    C.MESSAGE_FORWARD: specs.forward,  # G7: keyed like a send (random_id from the op key)
 }

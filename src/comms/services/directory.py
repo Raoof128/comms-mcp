@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 from comms.core.audit.writer import AuditWriter
@@ -328,6 +329,23 @@ class DirectoryService:
             request_id,
             create,
         )
+
+    def adopt_group(
+        self, conn: Any, location: str, marked: str, name: str, *, now: datetime
+    ) -> dict[str, Any]:
+        """A group this account just created, filed as a destination in ``location`` with its
+        ``grp_`` (G7), in the core's own transaction."""
+        rule = self._rules[("destination", "telegram")]
+        destination = d.add_destination(
+            conn, location, "telegram", rule.platform(marked), _name(name),
+            normalize=rule.canonical, now=now,
+        )  # fmt: skip
+        row = conn.execute(
+            "SELECT g.ref FROM groups g JOIN destinations x ON x.id = g.destination_id"
+            " WHERE x.ref = ?",
+            (destination,),
+        ).fetchone()
+        return {"group": None if row is None else str(row[0])}
 
     def destination_disable(
         self, ctx: CallContext, destination: str, request_id: str

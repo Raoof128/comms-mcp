@@ -128,7 +128,7 @@ MESSAGE_TOOLS: tuple[ToolSpec, ...] = (
     write(
         "comms_message_forward",
         "Forward a message",
-        "Forward a message to another group. Not offered yet: answers PROVIDER_UNSUPPORTED.",
+        "Forward a message into another group, as a new message; an actor in both groups sends it.",
         "message.forward",
         {"group": _GROUP, "message": _MESSAGE, "to_group": _GROUP},
         ["group", "message", "to_group"],

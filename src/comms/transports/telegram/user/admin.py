@@ -28,7 +28,13 @@ from comms.transports.telegram.telegram.errors import GatewayError
 from comms.transports.telegram.user.admin_chat import CHAT_SPECS, group_create
 from comms.transports.telegram.user.admin_members import MEMBER_SPECS
 from comms.transports.telegram.user.admin_messages import MESSAGE_SPECS
-from comms.transports.telegram.user.send import TextSender, random_id_for, send
+from comms.transports.telegram.user.send import (
+    Forwarder,
+    TextSender,
+    forward,
+    random_id_for,
+    send,
+)
 
 __all__ = ["UserAdmin"]
 
@@ -42,7 +48,7 @@ _SPECS: Mapping[Capability, Callable[[Mapping[str, Any]], dict[str, Any]]] = {
 assert all(not SEMANTICS[(c, ACTOR)].steps for c in _SPECS)  # no saga is ever one call
 
 
-class AdminSession(TextSender, Protocol):
+class AdminSession(TextSender, Forwarder, Protocol):
     def input_peer(self, peer_type: str, peer_id: int) -> Any: ...
 
     async def admin_request(
@@ -80,6 +86,10 @@ class UserAdmin:
     def _request(self, op: SemanticOperation, target: ProviderTarget) -> tuple[Any, str, int]:
         if target.actor != ACTOR:
             raise ValueError("not a telegram_user destination")
+        if op.capability is Capability.GROUP_CREATE:  # G7: made from the account, no group
+            if target.identity != "account":
+                raise ValueError("a group is created from the account")
+            return group_create(op.args), "none", 0
         build = _SPECS.get(op.capability)
         if build is None:
             raise NotImplementedError("the user actor does not perform this operation as one call")
@@ -93,6 +103,10 @@ class UserAdmin:
         spec, peer_type, peer_id = self._request(op, target)
         if op.capability is Capability.MESSAGE_SEND:
             return self._send(spec, peer_type, peer_id, target.identity, op_key)
+        if op.capability is Capability.MESSAGE_FORWARD:
+            return self._forward(spec, peer_type, peer_id, target.identity, op_key)
+        if op.capability is Capability.GROUP_CREATE:
+            return self.create_group(op.args)
         return self._run(  # type: ignore[no-any-return]
             self._session.admin_request(
                 op.capability, peer_type, peer_id, spec, timeout=ADMIN_TIMEOUT_S
@@ -114,6 +128,22 @@ class UserAdmin:
                 spec["text"],
                 random_id_for(op_key),
                 reply_to=spec.get("reply_to_message_id"),
+            )
+        )
+        return _sent(delivered)
+
+    def _forward(
+        self, spec: Mapping[str, Any], peer_type: str, peer_id: int, chat: str, op_key: str
+    ) -> ProviderResult:
+        """One keyed forward into this group (G7); both peers resolved before anything is sent."""
+        try:
+            to_peer = self._session.input_peer(peer_type, peer_id)
+            from_peer = self._session.input_peer(*unmark_chat_id(spec["from_chat"]))
+        except GatewayError:
+            return ProviderResult("FAILED", "PROVIDER_UNAVAILABLE")  # provably unsent
+        delivered: DeliveryResult = self._run(
+            forward(
+                self._session, from_peer, spec["message_id"], to_peer, chat, random_id_for(op_key)
             )
         )
         return _sent(delivered)

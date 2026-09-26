@@ -40,6 +40,8 @@ def _created(capability):
         C.TOPIC_CREATE: str(n),
         C.MESSAGE_SEND: str(100 + n),
         C.TEMPLATE_CREATE: str(5_000_000 + n),
+        C.MESSAGE_FORWARD: str(200 + n),  # G7
+        C.GROUP_CREATE: str(-(10**12 + 500 + n)),  # G7: the new supergroup's marked id
     }.get(capability)
 
 

@@ -14,7 +14,7 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from comms.core.campaigns.directory import DirectoryError, contact_targets, member_identity
@@ -52,10 +52,8 @@ _SOURCE_ACTOR = {"telegram_live": "telegram_user", "telegram_local": "telegram_b
 # Tools whose services are not offered yet (each named in the D-task that catalogued it).
 NOT_OFFERED = frozenset(
     {
-        "message.forward",
         "media.upload",
         "media.download",
-        "group.create",
         "account.profile",
         "whatsapp.phone_status",
     }
@@ -168,6 +166,46 @@ class _Facades:
         else:
             raise CommsError("STALE_HANDLE")
         return self.tokened(client, page, kind, group, actor, args)
+
+    # -- forward (catalog amendment G7) -------------------------------------------------
+
+    def forward(self, client: AuthenticatedClient, a: dict[str, Any]) -> dict[str, Any]:
+        """One message of ``group`` forwarded into ``to_group``, by an actor in both."""
+        source, destination = self.targets(a["group"]), self.targets(a["to_group"])
+        if {t.transport for t in (*source.values(), *destination.values())} != {"telegram"}:
+            raise CommsError("PROVIDER_UNSUPPORTED")  # WhatsApp documents no forward
+        both = {actor: t for actor, t in destination.items() if actor in source}
+        if not both:
+            raise CommsError("NOT_CONFIGURED")
+        origin = next(iter(source.values()))
+        message_id = self.message_id(a["message"], origin)
+        return self.s.messages.forward(
+            _ctx(client), a["to_group"], both, origin.identity, int(message_id), a["request_id"],
+            actor=a.get("actor"),
+        )  # fmt: skip
+
+    def group_create(self, client: AuthenticatedClient, a: dict[str, Any]) -> dict[str, Any]:
+        """A new Telegram group or channel from the account (G7), filed in ``location`` with
+        its ``grp_``. The location is checked before anything reaches Telegram."""
+        location = a["location"]
+        self.s.directory.location_get(location)  # NOT_FOUND before any provider call
+        targets = {
+            actor: ProviderTarget("telegram", actor, location, "account")
+            for actor in _TELEGRAM
+            if actor in self.s.actors
+        }
+        if not targets:
+            raise CommsError("NOT_CONFIGURED")
+        args: dict[str, Any] = {k: a[k] for k in ("title", "kind", "about", "forum") if k in a}
+
+        def created(conn: Any, marked: str) -> Mapping[str, Any]:
+            return self.s.directory.adopt_group(
+                conn, location, marked, a["title"], now=datetime.now(UTC)
+            )
+
+        return self.s.groups.create(
+            _ctx(client), targets, args, a["request_id"], actor=a.get("actor"), on_created=created
+        )
 
     # -- group reads (catalog amendment G6) ----------------------------------------------
 
@@ -496,6 +534,8 @@ class _Facades:
             "directory.recipient_enable": lambda cl, a: s.directory.recipient_enable(c(cl), a["recipient"], a["request_id"]),
             "directory.recipient_disable": lambda cl, a: s.directory.recipient_disable(c(cl), a["recipient"], a["request_id"]),
             "context.person": self.context_person,
+            "message.forward": self.forward,
+            "group.create": self.group_create,
             "group.members_get": lambda cl, a: self.reads.member(a["group"], self.targets(a["group"]), a["recipient"]),
             "group.permissions_get": lambda cl, a: self.reads.permissions(a["group"], self.targets(a["group"])),
             "group.join_requests_list": self.listed("join_requests"),

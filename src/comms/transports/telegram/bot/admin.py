@@ -34,7 +34,11 @@ _REQUESTS: Mapping[Capability, Request] = {
     **INVITE_REQUESTS,
     **MESSAGE_REQUESTS,
 }
-_REF_FIELDS: Mapping[Capability, str] = {**REF_FIELDS, Capability.MESSAGE_SEND: "message_id"}
+_REF_FIELDS: Mapping[Capability, str] = {
+    **REF_FIELDS,
+    Capability.MESSAGE_SEND: "message_id",
+    Capability.MESSAGE_FORWARD: "message_id",
+}
 assert all(not SEMANTICS[(c, ACTOR)].steps for c in _REQUESTS)  # no saga is ever one call
 
 

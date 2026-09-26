@@ -106,6 +106,7 @@ def _world(actor, tmp_path):
     states = dict.fromkeys(ACTORS, S.NOT_CONFIGURED) | {actor: S.AVAILABLE}
     _capability, _executor, admins = fixtures(w, states=states)
     conn = w["conn"]
+    w["loc"] = d.add_location(conn, "Real", now=NOW)  # G7: group.create checks it first
     if actor == "whatsapp_cloud":  # its group is a WhatsApp group, read from the archive (G1)
         loc = d.add_location(conn, "WA", now=NOW)
         dst = d.add_destination(
@@ -161,7 +162,7 @@ def _arguments(spec, w, actor, dispatcher, message, cursor):
     values = {
         "group": w["grp"], "groups": [w["grp"]], "recipient": w["rcp"], "message": message,
         "to_group": w["grp"], "text": "hi", "title": "T", "name": "renamed", "kind": "supergroup",
-        "location": "loc_" + "a" * 26, "profile": "moderator", "actor": actor, "description": "d",
+        "location": w["loc"], "profile": "moderator", "actor": actor, "description": "d",
         "permissions": {"can_send_messages": True}, "conversation": w["rcp"],
         "media": "med_" + "a" * 26, "file": "f", "mime": "image/png", "query": "hello",
         "scope": "everyone", "rights": {"can_pin_messages": True}, "cursor": cursor,

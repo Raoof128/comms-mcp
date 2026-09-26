@@ -769,3 +769,11 @@ Follow the user's engineering lifecycle: design/security analysis, implementatio
 - **Files changed:** `src/comms/transports/telegram/telegram/telethon_adapter.py`, `src/comms/transports/telegram/user/context.py`, `src/comms/transports/telegram/user/admin.py`, `src/comms/transports/telegram/user/admin_chat.py`, `src/comms/transports/telegram/user/capability.py`, `src/comms/transports/telegram/bot/*.py`, `src/comms/transports/telegram/chat_specs.py`, `src/comms/services/group_reads.py`, `src/comms/services/groups.py`, `src/comms/core/providers/semantics.py`, `src/comms/runtime/facades.py`, `src/comms/mcp/tools/admin.py`, `src/comms/mcp/egress.py`, `docs/verification/telegram-rpc-review.md`; tests (three new modules, plus updates), `tests/mcp/catalog_pin.json`; the matrix, the rulings, the ledger, `AGENT.md`, `CHANGELOG.md`.
 - **Verification:** 16 new tests; no G6 cell is left in the matrix; the full gate passed (GATE ok=1).
 - **Follow-ups:** G7 (Telegram writes and A46's three tools).
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Catalog amendment G7, part 1: forward and group create (branch `comms-v0.3-catalog`).
+- **Summary:** Forward works on both Telegram APIs; the user account's forward is deduplicated by `random_id` like a send, through one shared reconcile path. The user account creates a group or channel, which is filed in the directory with its `grp_` in the same step. A WhatsApp forward crash was found and turned into a refusal.
+- **Files changed:** `src/comms/transports/telegram/user/send.py`, `src/comms/transports/telegram/user/admin.py`, `src/comms/transports/telegram/user/admin_messages.py`, `src/comms/transports/telegram/user/capability.py`, `src/comms/transports/telegram/bot/admin.py`, `src/comms/transports/telegram/bot/admin_messages.py`, `src/comms/transports/telegram/chat_specs.py`, `src/comms/transports/telegram/telegram/telethon_adapter.py`, `src/comms/services/mutations.py`, `src/comms/services/writes.py`, `src/comms/services/messages.py`, `src/comms/services/groups.py`, `src/comms/services/directory.py`, `src/comms/runtime/facades.py`, `src/comms/mcp/tools/messages.py`; tests; `tests/mcp/catalog_pin.json`; the matrix, the rulings, the ledger, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 13 new tests; the full gate passed (GATE ok=1).
+- **Follow-ups:** G7 part 2 adds A46's three tools.

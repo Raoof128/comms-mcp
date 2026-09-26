@@ -1062,9 +1062,25 @@ class TelethonSession:
         request = functions.messages.SendMessageRequest(
             peer, text, random_id=random_id, reply_to=replied
         )
+        return await self._keyed_send(Capability.MESSAGE_SEND, request, random_id, timeout)
+
+    async def forward_once(
+        self, from_peer: Any, message_id: int, to_peer: Any, random_id: int, *, timeout: float
+    ) -> SendAttempt:
+        """One ``messages.forwardMessages`` of one message carrying ``random_id`` (G7; A20),
+        classified as a send; never retried here."""
+        request = functions.messages.ForwardMessagesRequest(
+            from_peer=from_peer, id=[message_id], to_peer=to_peer, random_id=[random_id]
+        )
+        return await self._keyed_send(Capability.MESSAGE_FORWARD, request, random_id, timeout)
+
+    async def _keyed_send(
+        self, capability: Capability, request: Any, random_id: int, timeout: float
+    ) -> SendAttempt:
+        """One keyed send-shaped call, classified (A20): the one copy for send and forward."""
         try:
             result = await self.call_capability(
-                Capability.MESSAGE_SEND,
+                capability,
                 request,
                 timeout=timeout,
                 passthrough=(errors.RandomIdDuplicateError, *_SEND_REFUSED),

@@ -170,8 +170,9 @@ def test_mark_read_is_a_write_and_never_hidden_in_a_read(world):
     assert tool == "comms_message_mark_read"  # an audited write of its own
 
 
-def test_forward_is_not_offered_yet(world):
-    service, _admins = _service(world)
-    with pytest.raises(CommsError) as refused:
-        service.forward(CTX, world["grp"], _both(world), _seen(world, world["bot"]), _req())
-    assert refused.value.code == "PROVIDER_UNSUPPORTED"
+def test_forward_goes_to_the_destination_with_the_source_message(world):
+    service, admins = _service(world)
+    result = service.forward(CTX, world["grp"], _both(world), "-99", 7, _req())
+    assert result["result"] == "SUCCEEDED" and result["message"].startswith("cmg_")
+    ((capability, args),) = [c for a in admins.values() for c in a.calls]
+    assert capability is C.MESSAGE_FORWARD and args == {"from_chat": "-99", "message_id": 7}

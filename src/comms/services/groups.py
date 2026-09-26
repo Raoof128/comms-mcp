@@ -29,7 +29,7 @@ from comms.core.providers.capability import Capability as C
 from comms.core.providers.protocols import ProviderTarget
 from comms.services.capability import CapabilityService
 from comms.services.local import next_cursor, page_args
-from comms.services.mutations import CallContext, MutationExecutor
+from comms.services.mutations import CallContext, Created, MutationExecutor
 from comms.services.writes import ProviderWrites, summary, transport_of
 
 __all__ = ["ADMIN", "MEMBERSHIP", "GroupService"]
@@ -229,6 +229,24 @@ class GroupService:
             **summary(chosen, outcome),
             "object": outcome.result.get("object_ref"),
         }
+
+    def create(
+        self,
+        ctx: CallContext,
+        targets: Mapping[str, ProviderTarget],
+        args: Mapping[str, Any],
+        request_id: str,
+        *,
+        actor: str | None = None,
+        on_created: Created,
+    ) -> dict[str, Any]:
+        """``group.create`` (G7): made from the account; ``on_created`` files the new group in
+        the directory with its ``grp_`` from the provider's new chat id."""
+        chosen, _target, outcome = self._writes.write(
+            ctx, "group.create", targets, C.GROUP_CREATE, args, request_id, actor,
+            on_created=on_created,
+        )  # fmt: skip
+        return {**summary(chosen, outcome), "group": outcome.result.get("group")}
 
     def _invite(self, target: ProviderTarget) -> str | None:
         where = destination_id(self._conn, target.destination_ref)

@@ -65,6 +65,22 @@ def invite_edit(args: Mapping[str, Any]) -> Spec:
     return fields
 
 
+def _group_chat(value: object) -> bool:
+    """A group's marked chat id, as the directory stores it: ``-N`` or ``-100…`` (G7)."""
+    return (
+        isinstance(value, str)
+        and value.startswith("-")
+        and value[1:].isascii()
+        and value[1:].isdigit()
+        and int(value[1:]) > 0
+    )
+
+
+def forward(args: Mapping[str, Any]) -> Spec:
+    """One message of another group, by its marked chat id and message id (G7)."""
+    return take(args, {"from_chat": _group_chat, "message_id": positive_int}, {})
+
+
 def no_args(args: Mapping[str, Any]) -> Spec:
     """An operation that takes nothing (G6: resetting the primary invite link)."""
     return take(args, {}, {})
