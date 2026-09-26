@@ -473,11 +473,15 @@ class _Facades:
         return call
 
     def mark_read(self, client: AuthenticatedClient, a: dict[str, Any]) -> dict[str, Any]:
-        identity = member_identity(self.s.conn, a["conversation"], "whatsapp")
+        """The conversation is the person's; the transport and the actor are the message's
+        (A47, Gx7): a message id belongs to the actor that read it, so a ``cmg_`` from the
+        bot's retained updates names the bot, which has no read state to set."""
+        found = resolve_object(self.s.conn, a["message"], "message")
+        identity = member_identity(self.s.conn, a["conversation"], found.transport)
         if identity is None:
             raise CommsError("NOT_FOUND")
-        target = ProviderTarget("whatsapp", "whatsapp_cloud", a["conversation"], identity)
-        return self.s.messages.mark_read(_ctx(client), a["conversation"], {"whatsapp_cloud": target},
+        target = ProviderTarget(found.transport, found.actor, a["conversation"], identity)
+        return self.s.messages.mark_read(_ctx(client), a["conversation"], {found.actor: target},
                                          a["message"], a["request_id"])  # fmt: skip
 
     # -- the rest --------------------------------------------------------------------------

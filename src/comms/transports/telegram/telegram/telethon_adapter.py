@@ -135,6 +135,9 @@ WRITE_RPCS: Mapping[Capability, frozenset[str]] = MappingProxyType(
         ),
         Capability.MESSAGE_FORWARD: frozenset({"messages.ForwardMessagesRequest"}),
         Capability.MESSAGE_PIN: frozenset({"messages.UpdatePinnedMessageRequest"}),
+        # A47 (the owner lifted one prohibition): a person's conversation, and nothing else;
+        # channels.readHistory and every other read-acknowledge request stay absent
+        Capability.MESSAGE_MARK_READ: frozenset({"messages.ReadHistoryRequest"}),
     }
 )
 _BAN = frozenset({"channels.EditBannedRequest"})
@@ -740,6 +743,17 @@ def _message_pin(
     )
 
 
+def _mark_read(
+    session: TelethonSession, peer_type: str, peer_id: int, spec: Mapping[str, Any]
+) -> Any:
+    """A47: ``messages.readHistory`` on a person's peer, up to one message."""
+    try:
+        peer = session.input_peer("user", peer_id)  # from the entity cache only
+    except GatewayError:
+        raise _PeerMissing("DESTINATION_NOT_FOUND") from None
+    return functions.messages.ReadHistoryRequest(peer, max_id=spec["message_id"])
+
+
 def _delete_scope(peer_type: str, spec: Mapping[str, Any]) -> str:
     """The scope a delete actually had (P §72): a basic-group delete without revoke is local."""
     return "everyone" if peer_type == "channel" or spec.get("revoke") else "local"
@@ -806,6 +820,7 @@ _ADMIN_BUILDERS: Mapping[Capability, Callable[..., Any]] = MappingProxyType(
         Capability.MESSAGE_EDIT: _message_edit,
         Capability.MESSAGE_DELETE: _message_delete,
         Capability.MESSAGE_PIN: _message_pin,
+        Capability.MESSAGE_MARK_READ: _mark_read,
     }
 )
 

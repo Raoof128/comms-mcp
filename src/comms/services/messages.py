@@ -10,6 +10,8 @@ provider says nothing it is ``provider_defined``, and a delete that did not succ
 scope (P §72). Marking read is a write of its own, audited, and no read ever marks anything
 (P §77). The reads themselves (get, recent, search, context) are the context engine's.
 
+A47: the Telegram user account marks a person's conversation read too.
+
 WhatsApp: ``mark_read`` only. Free-form WhatsApp sends go through the campaign path, which
 enforces the customer-service window and templates; forwarding is not offered yet.
 """
@@ -39,7 +41,7 @@ _OPERATIONS: Mapping[str, Mapping[str, C]] = {
     "message.delete": {"telegram": C.MESSAGE_DELETE},
     "message.pin": {"telegram": C.MESSAGE_PIN, "whatsapp": C.MESSAGE_PIN},  # G8
     "message.unpin": {"telegram": C.MESSAGE_PIN, "whatsapp": C.MESSAGE_PIN},
-    "message.mark_read": {"whatsapp": C.MESSAGE_MARK_READ},
+    "message.mark_read": {"whatsapp": C.MESSAGE_MARK_READ, "telegram": C.MESSAGE_MARK_READ},
     "message.forward": {"telegram": C.MESSAGE_FORWARD},  # G7
 }
 

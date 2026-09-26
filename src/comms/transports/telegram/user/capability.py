@@ -40,7 +40,8 @@ _LOOKUP_STATE = {
     "DEADLINE_EXCEEDED": S.TEMPORARILY_UNAVAILABLE,
 }
 _SEND = frozenset({C.MESSAGE_SEND, C.MESSAGE_EDIT, C.MESSAGE_FORWARD})
-_PRIVATE = _SEND | {C.MESSAGE_DELETE, C.MESSAGE_PIN, C.HISTORY_READ, C.HISTORY_SEARCH}
+_PRIVATE = _SEND | {C.MESSAGE_DELETE, C.MESSAGE_PIN, C.HISTORY_READ, C.HISTORY_SEARCH,
+                    C.MESSAGE_MARK_READ}  # fmt: skip  # A47: a person's conversation only
 _ROSTER = frozenset({C.MEMBER_LIST, C.MEMBER_GET, C.ADMIN_LIST})
 _RIGHT = {
     C.MESSAGE_DELETE: "delete_messages",
@@ -82,6 +83,7 @@ _SPECIAL = frozenset(
         C.HISTORY_READ,
         C.HISTORY_SEARCH,
         C.TOPIC_LIST,
+        C.MESSAGE_MARK_READ,  # A47: never a group
     }
 )
 assert set(TELEGRAM_CAPABILITIES) == _SEND | _ROSTER | set(_RIGHT) | _SPECIAL  # one rule each
@@ -158,6 +160,8 @@ def _state(cap: C, view: SelfRights) -> S:
 
     if cap in (C.HISTORY_READ, C.HISTORY_SEARCH):
         return S.AVAILABLE
+    if cap is C.MESSAGE_MARK_READ:  # A47: a group is never marked read
+        return S.UNAVAILABLE
     if cap in _SEND:
         if view.kind == "broadcast":
             return has("post_messages")

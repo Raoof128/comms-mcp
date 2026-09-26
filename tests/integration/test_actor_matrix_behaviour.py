@@ -155,6 +155,10 @@ def _world(actor, tmp_path):
         dm = ProviderTarget("whatsapp", "whatsapp_cloud", w["rcp"], WA_PHONE)
         page = built.services.context.archive(w["rcp"], dm, limit=1)
         w["dm_message"] = page["items"][0]["message_ref"]
+    elif actor == "telegram_user":  # A47: the account's own message in the person's chat
+        person = d.member_identity(conn, w["rcp"], "telegram")
+        w["dm_message"] = object_ref(conn, "message", "telegram", actor, None,
+                                     f"{person}:55", now=NOW)  # fmt: skip
     dispatcher = built.dispatcher
     specs = {spec.name: spec for spec in TOOL_CATALOG}
     return w, dispatcher, admins[actor], specs
@@ -183,10 +187,10 @@ def _arguments(spec, w, actor, dispatcher, message, cursor):
         "capability": "member.ban", "tag": "vip", "language": "en", "category": "MARKETING",
         "components": [{"type": "BODY", "text": "Hi"}],
     }  # fmt: skip
+    if spec.name == "comms_message_mark_read" and "dm_message" in w:
+        values.update(message=w["dm_message"])  # conversation-addressed: a direct message
     if actor == "whatsapp_cloud":
         values.update(media=w["media"])
-        if spec.name == "comms_message_mark_read":  # conversation-addressed: a direct message
-            values.update(message=w["dm_message"])
         if spec.name.startswith("comms_whatsapp_template_"):
             values.update(name="spring")  # the one template the source double holds
     required = set(spec.input_schema.get("required", ()))

@@ -44,6 +44,15 @@ def summary(actor: str, outcome: MutationOutcome) -> dict[str, Any]:
     }
 
 
+def _shared_ids(target: ProviderTarget, minted_by: str) -> bool:
+    """Whether a message id one actor read is valid for the acting one (A47, Gx6). Telegram
+    numbers a private chat's and a basic group's messages per account; a supergroup or channel
+    (a ``-100`` marked id) shares one sequence, and WhatsApp has one account."""
+    if target.transport != "telegram" or minted_by == target.actor:
+        return True
+    return target.identity.startswith("-100")
+
+
 class ProviderWrites:
     def __init__(
         self, conn: Any, capability: CapabilityService, executor: MutationExecutor
@@ -100,7 +109,7 @@ class ProviderWrites:
         identity = found.provider_identity
         if kind == "message":
             chat, _sep, message_id = identity.rpartition(":")
-            if chat != target.identity:
+            if chat != target.identity or not _shared_ids(target, found.actor):
                 raise CommsError("NOT_FOUND")
             telegram = target.transport == "telegram"  # a Telegram message id is an integer
             return int(message_id) if telegram and message_id.isdigit() else message_id

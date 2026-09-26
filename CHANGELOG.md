@@ -724,3 +724,11 @@
 - **Files changed:** `docs/superpowers/plans/2026-09-26-comms-v0.3-a47.md`, `docs/comms-spec-v0.3.md` (A47 corrected), `docs/verification/comms-v0.3-rulings.md` (re-pin, R-A47-docs2), `AGENT.md`, `CHANGELOG.md`.
 - **Verification:** each finding was produced by running Telethon 1.45.0 or our code (a temporary probe test, not committed); the full gate (GATE ok=1).
 - **Follow-ups:** the owner approves the A47 plan before H1.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** A47 H1: the Telegram user account marks a person's conversation read (branch `comms-v0.3-a47`).
+- **Summary:** `messages.readHistory` on a person's peer, reviewed under `cap.message.mark_read` only; every other read-acknowledge request stays absent. The facade routes by the `cmg_`'s actor. The write path now refuses another actor's message id outside a supergroup or channel, which fixes a latent cross-actor defect for edit, delete and pin as well.
+- **Files changed:** `src/comms/core/providers/semantics.py`, `src/comms/transports/telegram/user/{capability,admin,admin_messages}.py`, `src/comms/transports/telegram/telegram/telethon_adapter.py`, `src/comms/services/{messages,writes}.py`, `src/comms/runtime/facades.py`, `tests/transports/test_mark_read.py` (new), `tests/security/test_phase4_architecture.py`, `tests/integration/test_actor_matrix_behaviour.py`, `docs/verification/{telegram-rpc-review.md,comms-v0.3-actor-matrix.md,comms-v0.3-rulings.md}`, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 10 new tests, written first and seen failing; the full gate (GATE ok=1).
+- **Follow-ups:** H2 (Telegram `med_` refs and schema v8).

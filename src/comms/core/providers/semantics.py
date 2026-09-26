@@ -120,6 +120,9 @@ SUPPORT: Mapping[C, tuple[str, ...]] = MappingProxyType(
         C.JOIN_REQUEST_REJECT: (*_TELEGRAM, CLOUD),
         C.GROUP_CREATE: (USER, CLOUD),  # G8: WhatsApp creates asynchronously
         C.GROUP_DELETE: (USER, CLOUD),
+        # A47: the user account marks a person's conversation read (messages.readHistory);
+        # the bot has no read state outside a business connection
+        C.MESSAGE_MARK_READ: (USER, CLOUD),
     }
 )
 

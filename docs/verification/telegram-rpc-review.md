@@ -69,6 +69,7 @@ dropped link fails the in-flight call and only the daemon's keeper reconnects.
 | `cap.message.delete` | `messages.DeleteMessagesRequest` | https://core.telegram.org/method/messages.deleteMessages | destroys or converts an object | `DESTRUCTIVE_NONIDEMPOTENT`, `resolve_only` |
 | `cap.message.forward` | `messages.ForwardMessagesRequest` | https://core.telegram.org/method/messages.forwardMessages | posts a message | `MESSAGE_SEND`, `retry_same_key` |
 | `cap.message.pin` | `messages.UpdatePinnedMessageRequest` | https://core.telegram.org/method/messages.updatePinnedMessage | sets a chat or member state | `SET_STATE`, `retry_same_key` |
+| `cap.message.mark_read` | `messages.ReadHistoryRequest` | https://core.telegram.org/method/messages.readHistory | marks a person's conversation read up to `max_id` (users only; bots cannot call it) | `SET_STATE`, `retry_same_key`; spec A47: the owner lifted this one prohibition (2026-09-26, R-G9b). A person's peer only (`UserAdmin` refuses a group); never under `mcp.retrieval` or any read |
 | `cap.member.add` | `channels.InviteToChannelRequest` | https://core.telegram.org/method/channels.inviteToChannel | sets a chat or member state | `SET_STATE`, `retry_same_key` |
 | `cap.member.add` | `messages.AddChatUserRequest` | https://core.telegram.org/method/messages.addChatUser | sets a chat or member state | `SET_STATE`, `retry_same_key` |
 | `cap.member.remove` | `channels.EditBannedRequest` | https://core.telegram.org/method/channels.editBanned | sets a chat or member state | `SET_STATE`, `retry_same_key`; a saga of `member.ban`, `member.unban` |
@@ -114,7 +115,7 @@ dropped link fails the in-flight call and only the daemon's keeper reconnects.
 - `contacts.ResolveUsernameRequest`, `channels.GetChannelsRequest`.
 - Every takeout request.
 - `messages.SearchGlobalRequest`.
-- `messages.ReadHistoryRequest` and the other read-acknowledge methods.
+- `channels.ReadHistoryRequest`, `messages.ReadMessageContentsRequest`, `messages.ReadMentionsRequest`, `messages.ReadReactionsRequest` and every other read-acknowledge method. (`messages.ReadHistoryRequest` left this list under spec A47, by the owner's decision, for `cap.message.mark_read` on a person's conversation only.)
 - `messages.GetMessagesViewsRequest`.
 
 Transport requests Telethon issues on the sender directly (not through
