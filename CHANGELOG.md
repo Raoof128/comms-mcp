@@ -708,3 +708,11 @@
 - **Files changed:** `src/comms/transports/whatsapp/cloud/http.py`, `tests/conformance/meta_oracle.py`, `docs/comms-spec-v0.3.md` (A47), `docs/verification/{comms-v0.3.md,comms-v0.3-rulings.md}` (A47 pin, R-G9b), `docs/superpowers/plans/2026-09-26-comms-v0.3-a47.md` (new), `AGENT.md`, `CHANGELOG.md`.
 - **Verification:** the oracle test failed on the old part name and passes on the fix; the capability-id test now bounds each amendment's section (it read A47 as part of A46); the full gate (GATE ok=1).
 - **Follow-ups:** the owner approves the A47 plan (H1–H6); merge and push of `comms-v0.3-catalog`.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** The A47 plan gauntleted against the developer docs (branch `comms-v0.3-catalog`).
+- **Summary:** Eighteen findings (Gf1–Gf18) from Telegram's files, file-reference, datacenter and config pages, the method and constructor pages, Bot API 10.3, Meta's media reference and group messaging, pywa 4.5.0 and the installed Telethon 1.45.0. Two corrected A47: files live on their own DC (downloads go there through a borrowed sender under the same allowlist, never refused), and an uploaded file has no message to refresh its reference from (an expiry answers `NOT_FOUND`). The rest refine the plan: the bot's `med_` is keyed by `file_unique_id`; one part-upload helper covers files above 10 MB (`saveBigFilePart`) and is shared with G8's group photo; there are no kind changes on resend; `cdn_supported` stays unset; `FLOOD_PREMIUM_WAIT` is a rate limit; WhatsApp images are JPEG or PNG at most 5 MB; the bot file URL carries the token.
+- **Files changed:** `docs/superpowers/plans/2026-09-26-comms-v0.3-a47.md`, `docs/comms-spec-v0.3.md` (A47 corrected), `docs/verification/comms-v0.3-rulings.md` (re-pin, R-A47-docs), `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** the preflight pin, capability-id and supersession tests; the full gate (GATE ok=1).
+- **Follow-ups:** the owner approves the gauntleted A47 plan before H1.
