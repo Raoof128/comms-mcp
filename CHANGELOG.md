@@ -604,3 +604,11 @@
 - **Files changed:** `src/comms/mcp/tools/directory_people.py` (new), `src/comms/mcp/tools/__init__.py`, `src/comms/services/directory.py`, `src/comms/core/campaigns/directory.py`, `src/comms/core/campaigns/directory_views.py`, `src/comms/runtime/facades.py`, `src/comms/mcp/egress.py`, `tests/mcp/test_catalog_directory_people.py` (new), `tests/security/test_v03_egress.py`, `tests/mcp/catalog_pin.json`, the rulings, the plan, the ledger, `AGENT.md`, `CHANGELOG.md`.
 - **Verification:** 48 new tests; the egress sweep runs the new tools; the full gate passed (GATE ok=1).
 - **Follow-ups:** G3 adds contact points.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Catalog amendment G3: `comms_directory_contact_*` (branch `comms-v0.3-catalog`).
+- **Summary:** Add, disable and opt out a person's WhatsApp number or Telegram user id. The identity is input only: it is bound to the request by a keyed HMAC (an unkeyed digest of a phone number in the audit chain could be brute-forced) and never echoed. An opt-out now survives disabling and blocks re-adding. `contact_add` is host-confirmed.
+- **Files changed:** `src/comms/core/domains.py`, `src/comms/core/campaigns/binding.py` (new), `src/comms/core/campaigns/directory.py`, `src/comms/services/directory.py`, `src/comms/runtime/comms_runtime.py`, `src/comms/runtime/facades.py`, `src/comms/mcp/tools/directory_people.py`, `.claude/settings.json`; tests `tests/mcp/test_catalog_directory_contacts.py` (new), `tests/mcp/test_catalog_directory_people.py`, `tests/security/test_v03_egress.py`, `tests/security/test_comms_wire_frozen.py`, `tests/mcp/catalog_pin.json`; the rulings, the ledger, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 26 new tests (the opt-out guard mutation-checked); the full gate passed (GATE ok=1).
+- **Follow-ups:** G4 adds destinations and location membership.

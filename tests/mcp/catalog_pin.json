@@ -1,5 +1,5 @@
 {
-  "count": 115,
+  "count": 118,
   "names": [
     "comms_capability_list",
     "comms_context_get",
@@ -115,7 +115,10 @@
     "comms_directory_recipient_create",
     "comms_directory_recipient_update",
     "comms_directory_recipient_enable",
-    "comms_directory_recipient_disable"
+    "comms_directory_recipient_disable",
+    "comms_directory_contact_add",
+    "comms_directory_contact_disable",
+    "comms_directory_contact_opt_out"
   ],
   "tools": {
     "comms_capability_list": "52c9c68aadd227b8eafb7c50d6676e6543c5e46109c51939cffc8b142737e8bb",
@@ -232,7 +235,10 @@
     "comms_directory_recipient_create": "ee9ce3e180921269872d36f4b4a3611db4ae37c7969fb48df6c4ce1304af7525",
     "comms_directory_recipient_update": "a20dcfaf9833b685a1b2b4ad8ebfa918a0f6d91eaecb462b8c9fff059f415443",
     "comms_directory_recipient_enable": "46a90aaab1183b203a36746bd793d42c6746ee76852fcb1feeddd4879b43d971",
-    "comms_directory_recipient_disable": "a97da62fea8b38a87b8383ed2c3c20fda3e170d34f0db681dd08a781afd3d94d"
+    "comms_directory_recipient_disable": "a97da62fea8b38a87b8383ed2c3c20fda3e170d34f0db681dd08a781afd3d94d",
+    "comms_directory_contact_add": "70eb9f99a8044eb56e5d490be989dc4cdbb75b1874fae6414e1332dd144d534c",
+    "comms_directory_contact_disable": "433e9c60926cd7ab9d7f1287cd261387a8fa810e1b34c91d53fca408a67bbecb",
+    "comms_directory_contact_opt_out": "8fa38874d4681868071885850615631cacc4351a86521d81a63c8f03c2ac9840"
   },
-  "catalog": "7233812c49a5441bc526353b03f5bb05d539602e464096b194b2c9c24531188b"
+  "catalog": "9902f4e10b9a57bb2569a66cd8b4374bdcb244cf03c15fd0226b7934fb2e8efd"
 }

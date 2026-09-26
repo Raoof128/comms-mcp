@@ -266,6 +266,12 @@ def add_contact_point_in_tx(
         raise DirectoryError("recipient already has an enabled contact point on this transport")
     identity_id = _identity_id(conn, transport, platform_identity, normalize)
     _refuse_second_enabled(conn, "contact_points", identity_id)
+    opted_out = conn.execute(
+        "SELECT 1 FROM contact_points WHERE identity_id = ? AND opted_out_at IS NOT NULL",
+        (identity_id,),
+    ).fetchone()
+    if opted_out is not None:  # an opt-out outlives disabling (G3): never re-added silently
+        raise DirectoryError("delivery identity has opted out")
     conn.execute(
         "INSERT INTO contact_points (ref, recipient_id, transport, platform_identity,"
         " identity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",

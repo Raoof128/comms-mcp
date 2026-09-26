@@ -12,6 +12,7 @@ __all__ = [
     "AUDIT_CHECKPOINT",
     "AUDIT_GENESIS",
     "CURSOR",
+    "DIRECTORY_IDENTITY",
     "IDEMPOTENCY",
     "LOCAL_LEASE",
     "LOCAL_LEASE_AUDIENCE",
@@ -41,3 +42,4 @@ LOCAL_LEASE = b"comms-local-lease/v1\0"  # comms v0.3 A33 (Task D27)
 LOCAL_LEASE_AUDIENCE = "comms-loopback"  # comms v0.3 A33: a cml1 payload's aud
 BACKUP_BINDING = b"comms-backup-binding/v1\0"  # comms v0.3 B25
 BACKUP_SCHEMA = b"comms-backup/v1\0"  # comms v0.3 B25: the payload's schema name
+DIRECTORY_IDENTITY = b"comms-directory-identity/v1\0"  # catalog amendment G3 (A45, D1)

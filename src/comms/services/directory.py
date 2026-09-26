@@ -8,6 +8,8 @@ returns counts and endpoint refs — never a delivery identity.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from typing import Any
 
 from comms.core.audit.writer import AuditWriter
@@ -19,7 +21,7 @@ from comms.core.errors import CommsError
 from comms.services.local import effect, mapped, next_cursor, page_args, run_local
 from comms.services.mutations import CallContext, MutationExecutor
 
-__all__ = ["RESOLVE_ENDPOINTS_MAX", "DirectoryService"]
+__all__ = ["RESOLVE_ENDPOINTS_MAX", "DirectoryService", "IdentityRule"]
 
 RESOLVE_ENDPOINTS_MAX = 500
 _NAME_MAX = 200
@@ -31,6 +33,16 @@ def _name(name: object) -> str:
     return name
 
 
+@dataclass(frozen=True)
+class IdentityRule:
+    """One transport's identity rule for one directory kind (G3, G4): ``platform`` turns the
+    owner's input into the stored platform identity, ``canonical`` into the delivery identity.
+    Both raise ``ValueError``; the runtime supplies them, so services import no transport."""
+
+    platform: Callable[[str], str]
+    canonical: Callable[[str], str]
+
+
 def _ref(value: object, prefix: str) -> str:
     """A ref of one kind, or NOT_FOUND before anything is recorded (D16)."""
     if not isinstance(value, str) or not value.startswith(prefix):
@@ -39,8 +51,30 @@ def _ref(value: object, prefix: str) -> str:
 
 
 class DirectoryService:
-    def __init__(self, writer: AuditWriter, executor: MutationExecutor) -> None:
+    def __init__(
+        self,
+        writer: AuditWriter,
+        executor: MutationExecutor,
+        rules: Mapping[tuple[str, str], IdentityRule] | None = None,
+        bind: Callable[[str, str], str] | None = None,
+    ) -> None:
         self._writer, self._executor = writer, executor
+        self._rules, self._bind = rules or {}, bind
+
+    def _identity(self, kind: str, transport: object, raw: object) -> tuple[str, str, str]:
+        """``(platform identity, canonical identity, keyed binding)``, or INVALID_ARGUMENT
+        before anything is recorded. The raw identity never reaches an error or a digest."""
+        rule = self._rules.get((kind, transport)) if isinstance(transport, str) else None
+        if rule is None or not isinstance(raw, str):
+            raise CommsError("INVALID_ARGUMENT")
+        try:
+            platform = rule.platform(raw)
+            canonical = rule.canonical(platform)
+        except (ValueError, KeyError):
+            raise CommsError("INVALID_ARGUMENT") from None
+        if self._bind is None:
+            raise CommsError("NOT_CONFIGURED")
+        return platform, canonical, self._bind(str(transport), canonical)
 
     # -- locations ------------------------------------------------------------------------
 
@@ -210,6 +244,51 @@ class DirectoryService:
             {},
             request_id,
             effect(lambda tx: d.set_enabled_in_tx(tx.conn, recipient, enabled, now=tx.now)),
+        )
+
+    # -- contact points (catalog amendment G3) ---------------------------------------------
+
+    def contact_add(
+        self, ctx: CallContext, recipient: str, transport: str, identity: str, request_id: str
+    ) -> dict[str, Any]:
+        """A person's number or Telegram user id: input only, never echoed (A26, D1)."""
+        platform, _canonical, binding = self._identity("contact", transport, identity)
+        rule = self._rules[("contact", transport)]
+        return run_local(
+            self._executor,
+            ctx,
+            "comms_directory_contact_add",
+            {"recipient": _ref(recipient, "rcp_")},
+            {"transport": transport, "identity_binding": binding},
+            request_id,
+            lambda tx: {
+                "contact": d.add_contact_point_in_tx(
+                    tx.conn, recipient, transport, platform, normalize=rule.canonical, now=tx.now
+                )
+            },
+        )
+
+    def contact_disable(self, ctx: CallContext, contact: str, request_id: str) -> dict[str, Any]:
+        return run_local(
+            self._executor,
+            ctx,
+            "comms_directory_contact_disable",
+            {"contact": _ref(contact, "rct_")},
+            {},
+            request_id,
+            effect(lambda tx: d.set_enabled_in_tx(tx.conn, contact, False, now=tx.now)),
+        )
+
+    def contact_opt_out(self, ctx: CallContext, contact: str, request_id: str) -> dict[str, Any]:
+        """Recorded once, permanent: campaigns skip it and it is never re-added (G3)."""
+        return run_local(
+            self._executor,
+            ctx,
+            "comms_directory_contact_opt_out",
+            {"contact": _ref(contact, "rct_")},
+            {},
+            request_id,
+            effect(lambda tx: d.opt_out_in_tx(tx.conn, contact, now=tx.now)),
         )
 
     # -- shared ---------------------------------------------------------------------------

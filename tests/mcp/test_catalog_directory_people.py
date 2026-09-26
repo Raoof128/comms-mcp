@@ -20,7 +20,7 @@ from tests.core.campaign_helpers import NOW
 from tests.mcp import family
 from tests.services.group_fixtures import CTX
 
-BY_NAME = {spec.name: spec for spec in DIRECTORY_PEOPLE_TOOLS}
+BY_NAME = {s.name: s for s in DIRECTORY_PEOPLE_TOOLS if "_recipient_" in s.name}
 NAMES = sorted(BY_NAME)
 READS = {"comms_directory_recipient_list", "comms_directory_recipient_get"}
 PHONE = "+61400000001"

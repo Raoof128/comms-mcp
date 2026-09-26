@@ -1,4 +1,4 @@
-"""The directory's people over MCP (catalog amendment G2; spec A45).
+"""The directory's people and their contact points over MCP (catalog amendment G2, G3).
 
 A person is a ``rcp_`` ref with a label and contact points. Outputs carry the label under
 ``untrusted`` (owner-typed, but it can reach a model as text) and each contact point by its
@@ -38,18 +38,19 @@ def _done(**extra: Mapping[str, Any]) -> dict[str, Any]:
 
 def _write(
     verb: str, title: str, description: str, inputs: Mapping[str, Any], output: Mapping[str, Any],
-    *, idempotent: bool = True,
+    *, idempotent: bool = True, noun: str = "recipient", open_world: bool = False,
 ) -> ToolSpec:  # fmt: skip
     return write(
-        f"comms_directory_recipient_{verb}",
+        f"comms_directory_{noun}_{verb}",
         title,
         description,
-        f"directory.recipient_{verb}",
+        f"directory.{noun}_{verb}",
         inputs,
         list(inputs),
         output,
         idempotent=idempotent,
         failures=_FAILURES,
+        open_world=open_world,
     )
 
 
@@ -123,5 +124,39 @@ DIRECTORY_PEOPLE_TOOLS: tuple[ToolSpec, ...] = (
         "Disable a person: campaigns and name resolution skip them. Nothing is deleted.",
         {"recipient": _RECIPIENT},
         _done(),
+    ),
+    # -- contact points (G3): the identity is input only, never an output ------------------
+    _write(
+        "add",
+        "Add a number or account",
+        "Give a person a WhatsApp number (E.164, e.g. +61400000001) or a numeric Telegram user "
+        "id. The identity is stored encrypted and never returned; campaigns can then reach the "
+        "person on that transport, so the host asks first.",
+        {
+            "recipient": _RECIPIENT,
+            "transport": {"enum": ["whatsapp", "telegram"]},
+            "identity": string(1, 32),
+        },
+        _done(contact=ref("contact_point")),
+        idempotent=False,
+        noun="contact",
+        open_world=True,
+    ),
+    _write(
+        "disable",
+        "Disable a number or account",
+        "Stop using one contact point; the person keeps their others.",
+        {"contact": ref("contact_point")},
+        _done(),
+        noun="contact",
+    ),
+    _write(
+        "opt_out",
+        "Record an opt-out",
+        "Record that this number or account opted out: campaigns skip it, and it can never be "
+        "added again under any person.",
+        {"contact": ref("contact_point")},
+        _done(),
+        noun="contact",
     ),
 )
