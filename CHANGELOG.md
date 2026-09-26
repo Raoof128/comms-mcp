@@ -716,3 +716,11 @@
 - **Files changed:** `docs/superpowers/plans/2026-09-26-comms-v0.3-a47.md`, `docs/comms-spec-v0.3.md` (A47 corrected), `docs/verification/comms-v0.3-rulings.md` (re-pin, R-A47-docs), `AGENT.md`, `CHANGELOG.md`.
 - **Verification:** the preflight pin, capability-id and supersession tests; the full gate (GATE ok=1).
 - **Follow-ups:** the owner approves the gauntleted A47 plan before H1.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** The A47 plan gauntleted again, this time by executing the code it relies on (branch `comms-v0.3-catalog`).
+- **Summary:** Thirteen findings (Gx1–Gx13). Three would have broken H1–H3: Telethon's exported-sender path sends `auth.exportAuthorization` and `help.getConfig` through our allowlist; a person's Telegram `cmg_` can be the bot's, with the bot chat's ids; the mark-read facade is WhatsApp-only. Also: the migrate and expired-reference errors need catching before the general classification; there are no media columns (schema v8 `media_facts`); `file_id` is read from the retained update rather than stored twice; Telethon's public `get_input_location` is used and pinned; WhatsApp images are checked by magic bytes; the bot download is streamed, capped and path-checked; and `cmg_` replaces `msg_`, which is WhatsVault's.
+- **Files changed:** `docs/superpowers/plans/2026-09-26-comms-v0.3-a47.md`, `docs/comms-spec-v0.3.md` (A47 corrected), `docs/verification/comms-v0.3-rulings.md` (re-pin, R-A47-docs2), `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** each finding was produced by running Telethon 1.45.0 or our code (a temporary probe test, not committed); the full gate (GATE ok=1).
+- **Follow-ups:** the owner approves the A47 plan before H1.
