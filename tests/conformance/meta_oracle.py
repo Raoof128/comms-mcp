@@ -50,6 +50,12 @@ def _g8(request: httpx.Request) -> tuple[int, dict] | None:
         return 200, {"messaging_product": "whatsapp", "id": GROUP, "subject": "Fixture group",
                      "participants": [{"wa_id": "61400000001"}],
                      "total_participant_count": "1"}  # fmt: skip
+    if (
+        parts == [GROUP]
+        and method == "POST"
+        and "multipart" in request.headers.get("content-type", "")
+    ):
+        return 200, {"success": True}  # the group's picture (G8)
     if parts == [GROUP] and method == "DELETE":
         return 200, {"success": True}
     if parts == [GROUP, "invite_link"] and method == "GET":

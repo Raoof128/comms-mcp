@@ -77,6 +77,7 @@ REVIEWED_RPCS: frozenset[str] = frozenset(
         "messages.MigrateChatRequest",
         "messages.SendMessageRequest",
         "messages.UpdatePinnedMessageRequest",
+        "upload.SaveFilePartRequest",  # catalog amendment G8: a group photo, in parts
     }
 )
 

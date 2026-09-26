@@ -45,7 +45,12 @@ WRITES = {
         {"description": "Sal-e no"},
         False,
     ),
-    "comms_group_info_set_photo": (C.CHAT_SET_PHOTO, None, {"media": "med_" + "a" * 26}, False),
+    "comms_group_info_set_photo": (
+        C.CHAT_SET_PHOTO,
+        None,
+        {"data_b64": "/9j/4A==", "mime": "image/jpeg"},
+        False,
+    ),
     "comms_group_invite_create": (
         C.INVITE_CREATE,
         "group.invite.create",

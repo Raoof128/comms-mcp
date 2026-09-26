@@ -50,6 +50,11 @@ class Media:
     def info(self, media_id):
         return {"mime_type": "image/png", "file_size": 1234, "sha256": "ab" * 32}
 
+    def retrieve(self, media_id):  # G8: the bytes, as MediaOps.retrieve gives them
+        from comms.transports.whatsapp.cloud.media import MediaBlob
+
+        return MediaBlob(b"\x89PNG fixture", "image/png", "")
+
 
 class WebhookState:
     def counts(self):
@@ -169,13 +174,6 @@ def test_media_delete_is_an_audited_write(world):
     result = _media(world).delete(CTX, ACCOUNT, ref, _req())
     assert result["result"] == "SUCCEEDED"
     assert world["admins"]["whatsapp_cloud"].calls == [(C.MEDIA_DELETE, {"media_id": "7788990011"})]
-
-
-@pytest.mark.parametrize("call", ["upload", "download"])
-def test_media_upload_and_download_are_not_offered_yet(world, call):
-    with pytest.raises(CommsError) as refused:
-        getattr(_media(world), call)()
-    assert refused.value.code == "PROVIDER_UNSUPPORTED"
 
 
 # -- account (P §34) -------------------------------------------------------------------------

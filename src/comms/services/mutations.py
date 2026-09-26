@@ -85,6 +85,15 @@ def request_digest(tool: str, args: Mapping[str, Any], targets: Mapping[str, Any
     return hashlib.sha256(domains.REQUEST_DIGEST + body).hexdigest()
 
 
+def _digestible(args: Mapping[str, Any]) -> dict[str, Any]:
+    """File bytes (G8: a media upload, a group photo) enter the request digest as their SHA-256
+    and size only; they never reach a digest, a record or the audit chain themselves."""
+    return {
+        k: {"sha256": hashlib.sha256(v).hexdigest(), "size": len(v)} if isinstance(v, bytes) else v
+        for k, v in args.items()
+    }
+
+
 def op_key(client_ref: str, request_id: str) -> str:
     body = jcs_dumps({"client": client_ref, "request": request_id})
     return hashlib.sha256(domains.ADMIN_OP + body).hexdigest()
@@ -221,7 +230,7 @@ class MutationExecutor:
             "capability": op.capability.value,
             "destination": target.destination_ref,
         }
-        digest = request_digest(tool, op.args, targets)
+        digest = request_digest(tool, _digestible(op.args), targets)
         mutation_id, op_ref = 0, ""
         try:
             with self._writer.transaction() as tx:

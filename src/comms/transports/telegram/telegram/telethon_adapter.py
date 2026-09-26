@@ -16,6 +16,7 @@ import contextlib
 import fcntl
 import inspect
 import os
+import secrets
 import stat
 from collections.abc import Callable, Iterator, Mapping
 from contextvars import ContextVar
@@ -166,7 +167,12 @@ ADMIN_RPCS: Mapping[Capability, frozenset[str]] = MappingProxyType(
         ),
         Capability.CHAT_SET_DESCRIPTION: frozenset({"messages.EditChatAboutRequest"}),
         Capability.CHAT_SET_PHOTO: frozenset(
-            {"messages.EditChatPhotoRequest", "channels.EditPhotoRequest"}
+            # G8: the photo goes up in upload.saveFilePart parts first, then is set
+            {
+                "messages.EditChatPhotoRequest",
+                "channels.EditPhotoRequest",
+                "upload.SaveFilePartRequest",
+            }
         ),
         Capability.CHAT_SET_PERMISSIONS: frozenset({"messages.EditChatDefaultBannedRightsRequest"}),
         Capability.TOPIC_CREATE: frozenset({"messages.CreateForumTopicRequest"}),
@@ -613,6 +619,15 @@ def _reactions_clear(
     )
 
 
+def _chat_photo(
+    session: TelethonSession, peer_type: str, peer_id: int, spec: Mapping[str, Any]
+) -> Any:
+    photo = types.InputChatUploadedPhoto(file=spec["uploaded"])
+    if peer_type == "channel":
+        return functions.channels.EditPhotoRequest(session._admin_channel(peer_id), photo)
+    return functions.messages.EditChatPhotoRequest(peer_id, photo)
+
+
 def _invite_edit(
     session: TelethonSession, peer_type: str, peer_id: int, spec: Mapping[str, Any]
 ) -> Any:
@@ -765,6 +780,7 @@ _ADMIN_BUILDERS: Mapping[Capability, Callable[..., Any]] = MappingProxyType(
         Capability.CHAT_SET_TITLE: _title,
         Capability.CHAT_SET_DESCRIPTION: _about,
         Capability.CHAT_SET_PERMISSIONS: _default_rights,
+        Capability.CHAT_SET_PHOTO: _chat_photo,  # G8
         Capability.INVITE_CREATE: _invite_create,
         Capability.INVITE_EDIT: _invite_edit,
         Capability.INVITE_REVOKE: _invite_revoke,
@@ -805,6 +821,7 @@ _ROLE: Mapping[type, str] = MappingProxyType(
 )
 
 
+PHOTO_PART = 512 * 1024  # upload.saveFilePart's part size (G8)
 MAX_ADMINS = 200  # a channel's administrators (Telegram caps them at 50; one page holds all)
 
 
@@ -1106,6 +1123,28 @@ class TelethonSession:
             peer, text, random_id=random_id, reply_to=replied
         )
         return await self._keyed_send(Capability.MESSAGE_SEND, request, random_id, timeout)
+
+    async def set_chat_photo(
+        self, peer_type: str, peer_id: int, data: bytes, *, timeout: float
+    ) -> ProviderResult:
+        """A group's photo (G8): the bytes in ``upload.saveFilePart`` parts of 512 KiB, then
+        ``channels.editPhoto`` / ``messages.editChatPhoto``, classified as every admin call.
+        A part that fails means nothing was set: the photo is provably unchanged."""
+        file_id = secrets.randbits(63)
+        parts = [data[i : i + PHOTO_PART] for i in range(0, len(data), PHOTO_PART)]
+        for index, part in enumerate(parts):
+            try:
+                await self.call_capability(
+                    Capability.CHAT_SET_PHOTO,
+                    functions.upload.SaveFilePartRequest(file_id, index, part),
+                    timeout=timeout,
+                )
+            except GatewayError:
+                return ProviderResult("FAILED", "PROVIDER_UNAVAILABLE")
+        uploaded = types.InputFile(file_id, len(parts), "photo.jpg", md5_checksum="")
+        return await self.admin_request(
+            Capability.CHAT_SET_PHOTO, peer_type, peer_id, {"uploaded": uploaded}, timeout=timeout
+        )
 
     async def forward_once(
         self, from_peer: Any, message_id: int, to_peer: Any, random_id: int, *, timeout: float

@@ -30,6 +30,8 @@ __all__ = [
     "MediaBlob",
     "MediaOps",
     "MediaRefused",
+    "check_upload",
+    "upload_media",
 ]
 
 META_MEDIA_HOST_SUFFIXES = ("fbsbx.com", "fbcdn.net", "whatsapp.net")
@@ -52,6 +54,25 @@ MEDIA_TYPES = frozenset(
         "text/plain",
     }
 )
+
+
+def check_upload(data: object, mime: object) -> None:
+    """A media upload's bytes and type, checked before any call (the one rule)."""
+    if not isinstance(data, bytes) or not 0 < len(data) <= MAX_MEDIA_BYTES:
+        raise ValueError("media size refused")
+    if mime not in MEDIA_TYPES:
+        raise ValueError("media type refused")
+
+
+def upload_media(api: GraphApi, data: bytes, mime: str) -> ProviderResult:
+    check_upload(data, mime)
+    result = admin_call(lambda: api.upload_media(data, mime))
+    if result.outcome != "SUCCEEDED":
+        return result
+    media_id = result.detail.get("id")
+    if not isinstance(media_id, str) or not media_id.isdigit():
+        return ProviderResult("OUTCOME_UNKNOWN", None)
+    return ProviderResult("SUCCEEDED", None, provider_ref=media_id)
 
 
 class MediaRefused(Exception):
@@ -79,17 +100,7 @@ class MediaOps:
 
     def upload(self, data: bytes, mime: str) -> ProviderResult:
         """``media.upload`` (CREATE, resolve-only): the ref is the new media id."""
-        if not isinstance(data, bytes) or not 0 < len(data) <= MAX_MEDIA_BYTES:
-            raise ValueError("media size refused")
-        if mime not in MEDIA_TYPES:
-            raise ValueError("media type refused")
-        result = admin_call(lambda: self._api.upload_media(data, mime))
-        if result.outcome != "SUCCEEDED":
-            return result
-        media_id = result.detail.get("id")
-        if not isinstance(media_id, str) or not media_id.isdigit():
-            return ProviderResult("OUTCOME_UNKNOWN", None)
-        return ProviderResult("SUCCEEDED", None, provider_ref=media_id)
+        return upload_media(self._api, data, mime)
 
     def info(self, media_id: str) -> dict[str, Any]:
         """``media.inspect``: type, size and digest — never the download URL."""

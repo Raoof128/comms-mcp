@@ -208,6 +208,8 @@ def _arguments(spec, w, actor, dispatcher, message, cursor):
     arguments = {k: values[k] for k in required if values.get(k) is not None}
     if spec.name.endswith("_edit") and "name" in spec.input_schema.get("properties", {}):
         arguments["name"] = "renamed"  # an edit must change something
+    if spec.name in ("comms_group_info_set_photo", "comms_media_upload"):  # G8: staged bytes
+        arguments.update(data_b64="/9j/4AAQ", mime="image/jpeg")
     if spec.requires_request_id:
         arguments["request_id"] = refs.mint("request")
     return arguments

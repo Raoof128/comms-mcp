@@ -61,9 +61,9 @@ class AdminSession(TextSender, Forwarder, Protocol):
         timeout: float,
     ) -> ProviderResult: ...
 
-    async def admin_log(
-        self, peer_id: int, *, max_id: int, limit: int, timeout: float
-    ) -> list[tuple[int, datetime, int, str]]: ...
+    async def set_chat_photo(
+        self, peer_type: str, peer_id: int, data: bytes, *, timeout: float
+    ) -> ProviderResult: ...
 
 
 Runner = Callable[[Coroutine[Any, Any, Any]], Any]
@@ -107,6 +107,12 @@ class UserAdmin:
             return self._forward(spec, peer_type, peer_id, target.identity, op_key)
         if op.capability is Capability.GROUP_CREATE:
             return self.create_group(op.args)
+        if op.capability is Capability.CHAT_SET_PHOTO:  # G8: uploaded in parts, then set
+            return self._run(  # type: ignore[no-any-return]
+                self._session.set_chat_photo(
+                    peer_type, peer_id, spec["photo"], timeout=ADMIN_TIMEOUT_S
+                )
+            )
         return self._run(  # type: ignore[no-any-return]
             self._session.admin_request(
                 op.capability, peer_type, peer_id, spec, timeout=ADMIN_TIMEOUT_S

@@ -1,5 +1,5 @@
 {
-  "count": 127,
+  "count": 129,
   "names": [
     "comms_capability_list",
     "comms_context_get",
@@ -127,7 +127,9 @@
     "comms_group_member_tag_set",
     "comms_message_reaction_remove",
     "comms_whatsapp_health_status",
-    "comms_group_member_reactions_clear"
+    "comms_group_member_reactions_clear",
+    "comms_media_stage_begin",
+    "comms_media_stage_chunk"
   ],
   "tools": {
     "comms_capability_list": "52c9c68aadd227b8eafb7c50d6676e6543c5e46109c51939cffc8b142737e8bb",
@@ -171,7 +173,7 @@
     "comms_group_permissions_set": "a0970946541d08e8cc4e86ff9e270e81aef715ee804269289d55694d2d6df00b",
     "comms_group_info_set_title": "8e632a36a06ac1ea176ed1bf76ce9d6f661b2324a9cec52e294571f4b2e6be5b",
     "comms_group_info_set_description": "1c13ea7fa003a76180636c644bf003f781186c7009c5b566aed7080a88403dc0",
-    "comms_group_info_set_photo": "3c6e306a227b2a5d893e50cfe29583a67087dee29e8b08a1ac0daf7dff741b2e",
+    "comms_group_info_set_photo": "fb58572fcd445b4d861bf193729b8098b22d95add461f9390eb5352317383323",
     "comms_group_invite_list": "4272b5a3ec0b3649c2f2e47b10bbdb96dfbe835f14741fcbf6d2325680e52237",
     "comms_group_invite_create": "0a91ec7e34332f9d681364e0648450c6f6b0dce0352461ac25d6c0ce2229014a",
     "comms_group_invite_edit": "fd9c06c0d927a3e0743b4abf4f2ac71368e46c0e169c0c5114fe383be11a92ff",
@@ -223,8 +225,8 @@
     "comms_whatsapp_template_edit": "5ae3e2b4c8816aaf5af5fb173c9b502ba7ec301e57c27734f16c1e48cd2e1e63",
     "comms_whatsapp_template_delete": "04ed750fd227fb19909a506d6144b74697fe71a62e1d6e2868be0af078afb2f6",
     "comms_media_inspect": "5dd6b10772d0a5647a49d39ac2b8b871f505deef9d46110b8991db4266276288",
-    "comms_media_upload": "615a8849ec969abcb3d930c05f3b08e899f94f65e6439435adaf9e23865e23ea",
-    "comms_media_download": "da26103a7a84b4a1cf3b8e62957d883bc12839d52e979568a90cb9b23b79fee6",
+    "comms_media_upload": "c214e0450de20408c77d5b9a3b624b442271867b147bba2d5330dc9442ea2284",
+    "comms_media_download": "25cfe5bba34868223061a75129d04c544be335dba1391af21edfff568ef997ea",
     "comms_media_delete": "22fd219d930bf12860ee5bd301713a30a85871cb986d6acecaf89ed6a10ed2af",
     "comms_account_status": "32bfce84b31905f4a166293adbc69d040fb61d2e77140f891bbefc6d54d9364c",
     "comms_account_profile": "6ae0e944e19d85028df41d2294a1c324d521290f49566d59eccc1bb195c584a6",
@@ -256,7 +258,9 @@
     "comms_group_member_tag_set": "fb5ba62a21071e5ab57b6522b43b323af0d8199e2cfdf855c52ca2a36b86e3e8",
     "comms_message_reaction_remove": "c23723c70cf4cb62e3919c5134b6b943f0549dcae58e70c4e4c8d6f7d59ece3e",
     "comms_whatsapp_health_status": "a3ed8574ff396dbd43a67c250120c3cb7c609ef0b75e52b86df58799ab2557e4",
-    "comms_group_member_reactions_clear": "0ce6cf04af121a2c52cefe6eca8af7997e185c729cb4f71c8095a0bfb5c026ed"
+    "comms_group_member_reactions_clear": "0ce6cf04af121a2c52cefe6eca8af7997e185c729cb4f71c8095a0bfb5c026ed",
+    "comms_media_stage_begin": "cc37c528b84fea6b6f408154321a3b7b5d1aae8e86d2a09a389dab7e9888ae8e",
+    "comms_media_stage_chunk": "deef3f81493eb7ab12757745ac66b1c64b3eaced773285a991db95995a8ce5c4"
   },
-  "catalog": "bc4c9b49c35373647465ad487e8a63d5d1a645f3766f2931ec9bdeb42b79c2fa"
+  "catalog": "7cecb5cde476951f7f10ae1a4b19eeaa7230c14de8bc60ef2597d1614e0781ca"
 }

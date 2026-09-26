@@ -65,7 +65,12 @@ class BotAdmin:
     def invoke(self, op: SemanticOperation, target: ProviderTarget, op_key: str) -> ProviderResult:
         method, params = self._request(op, target)
         try:
-            outcome: BotResponse | BotTransportError = self._api.call(method, params)
+            outcome: BotResponse | BotTransportError
+            if op.capability is Capability.CHAT_SET_PHOTO:  # G8: the photo as a file part
+                photo = ("photo", op.args["photo"], op.args["mime"])
+                outcome = self._api.call_multipart(method, params, {"photo": photo})
+            else:
+                outcome = self._api.call(method, params)
         except BotTransportError as exc:
             outcome = exc
         result = classify_admin(outcome)

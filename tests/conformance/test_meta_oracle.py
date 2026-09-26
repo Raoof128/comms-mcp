@@ -71,6 +71,7 @@ def test_oracle_serves_every_endpoint_the_adapter_calls():
         ),
         "create_group": lambda: api.create_group({"messaging_product": "whatsapp", "subject": "X"}),
         "delete_group": lambda: api.delete_group("120363049891234567"),
+        "update_group_photo": lambda: api.update_group_photo("120363049891234567", b"\xff\xd8\xff"),
         "business_profile": lambda: api.business_profile(),
         "health_status": lambda: api.health_status(),
     }

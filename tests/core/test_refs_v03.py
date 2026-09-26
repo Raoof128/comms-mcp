@@ -15,6 +15,7 @@ V03 = {
     "request": "req_",
     "cutover": "cut_",
     "client": "cli_",
+    "upload": "upl_",  # catalog amendment G8 (D3)
 }
 
 
@@ -30,7 +31,7 @@ def test_v03_prefixes_disjoint_from_telegram_whatsvault_and_5b4():
     from comms.transports.telegram.authority.refs import REF_PREFIXES
 
     values = list(refs.CORE_PREFIXES.values())
-    assert len(values) == len(set(values)) == 26
+    assert len(values) == len(set(values)) == 27
     others = set(REF_PREFIXES) | {"tgu_"} | {p + "_" for p in PREFIXES}
     assert not set(values) & others
 

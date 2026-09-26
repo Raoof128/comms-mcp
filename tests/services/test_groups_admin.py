@@ -128,7 +128,7 @@ def test_topic_edit_close_reopen_by_ref(world):
     assert len(threads) == 1 and all(type(t) is int for t in threads)
 
 
-@pytest.mark.parametrize("tool", ["group.topic.hide", "group.topic.unhide", "group.info.set_photo"])
+@pytest.mark.parametrize("tool", ["group.topic.hide", "group.topic.unhide"])
 def test_operations_no_adapter_performs_are_unsupported(world, tool):
     service, admins = group_service(world)
     with pytest.raises(CommsError) as refused:

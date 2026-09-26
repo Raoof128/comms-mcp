@@ -10,7 +10,8 @@ from comms.core.delivery.commitment import commit_context
 from comms.core.keys import rotate as rot
 from comms.mcp.catalog import TOOL_CATALOG
 from comms.mcp.dispatch import AuthenticatedClient, Dispatcher
-from comms.runtime.facades import NOT_OFFERED, Services, build_registry
+from comms.runtime import facades
+from comms.runtime.facades import Services, build_registry
 from comms.services.account import AccountService
 from comms.services.campaigns import CampaignService
 from comms.services.context import ContextEngine
@@ -136,11 +137,9 @@ def test_capability_and_identity(world):
     assert inspected.structured["identities"] == [{"transport": "telegram", "identity": "-77"}]
 
 
-@pytest.mark.parametrize("name", sorted({s.name for s in TOOL_CATALOG if s.service in NOT_OFFERED}))
-def test_tools_not_offered_answer_provider_unsupported(world, name):
-    spec = next(s for s in TOOL_CATALOG if s.name == name)
-    example = {k: v for k, v in _minimal(world, spec).items()}
-    assert _call(world, name, example).error_code in ("PROVIDER_UNSUPPORTED", "INVALID_ARGUMENT")
+def test_every_tool_is_offered():
+    """Catalog amendment G8 retired NOT_OFFERED: no tool answers a constant refusal."""
+    assert not hasattr(facades, "NOT_OFFERED")
 
 
 def _minimal(world, spec):

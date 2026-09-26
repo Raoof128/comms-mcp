@@ -99,6 +99,20 @@ def member_reaction(args: Mapping[str, Any]) -> Spec:
     return take(args, {"user_id": positive_int, "message_id": positive_int}, {})
 
 
+PHOTO_TYPES = frozenset({"image/jpeg", "image/png"})
+PHOTO_MAX = 10 * 1024 * 1024  # Telegram's photo limit
+
+
+def chat_photo(args: Mapping[str, Any]) -> Spec:
+    """A group photo (G8): JPEG or PNG bytes, at most 10 MiB."""
+    photo, mime = args.get("photo"), args.get("mime")
+    if set(args) != {"photo", "mime"} or mime not in PHOTO_TYPES:
+        raise ValueError("operation arguments are malformed")
+    if not isinstance(photo, bytes) or not 0 < len(photo) <= PHOTO_MAX:
+        raise ValueError("operation arguments are malformed")
+    return {"photo": photo, "mime": mime}
+
+
 def no_args(args: Mapping[str, Any]) -> Spec:
     """An operation that takes nothing (G6: resetting the primary invite link)."""
     return take(args, {}, {})

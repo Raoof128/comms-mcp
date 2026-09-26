@@ -94,6 +94,7 @@ dropped link fails the in-flight call and only the daemon's keeper reconnects.
 | `cap.chat.set_title` | `messages.EditChatTitleRequest` | https://core.telegram.org/method/messages.editChatTitle | sets a chat or member state | `SET_STATE`, `retry_same_key` |
 | `cap.chat.set_description` | `messages.EditChatAboutRequest` | https://core.telegram.org/method/messages.editChatAbout | sets a chat or member state | `SET_STATE`, `retry_same_key` |
 | `cap.chat.set_photo` | `channels.EditPhotoRequest` | https://core.telegram.org/method/channels.editPhoto | creates an object | `CREATE`, `resolve_only` |
+| `cap.chat.set_photo` | `upload.SaveFilePartRequest` | https://core.telegram.org/method/upload.saveFilePart | uploads a file part to the account's temporary storage; nothing is visible until the photo is set | `CREATE`, `resolve_only`; catalog amendment G8: the new group photo, in 512 KiB parts (reviewed 2026-09-26) |
 | `cap.chat.set_photo` | `messages.EditChatPhotoRequest` | https://core.telegram.org/method/messages.editChatPhoto | creates an object | `CREATE`, `resolve_only` |
 | `cap.chat.set_permissions` | `messages.EditChatDefaultBannedRightsRequest` | https://core.telegram.org/method/messages.editChatDefaultBannedRights | sets a chat or member state | `SET_STATE`, `retry_same_key` |
 | `cap.topic.create` | `messages.CreateForumTopicRequest` | https://core.telegram.org/method/messages.createForumTopic | creates an object | `CREATE`, `resolve_only` |

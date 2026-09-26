@@ -162,8 +162,10 @@ def test_set_state_operations_idempotent_by_semantics():
         C.CHAT_SET_DESCRIPTION,
         C.CHAT_SET_PERMISSIONS,
         C.MESSAGE_PIN,
+        C.CHAT_SET_PHOTO,  # G8: a CREATE (each photo joins the chat's history), below
     }
-    for cap in CHAT_REQUESTS:
+    assert SEMANTICS[(C.CHAT_SET_PHOTO, "telegram_bot")].retry_class == "CREATE"
+    for cap in set(CHAT_REQUESTS) - {C.CHAT_SET_PHOTO}:
         semantics = SEMANTICS[(cap, "telegram_bot")]
         assert (
             semantics.retry_class,

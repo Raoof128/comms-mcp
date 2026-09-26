@@ -36,6 +36,7 @@ def group_create(args: Mapping[str, Any]) -> dict[str, Any]:
 
 
 CHAT_SPECS = {
+    C.CHAT_SET_PHOTO: specs.chat_photo,  # G8
     C.CHAT_SET_TITLE: specs.set_title,
     C.CHAT_SET_DESCRIPTION: specs.set_description,
     C.CHAT_SET_PERMISSIONS: specs.set_permissions,

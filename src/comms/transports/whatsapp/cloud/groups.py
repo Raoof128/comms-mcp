@@ -21,6 +21,7 @@ from comms.core.providers.capability import CapabilityState as S
 from comms.core.providers.protocols import ProviderResult, ProviderTarget, SemanticOperation
 from comms.transports.whatsapp.cloud.classify import admin_call
 from comms.transports.whatsapp.cloud.http import GraphApi, GraphTransportError
+from comms.transports.whatsapp.cloud.media import check_upload, upload_media
 from comms.transports.whatsapp.cloud.templates import (
     TemplateOps,
     check_create,
@@ -132,7 +133,17 @@ _SETTINGS = {
 }
 
 
+WA_PHOTO_MAX = 5 * 1024 * 1024  # Meta: a group picture is a JPEG of at most 5 MB
+
+
 def _settings_args(args: Mapping[str, Any]) -> None:
+    if set(args) == {"photo", "mime"}:  # G8: the group's picture
+        photo = args["photo"]
+        if args["mime"] != "image/jpeg" or not isinstance(photo, bytes):
+            raise ValueError("operation arguments are malformed")
+        if not 0 < len(photo) <= WA_PHOTO_MAX:
+            raise ValueError("operation arguments are malformed")
+        return
     if (
         not args
         or not set(args) <= set(_SETTINGS)
@@ -142,6 +153,8 @@ def _settings_args(args: Mapping[str, Any]) -> None:
 
 
 def _settings(api: GraphApi, group_id: str, args: Mapping[str, Any]) -> ProviderResult:
+    if "photo" in args:
+        return admin_call(lambda: api.update_group_photo(group_id, args["photo"]))
     return admin_call(lambda: api.update_group(group_id, args))
 
 
@@ -327,6 +340,16 @@ def phone_account(target: ProviderTarget) -> str:
     return "account"
 
 
+def _media_upload_args(args: Mapping[str, Any]) -> None:
+    if set(args) != {"data", "mime"}:
+        raise ValueError("operation arguments are malformed")
+    check_upload(args["data"], args["mime"])
+
+
+def _media_upload(api: GraphApi, _waba: str, args: Mapping[str, Any]) -> ProviderResult:
+    return upload_media(api, args["data"], args["mime"])
+
+
 Check = Callable[[Mapping[str, Any]], None]
 Call = Callable[[GraphApi, str, Mapping[str, Any]], ProviderResult]
 Where = Callable[[ProviderTarget], str]
@@ -340,6 +363,7 @@ _OPERATIONS: Mapping[C, tuple[Check, Call, Where]] = {
     C.TEMPLATE_EDIT: (_template_edit_args, _template_edit, account_of),
     C.TEMPLATE_DELETE: (_template_delete_args, _template_delete, account_of),
     C.MEDIA_DELETE: (_media_delete_args, _media_delete, account_of),
+    C.MEDIA_UPLOAD: (_media_upload_args, _media_upload, account_of),  # G8 (D3)
     C.GROUP_MESSAGE_SEND: (_send_args, _send, group_id_of),  # G8
     C.MESSAGE_PIN: (_pin_args, _pin, group_id_of),
     C.JOIN_REQUEST_APPROVE: (_join_args, _join(True), group_id_of),

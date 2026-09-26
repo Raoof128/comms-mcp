@@ -246,11 +246,12 @@ ADMIN_TOOLS: tuple[ToolSpec, ...] = (
     _admin(
         "group_info_set_photo",
         "Set the photo",
-        "Replace the group's photo with a media object. Not offered yet: answers "
-        "PROVIDER_UNSUPPORTED.",
+        "Replace the group's photo with a staged image (upload, from comms_media_stage_begin and "
+        "_chunk) or an inline one of at most 512 KiB (data_b64 with mime): JPEG or PNG on "
+        "Telegram (at most 10 MiB), JPEG on WhatsApp (at most 5 MB).",
         C.CHAT_SET_PHOTO,
-        {"media": ref("media")},
-        ["media"],
+        {"upload": ref("upload"), "data_b64": string(1, 699052), "mime": string(1, 128)},
+        [],
         destructive=True,
     ),
     # -- invites and join requests (P §27) ---------------------------------------------------

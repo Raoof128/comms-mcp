@@ -68,7 +68,7 @@ ADMIN: Mapping[str, Mapping[str, C]] = MappingProxyType(
             "telegram": C.CHAT_SET_DESCRIPTION,
             "whatsapp": C.GROUP_SETTINGS_UPDATE,
         },
-        "group.info.set_photo": {"telegram": C.CHAT_SET_PHOTO},
+        "group.info.set_photo": {"telegram": C.CHAT_SET_PHOTO, "whatsapp": C.GROUP_SETTINGS_UPDATE},
         "group.permissions.set": {"telegram": C.CHAT_SET_PERMISSIONS},
         "group.invite.create": {"telegram": C.INVITE_CREATE},
         "group.invite.edit": {"telegram": C.INVITE_EDIT},

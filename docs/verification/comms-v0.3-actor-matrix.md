@@ -91,7 +91,7 @@ MTProto rows cover both a basic group (`messages.*`) and a supergroup or channel
 | `comms_group_permissions_set` | A done [chat.set_permissions]: `setChatPermissions` | A done [chat.set_permissions]: `messages.editChatDefaultBannedRights` | B [chat.set_permissions]: as above |
 | `comms_group_info_set_title` | A done [chat.set_title]: `setChatTitle` | A done [chat.set_title]: `channels.editTitle` / `messages.editChatTitle` | A done [group.settings.update]: `POST /{group_id}` (`subject`) |
 | `comms_group_info_set_description` | A done [chat.set_description]: `setChatDescription` | A done [chat.set_description]: `messages.editChatAbout` | A done [group.settings.update]: `POST /{group_id}` (`description`) |
-| `comms_group_info_set_photo` | A todo:G8 [chat.set_photo]: `setChatPhoto` (multipart) | A todo:G8 [chat.set_photo]: `upload.saveFilePart` → `channels.editPhoto` / `messages.editChatPhoto` | A todo:G8 [group.settings.update]: `POST /{group_id}` (profile photo) |
+| `comms_group_info_set_photo` | A done [chat.set_photo]: `setChatPhoto` (multipart, from staged bytes; G8) | A done [chat.set_photo]: `upload.saveFilePart` → `channels.editPhoto` / `messages.editChatPhoto` (G8) | A done [group.settings.update]: `POST /{group_id}` multipart (a JPEG; G8) |
 | `comms_group_invite_create` / `comms_group_invite_edit` | A done [invite.create]/[invite.edit]: `createChatInviteLink` / `editChatInviteLink` | A done [invite.create]/[invite.edit]: `messages.exportChatInvite` / `messages.editExportedChatInvite` | B [invite.create]/[invite.edit]: one invite link per group, which the Groups API can only reset |
 | `comms_group_invite_revoke` | A done [invite.revoke]: `revokeChatInviteLink` | A done [invite.revoke]: `messages.editExportedChatInvite(revoked=True)` | A done [group.invite.reset]: `POST /{group_id}/invite_link` |
 | `comms_group_invite_revoke` (variant: no invite given, reset the primary link) | A done [group.invite.reset]: `exportChatInviteLink` (a new primary link revokes the old; its `inv_` returned; G6) | A done [group.invite.reset]: `messages.exportChatInvite(legacy_revoke_permanent=True)` (G6) | A done [group.invite.reset]: `POST /{group_id}/invite_link` |
@@ -112,8 +112,8 @@ MTProto rows cover both a basic group (`messages.*`) and a supergroup or channel
 | `comms_account_status` / `comms_account_capabilities` / `comms_telegram_*_status` / `comms_whatsapp_account_status` | A done: capability snapshot (`getMe`, rights) | A done: session readiness, `users.getUsers(self)` | A done [account.inspect]: `GET /{waba}` |
 | `comms_whatsapp_phone_status` | — : a WhatsApp account tool | — : a WhatsApp account tool | A done [phone_number.inspect]: `GET /{phone}?fields=` (`quality_rating`, `status`; G8) |
 | `comms_whatsapp_health_status` | — : a WhatsApp account tool | — : a WhatsApp account tool | A done [phone_number.health]: `GET /{phone}?fields=health_status`, entity ids dropped, Meta's notes untrusted (A46; G8) |
-| `comms_media_upload` | B [media.upload]: the Bot API has no standalone upload (files upload only inside a send) | A todo:G8 [media.upload]: `upload.saveFilePart` → `messages.uploadMedia` | A todo:G8 [media.upload]: `POST /{phone}/media` (multipart; Meta allows up to 100 MB documents, but the `upl_` stage caps at 16 MiB) |
-| `comms_media_download` | A todo:G8 [media.retrieve]: `getFile` + file download | A todo:G8 [media.retrieve]: `upload.getFile` | A todo:G8 [media.retrieve]: `GET /{media_id}` → bounded Meta-URL download |
+| `comms_media_upload` | B [media.upload]: the Bot API has no standalone upload (files upload only inside a send) | — : no catalog tool takes a Telegram media object; group photos take staged bytes directly (R-G8d) | A done [media.upload]: `POST /{phone}/media` (multipart, from staged bytes or inline; G8) |
+| `comms_media_download` | — : no catalog tool yields a Telegram media ref to download (R-G8d) | — : no catalog tool yields a Telegram media ref to download (R-G8d) | A done [media.retrieve]: `GET /{media_id}` → bounded Meta-host download, paged in base64 slices (G8) |
 | `comms_media_inspect` / `comms_media_delete` | — : WhatsApp media by `med_` id (Telegram files are message attachments, G8) | — : WhatsApp media by `med_` id (Telegram files are message attachments, G8) | A done [media.delete]: `GET` / `DELETE /{media_id}` |
 | `comms_whatsapp_template_*` | — : a WhatsApp account tool | — : a WhatsApp account tool | A done [template.list]/[template.get]/[template.create]/[template.edit]/[template.delete]: `/{waba}/message_templates` |
 | `comms_whatsapp_webhook_status` | — : a local report on the WhatsApp webhook inbox | — : a local report on the WhatsApp webhook inbox | A done: the local inbox counts |
@@ -121,7 +121,7 @@ MTProto rows cover both a basic group (`messages.*`) and a supergroup or channel
 
 ## Local tools (no provider actor)
 
-`comms_capability_list`, `comms_group_list`, `comms_group_get`, every `comms_campaign_*`, `comms_location_*` and `comms_audience_*` tool, `comms_admin_identity_inspect`, the `comms_directory_*` tools G2–G4 add, and `comms_location_member_*`. These read or write `comms.db` only. A campaign's delivery goes through the transports' delivery adapters, not these tools.
+`comms_capability_list`, `comms_group_list`, `comms_group_get`, every `comms_campaign_*`, `comms_location_*` and `comms_audience_*` tool, `comms_admin_identity_inspect`, the `comms_directory_*` tools G2–G4 add, `comms_location_member_*`, and `comms_media_stage_*` (staging a file in memory, G8). These read or write `comms.db` only. A campaign's delivery goes through the transports' delivery adapters, not these tools.
 
 ## Checked against the 2026 developer docs (2026-09-26)
 

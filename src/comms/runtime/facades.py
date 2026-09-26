@@ -5,8 +5,9 @@ Task D30; A37).
 the admin socket (CLI) both call through it, so the two reach the same service by construction.
 A facade turns validated tool arguments into a service call: a ``grp_`` ref becomes provider
 targets for the configured actors, a request id and the caller become the call context, and a
-context page's provider cursor becomes a client-bound ``cur_`` token (D9). The few tools whose
-services are not offered yet answer ``PROVIDER_UNSUPPORTED`` (``NOT_OFFERED``).
+context page's provider cursor becomes a client-bound ``cur_`` token (D9). Every catalog tool
+is offered (catalog amendment G8 retired ``NOT_OFFERED``); what an actor cannot do is its
+capability's answer, never a constant refusal.
 """
 
 from __future__ import annotations
@@ -45,8 +46,9 @@ from comms.services.messages import MessageService
 from comms.services.mutations import CallContext
 from comms.services.registry import ServiceRegistry
 from comms.services.templates import TemplateService
+from comms.services.uploads import CHUNK_MAX, INLINE_MAX, StagedMedia, decode_b64
 
-__all__ = ["NOT_OFFERED", "Services", "build_registry", "group_targets"]
+__all__ = ["Services", "build_registry", "group_targets"]
 
 Facade = Callable[[AuthenticatedClient, dict[str, Any]], dict[str, Any]]
 _TELEGRAM = ("telegram_bot", "telegram_user")
@@ -54,13 +56,6 @@ _WHATSAPP = "whatsapp_cloud"
 _PERSON_TRANSPORTS = ("telegram", "whatsapp")
 _PERSON_GROUPS = 10  # P §71: one read spans at most ten groups, as comms_context_search
 _SOURCE_ACTOR = {"telegram_live": "telegram_user", "telegram_local": "telegram_bot"}
-# Tools whose services are not offered yet (each named in the D-task that catalogued it).
-NOT_OFFERED = frozenset(
-    {
-        "media.upload",
-        "media.download",
-    }
-)
 
 
 @dataclass(frozen=True)
@@ -104,14 +99,15 @@ def _ctx(client: AuthenticatedClient) -> CallContext:
     return CallContext(client_ref=client.client_ref)
 
 
-def _not_offered(client: AuthenticatedClient, arguments: dict[str, Any]) -> dict[str, Any]:
-    raise CommsError("PROVIDER_UNSUPPORTED")
+def _unbound(client: AuthenticatedClient, arguments: dict[str, Any]) -> dict[str, Any]:
+    raise CommsError("NOT_CONFIGURED")  # a registry built without services, for coverage only
 
 
 class _Facades:
     def __init__(self, s: Services) -> None:
         self.s = s
         self.reads = GroupReads(s.conn, s.context)
+        self.staged = StagedMedia()  # G8 (D3): staged uploads and held downloads, in memory
 
     # -- shared --------------------------------------------------------------------------
 
@@ -184,6 +180,31 @@ class _Facades:
             "code": None if invite else "PROVIDER_UNAVAILABLE",
             "actor": actor, "op_ref": None, "replayed": False, "invite": invite,
         }  # fmt: skip
+
+    def staged_bytes(self, client: AuthenticatedClient, a: dict[str, Any]) -> tuple[bytes, str]:
+        """A file given as a staged ``upl_`` ref, or inline as ``data_b64`` (at most 512 KiB)
+        with its ``mime``: exactly one (G8, D3)."""
+        if ("upload" in a) == ("data_b64" in a):
+            raise CommsError("INVALID_ARGUMENT")
+        if "upload" in a:
+            return self.staged.take(client.client_ref, a["upload"], a["request_id"])
+        mime = a.get("mime")
+        if not isinstance(mime, str):
+            raise CommsError("INVALID_ARGUMENT")
+        return decode_b64(a["data_b64"], limit=INLINE_MAX), mime
+
+    def set_photo(self, client: AuthenticatedClient, a: dict[str, Any]) -> dict[str, Any]:
+        targets = self.targets(a["group"])  # NOT_FOUND before a staged file is taken
+        photo, mime = self.staged_bytes(client, a)
+        return self.s.groups.admin(
+            _ctx(client), "group.info.set_photo", a["group"], targets,
+            {"photo": photo, "mime": mime}, a["request_id"], actor=a.get("actor"),
+        )  # fmt: skip
+
+    def media_upload(self, client: AuthenticatedClient, a: dict[str, Any]) -> dict[str, Any]:
+        media = self.media()  # NOT_CONFIGURED before a staged file is taken
+        data, mime = self.staged_bytes(client, a)
+        return media.upload(_ctx(client), self.account_target(), data, mime, a["request_id"])
 
     # -- forward (catalog amendment G7) -------------------------------------------------
 
@@ -534,6 +555,7 @@ class _Facades:
                for name in ("permissions.set", "info.set_title", "info.set_description",
                             "info.set_photo", "invite.create", "invite.edit", "invite.revoke",
                             "topic.create", "topic.edit", "topic.close", "topic.reopen")},
+            "group.info_set_photo": self.set_photo,  # G8: staged bytes, not a media ref
             "group.delete": self.admin("group.delete"),
             "group.migrate": self.admin("group.migrate"),
             "campaign.create": lambda cl, a: s.campaigns.create(c(cl), a["title"], a["request_id"]),
@@ -597,6 +619,18 @@ class _Facades:
             "whatsapp.template_edit": lambda cl, a: self.templates().edit(c(cl), self.account_target(), a["template"], a["components"], a["request_id"]),
             "whatsapp.template_delete": lambda cl, a: self.templates().delete(c(cl), self.account_target(), a["name"], a["request_id"]),
             "media.inspect": lambda cl, a: self.media().inspect(a["media"]),
+            "media.upload": self.media_upload,  # G8 (D3)
+            "media.download": lambda cl, a: self.media().download(
+                self.staged, cl.client_ref, a["media"], a.get("offset", 0), a.get("length", CHUNK_MAX)
+            ),
+            "media.stage_begin": lambda cl, a: self.staged.replayed(
+                cl.client_ref, a["request_id"],
+                lambda: self.staged.begin(cl.client_ref, a["mime"], a["size"], a["sha256"]),
+            ),
+            "media.stage_chunk": lambda cl, a: self.staged.replayed(
+                cl.client_ref, a["request_id"],
+                lambda: self.staged.chunk(cl.client_ref, a["upload"], a["seq"], a["data_b64"]),
+            ),
             "media.delete": lambda cl, a: self.media().delete(c(cl), self.account_target(), a["media"], a["request_id"]),
             "account.status": self.account_status(None),
             "account.capabilities": lambda cl, a: {"actors": s.capability.list()},
@@ -646,12 +680,12 @@ def build_registry(services: Services | None) -> ServiceRegistry:
     registry = ServiceRegistry()
     table = _Facades(services).table() if services is not None else {}
     for spec in TOOL_CATALOG:
-        if spec.service in NOT_OFFERED or services is None:
-            registry.register(spec.service, _not_offered)
+        if services is None:
+            registry.register(spec.service, _unbound)
         else:
             registry.register(spec.service, _keyword(table[spec.service]))
     if services is not None:
-        missing = {s.service for s in TOOL_CATALOG} - set(table) - NOT_OFFERED
+        missing = {s.service for s in TOOL_CATALOG} - set(table)
         if missing:
             raise ValueError("a catalog service has no facade")
     return registry

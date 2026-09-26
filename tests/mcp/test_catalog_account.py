@@ -13,6 +13,7 @@ from comms.services.account import AccountService
 from comms.services.identity import IdentityService
 from comms.services.media import MediaService
 from comms.services.templates import TemplateService
+from comms.services.uploads import StagedMedia
 from tests.core.campaign_helpers import NOW
 from tests.mcp import family
 from tests.services.group_fixtures import CTX, fixtures, group_world
@@ -61,11 +62,8 @@ def results(tmp_path_factory):
         ),
         "comms_whatsapp_template_delete": templates.delete(CTX, ACCOUNT, "spring_two", req()),
         "comms_media_inspect": media.inspect(med),
-        "comms_media_upload": {  # never produced: upload is not offered yet
-            **{k: v for k, v in created.items() if k != "template"},
-            "media": None,
-        },
-        "comms_media_download": {"media": med, "file": "stage_x"},  # never produced: not offered
+        "comms_media_upload": media.upload(CTX, ACCOUNT, b"\x89PNG", "image/png", req()),  # G8
+        "comms_media_download": media.download(StagedMedia(), "cli_x", med, 0, 1024),
         "comms_media_delete": media.delete(CTX, ACCOUNT, med, req()),
         "comms_account_status": status,
         "comms_account_profile": {
@@ -100,7 +98,7 @@ def results(tmp_path_factory):
         },
         "comms_whatsapp_template_delete": {"name": "spring_two"},
         "comms_media_inspect": {"media": med},
-        "comms_media_upload": {"file": "stage_x", "mime": "image/png"},
+        "comms_media_upload": {"data_b64": "iVBORw==", "mime": "image/png"},
         "comms_media_download": {"media": med},
         "comms_media_delete": {"media": med},
         "comms_capability_get": {"group": grp, "actor": "telegram_bot", "capability": "member.ban"},

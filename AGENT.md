@@ -809,3 +809,11 @@ Follow the user's engineering lifecycle: design/security analysis, implementatio
 - **Files changed:** `src/comms/transports/profiles.py` (new), `src/comms/transports/whatsapp/cloud/{account,http}.py`, `src/comms/transports/telegram/telegram/telethon_adapter.py`, `src/comms/runtime/{adapters,comms_runtime,facades}.py`, `src/comms/services/account.py`, `src/comms/core/providers/{capability,semantics}.py`, `src/comms/mcp/tools/{account,groups}.py`, `src/comms/mcp/egress.py`; tests; `tests/mcp/catalog_pin.json`; the matrix, the rulings, the ledger, `AGENT.md`, `CHANGELOG.md`.
 - **Verification:** 6 new tests; the full gate passed (GATE ok=1).
 - **Follow-ups:** G8 part d: media upload and download, and group photos.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Catalog amendment G8, part d: staged media (D3), media upload and download, and group photos (branch `comms-v0.3-catalog`).
+- **Summary:** Files are staged in memory for one client (`upl_`), checked by SHA-256 and used once; bytes never reach a request digest. WhatsApp media upload and paged download; group photos on the bot, the user account and WhatsApp. `NOT_OFFERED` is gone, and no open cell is left in the actor matrix. Telegram media objects are marked "not addressed" (nothing consumes them): the owner is asked to confirm.
+- **Files changed:** `src/comms/services/uploads.py` (new), `src/comms/services/{media,mutations,groups}.py`, `src/comms/core/refs.py`, `src/comms/runtime/facades.py`, `src/comms/transports/telegram/{chat_specs,bot/http,bot/admin,bot/admin_chat,user/admin,user/admin_chat,telegram/telethon_adapter}.py`, `src/comms/transports/whatsapp/cloud/{http,groups,media}.py`, `src/comms/mcp/tools/{account,admin,__init__}.py`, `docs/verification/telegram-rpc-review.md`; tests; `tests/mcp/catalog_pin.json`; the matrix, the rulings, the ledger, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 15 new tests; the full gate passed (GATE ok=1).
+- **Follow-ups:** G9 (the pin, the guards, D39-A, the exit test and the evidence). The owner decides on Telegram media objects and on Telegram mark-read (the frozen spec prohibits `readHistory`).
