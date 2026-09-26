@@ -645,6 +645,6 @@ R-G6a-docs, R-A46, R-G1 to R-G8d and R-G9 are in `docs/verification/comms-v0.3-r
 
 ### Tag
 
-`comms-v0.3-catalog` is a local annotated tag. It is not pushed.
+`comms-v0.3-catalog-amendment` is a local annotated tag (the branch has the other name). It is not pushed.
 
 No production claim.
