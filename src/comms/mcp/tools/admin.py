@@ -60,14 +60,6 @@ _TOPIC_FIELDS = {
     "icon_color": integer(0),
     "icon_custom_emoji_id": string(1, 64),
 }
-_LISTED = obj(
-    {
-        "group": _GROUP,
-        "items": array({"type": "object"}, high=100),
-        "next_cursor": nullable(string(1, 64)),
-    },
-    ["group", "items", "next_cursor"],
-)
 
 
 def _admin(
@@ -135,13 +127,42 @@ _JOIN_REQUEST = obj(
 )
 
 
+_TOPIC_NAME = obj({"name": nullable(string(0, 128))}, [])
+# G6: an invite link by ref; its name is untrusted text
+_INVITE_ITEM = obj(
+    {
+        "invite": ref("invite"),
+        "primary": BOOL,
+        "revoked": BOOL,
+        "usage": integer(0),
+        "usage_limit": nullable(integer(0)),
+        "expires_at": nullable(string(1, 64)),
+        "request_needed": BOOL,
+        "requested": nullable(integer(0)),
+        "untrusted": obj({"title": nullable(string(0, 256))}, []),
+    },
+    ["invite", "primary", "revoked", "usage", "usage_limit", "expires_at", "request_needed",
+     "requested", "untrusted"],
+)  # fmt: skip
+_TOPIC_ITEM = obj(
+    {"topic": ref("topic"), "closed": BOOL, "pinned": BOOL, "hidden": BOOL,
+     "untrusted": _TOPIC_NAME},
+    ["topic", "closed", "pinned", "hidden", "untrusted"],
+)  # fmt: skip
+# G6: one admin-log event: when, which kind, and who by ref (null when not in the directory)
+_LOG_EVENT = obj(
+    {"at": nullable(string(1, 64)), "action": string(1, 128), "actor": nullable(ref("recipient"))},
+    ["at", "action", "actor"],
+)
+
+
 def _list(
     name: str,
     title: str,
     description: str,
     inputs: Mapping[str, Any] | None = None,
     *,
-    item: Mapping[str, Any] | None = None,
+    item: Mapping[str, Any],
 ) -> ToolSpec:
     return read(
         f"comms_{name}",
@@ -150,7 +171,7 @@ def _list(
         name.replace("_", ".", 1),
         {"group": _GROUP, "cursor": string(1, 64), **(inputs or {})},
         ["group"],
-        _LISTED if item is None else _listed(item),
+        _listed(item),
         failures=CONTEXT_FAILURES,
         open_world=True,
     )
@@ -233,7 +254,13 @@ ADMIN_TOOLS: tuple[ToolSpec, ...] = (
         destructive=True,
     ),
     # -- invites and join requests (P §27) ---------------------------------------------------
-    _list("group_invite_list", "List invites", "The group's invite links, by ref."),
+    _list(
+        "group_invite_list",
+        "List invites",
+        "The account's active invite links for the group, by inv_ ref: usage, limit, expiry, "
+        "whether it is the primary link or needs approval; the link's name is untrusted.",
+        item=_INVITE_ITEM,
+    ),
     _admin(
         "group_invite_create",
         "Create an invite",
@@ -280,17 +307,22 @@ ADMIN_TOOLS: tuple[ToolSpec, ...] = (
         destructive=True,
     ),
     # -- topics (P §28) -----------------------------------------------------------------------
-    _list("group_topic_list", "List topics", "The forum's topics, by ref."),
+    _list(
+        "group_topic_list",
+        "List topics",
+        "The forum's topics, by top_ ref: closed, pinned or hidden; the name is untrusted.",
+        item=_TOPIC_ITEM,
+    ),
     read(
         "comms_group_topic_get",
         "Get a topic",
-        "One forum topic, by its ref. Not offered yet: answers PROVIDER_UNSUPPORTED.",
+        "One forum topic, by its ref: whether it is closed; its name is untrusted.",
         "group.topic_get",
         {"group": _GROUP, "topic": _TOPIC},
         ["group", "topic"],
         obj(
-            {"group": _GROUP, "topic": _TOPIC, "name": string(0, 128), "closed": BOOL},
-            ["group", "topic", "name", "closed"],
+            {"group": _GROUP, "topic": _TOPIC, "closed": BOOL, "untrusted": _TOPIC_NAME},
+            ["group", "topic", "closed", "untrusted"],
         ),
         failures=CONTEXT_FAILURES,
         open_world=True,
@@ -380,7 +412,7 @@ ADMIN_TOOLS: tuple[ToolSpec, ...] = (
         "group.admin_log",
         {"group": _GROUP, "limit": integer(1, 100), "cursor": string(1, 64)},
         ["group"],
-        _LISTED,
+        _listed(_LOG_EVENT),
         failures=(*READ_FAILURES, "NOT_AUTHORIZED", "PROVIDER_UNSUPPORTED"),
         open_world=True,
     ),

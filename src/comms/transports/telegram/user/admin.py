@@ -15,11 +15,9 @@ from collections.abc import Callable, Coroutine, Mapping
 from datetime import datetime
 from typing import Any, Protocol
 
-from comms.core import timeutil
 from comms.core.delivery.transport import DeliveryResult, ResultKind
 from comms.core.providers.capability import Capability
 from comms.core.providers.protocols import (
-    ContextPage,
     ProviderResult,
     ProviderTarget,
     SemanticOperation,
@@ -36,7 +34,6 @@ __all__ = ["UserAdmin"]
 
 ACTOR = "telegram_user"
 ADMIN_TIMEOUT_S = 15.0
-MAX_LOG_PAGE = 100
 _SPECS: Mapping[Capability, Callable[[Mapping[str, Any]], dict[str, Any]]] = {
     **MEMBER_SPECS,
     **CHAT_SPECS,
@@ -130,39 +127,6 @@ class UserAdmin:
                 Capability.GROUP_CREATE, "none", 0, spec, timeout=ADMIN_TIMEOUT_S
             )
         )
-
-    def read_admin_log(
-        self, target: ProviderTarget, *, limit: int = 50, cursor: str | None = None
-    ) -> ContextPage:
-        """One bounded page of the admin log (``admin.log.read``), newest first, event kinds only
-        (no content); a basic group has none. ``cursor`` is the last page's lowest event id."""
-        if target.actor != ACTOR:
-            raise ValueError("not a telegram_user destination")
-        if type(limit) is not int or not 1 <= limit <= MAX_LOG_PAGE:
-            raise ValueError("admin log page size is 1..100")
-        if cursor is not None and not (cursor.isascii() and cursor.isdigit() and int(cursor) > 0):
-            raise ValueError("admin log cursor is malformed")
-        peer_type, peer_id = unmark_chat_id(target.identity)
-        if peer_type != "channel":
-            return ContextPage((), "telegram_live")
-        max_id = int(cursor) if cursor is not None else 0
-        events = self._run(
-            self._session.admin_log(peer_id, max_id=max_id, limit=limit, timeout=ADMIN_TIMEOUT_S)
-        )
-        observed = timeutil.iso(self._clock())
-        items = tuple(
-            {
-                "source": "telegram_live",
-                "observed_at": observed,
-                "event_id": event_id,
-                "date": timeutil.iso(date),
-                "user_id": user_id,
-                "action": action,
-            }
-            for event_id, date, user_id, action in events
-        )
-        next_cursor = str(min(e[0] for e in events)) if len(events) == limit else None
-        return ContextPage(items, "telegram_live", next_cursor)
 
 
 def _sent(delivered: DeliveryResult) -> ProviderResult:

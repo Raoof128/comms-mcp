@@ -71,6 +71,8 @@ class BotAdmin:
         if field is None or result.outcome != "SUCCEEDED":
             return result
         ref = result.detail.get(field)
+        if op.capability is Capability.GROUP_INVITE_RESET and isinstance(outcome, BotResponse):
+            ref = (outcome.envelope or {}).get("result")  # the new link is the bare result
         if type(ref) not in (int, str) or ref in ("", 0):
             return ProviderResult("OUTCOME_UNKNOWN", None)  # created, but no ref to name it by
         return ProviderResult("SUCCEEDED", None, provider_ref=str(ref), detail=result.detail)

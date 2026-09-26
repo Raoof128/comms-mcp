@@ -68,6 +68,7 @@ REVIEWED_RPCS: frozenset[str] = frozenset(
         "messages.GetChatInviteImportersRequest",
         "messages.GetExportedChatInvitesRequest",
         "messages.GetForumTopicsRequest",
+        "messages.GetForumTopicsByIDRequest",  # catalog amendment G6: comms_group_topic_get
         "messages.GetFullChatRequest",
         "messages.HideChatJoinRequestRequest",
         "messages.MigrateChatRequest",

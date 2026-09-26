@@ -62,6 +62,7 @@ dropped link fails the in-flight call and only the daemon's keeper reconnects.
 | `cap.invite.list` | `messages.GetExportedChatInvitesRequest` | https://core.telegram.org/method/messages.getExportedChatInvites | none | `READ`, `retry_same_key` |
 | `cap.join_request.list` | `messages.GetChatInviteImportersRequest` | https://core.telegram.org/method/messages.getChatInviteImporters | none | `READ`, `retry_same_key` |
 | `cap.topic.list` | `messages.GetForumTopicsRequest` | https://core.telegram.org/method/messages.getForumTopics | none | `READ`, `retry_same_key` |
+| `cap.topic.list` | `messages.GetForumTopicsByIDRequest` | https://core.telegram.org/method/messages.getForumTopicsByID | none | `READ`, `retry_same_key`; catalog amendment G6: one topic for `comms_group_topic_get` (reviewed 2026-09-26 against the live method page) |
 | `cap.message.send` | `messages.SendMessageRequest` | https://core.telegram.org/method/messages.sendMessage | posts a message | `MESSAGE_SEND`, `retry_same_key` |
 | `cap.message.edit` | `messages.EditMessageRequest` | https://core.telegram.org/method/messages.editMessage | sets a chat or member state | `SET_STATE`, `retry_same_key` |
 | `cap.message.delete` | `channels.DeleteMessagesRequest` | https://core.telegram.org/method/channels.deleteMessages | destroys or converts an object | `DESTRUCTIVE_NONIDEMPOTENT`, `resolve_only` |
@@ -83,6 +84,7 @@ dropped link fails the in-flight call and only the daemon's keeper reconnects.
 | `cap.invite.create` | `messages.ExportChatInviteRequest` | https://core.telegram.org/method/messages.exportChatInvite | creates an object | `CREATE`, `resolve_only` |
 | `cap.invite.edit` | `messages.EditExportedChatInviteRequest` | https://core.telegram.org/method/messages.editExportedChatInvite | sets a chat or member state | `SET_STATE`, `retry_same_key` |
 | `cap.invite.revoke` | `messages.EditExportedChatInviteRequest` | https://core.telegram.org/method/messages.editExportedChatInvite | sets a chat or member state | `SET_STATE`, `retry_same_key` |
+| `cap.group.invite.reset` | `messages.ExportChatInviteRequest` | https://core.telegram.org/method/messages.exportChatInvite | creates an object and revokes the old primary link (`legacy_revoke_permanent`) | `DESTRUCTIVE_NONIDEMPOTENT`, `resolve_only`; catalog amendment G6: `comms_group_invite_revoke` with no invite (reviewed 2026-09-26) |
 | `cap.join_request.approve` | `messages.HideChatJoinRequestRequest` | https://core.telegram.org/method/messages.hideChatJoinRequest | sets a chat or member state | `SET_STATE`, `retry_same_key` |
 | `cap.join_request.reject` | `messages.HideChatJoinRequestRequest` | https://core.telegram.org/method/messages.hideChatJoinRequest | sets a chat or member state | `SET_STATE`, `retry_same_key` |
 | `cap.chat.set_title` | `channels.EditTitleRequest` | https://core.telegram.org/method/channels.editTitle | sets a chat or member state | `SET_STATE`, `retry_same_key` |

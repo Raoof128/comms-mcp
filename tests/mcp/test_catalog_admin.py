@@ -133,7 +133,8 @@ def results(tmp_path_factory):
         "permissions": {"can_send_messages": True},
     }
     examples["comms_group_permissions_get"] = {"group": grp}
-    produced["comms_group_topic_get"] = {"group": grp, "topic": topic, "name": "T", "closed": False}
+    produced["comms_group_topic_get"] = {"group": grp, "topic": topic, "closed": False,
+                                         "untrusted": {"name": "T"}}  # fmt: skip
     examples["comms_group_topic_get"] = {"group": grp, "topic": topic}
     return {"results": produced, "examples": examples}
 

@@ -277,52 +277,6 @@ def test_group_create_needs_no_destination(tmp_path):
             _run(tmp_path, {}, lambda admin, bad=bad: admin.create_group(bad))
 
 
-def _log_event(event_id):
-    return types.ChannelAdminLogEvent(
-        id=event_id,
-        date=NOW,
-        user_id=42,
-        action=types.ChannelAdminLogEventActionChangeTitle("a", "b"),
-    )
-
-
-def test_admin_log_bounded_pages(tmp_path):
-    full = types.channels.AdminLogResults(
-        events=[_log_event(i) for i in (50, 49)], chats=[], users=[]
-    )
-    page, sent, calls = _run(
-        tmp_path,
-        {"channels.GetAdminLogRequest": full},
-        lambda admin: admin.read_admin_log(SUPER, limit=2),
-    )
-    assert calls == ["channels.GetAdminLogRequest"] and (
-        sent[0].limit,
-        sent[0].max_id,
-        sent[0].q,
-    ) == (2, 0, "")
-    assert page.provenance == "telegram_live" and page.next_cursor == "49"
-    assert page.items[0] == {
-        "source": "telegram_live",
-        "observed_at": "2026-09-25T00:00:00.000000Z",
-        "event_id": 50,
-        "date": "2026-09-25T00:00:00.000000Z",
-        "user_id": 42,
-        "action": "ChannelAdminLogEventActionChangeTitle",
-    }
-    last = types.channels.AdminLogResults(events=[_log_event(48)], chats=[], users=[])
-    page, sent, _ = _run(
-        tmp_path,
-        {"channels.GetAdminLogRequest": last},
-        lambda admin: admin.read_admin_log(SUPER, limit=2, cursor="49"),
-    )
-    assert sent[0].max_id == 49 and page.next_cursor is None
-    for bad in ({"limit": 0}, {"limit": 101}, {"cursor": "x"}):
-        with pytest.raises(ValueError):
-            _run(tmp_path, {}, lambda admin, bad=bad: admin.read_admin_log(SUPER, **bad))
-    page, _sent, calls = _run(tmp_path, {}, lambda admin: admin.read_admin_log(BASIC))
-    assert page.items == () and calls == []  # basic groups have no admin log
-
-
 @pytest.mark.parametrize(
     "error,outcome,code",
     [

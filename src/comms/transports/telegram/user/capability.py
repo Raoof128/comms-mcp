@@ -53,6 +53,7 @@ _RIGHT = {
     C.INVITE_CREATE: "invite_users",
     C.INVITE_EDIT: "invite_users",
     C.INVITE_REVOKE: "invite_users",
+    C.GROUP_INVITE_RESET: "invite_users",
     C.INVITE_LIST: "invite_users",
     C.JOIN_REQUEST_LIST: "invite_users",
     C.JOIN_REQUEST_APPROVE: "invite_users",

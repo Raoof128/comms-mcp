@@ -636,3 +636,11 @@
 - **Files changed:** `src/comms/services/group_reads.py` (new), `src/comms/services/context.py`, `src/comms/runtime/facades.py`, `src/comms/transports/telegram/bot/context.py`, `src/comms/transports/telegram/user/context.py`, `src/comms/transports/telegram/telegram/telethon_adapter.py`, `src/comms/core/campaigns/directory.py`, `src/comms/mcp/tools/admin.py`, `src/comms/mcp/tools/groups.py`, `src/comms/mcp/egress.py`; tests (three new modules, plus updates), `tests/mcp/catalog_pin.json`; the matrix, the rulings, the ledger, `AGENT.md`, `CHANGELOG.md`.
 - **Verification:** 22 new tests; the behaviour matrix passes on all three actors; the full gate passed (GATE ok=1).
 - **Follow-ups:** G6 part 2: the user account's invite list, join requests, topics, admin log and sender search.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Catalog amendment G6, part 2: the user account's lists and the primary-link reset (branch `comms-v0.3-catalog`).
+- **Summary:** The user account lists invites, join requests, topics (and one topic) and the admin log. Its sender search serves a person's group activity. Invite revoke with no invite resets the primary link on both Telegram APIs and returns the new ref. Every provider id is mapped to a ref. The admin-log read now has one copy.
+- **Files changed:** `src/comms/transports/telegram/telegram/telethon_adapter.py`, `src/comms/transports/telegram/user/context.py`, `src/comms/transports/telegram/user/admin.py`, `src/comms/transports/telegram/user/admin_chat.py`, `src/comms/transports/telegram/user/capability.py`, `src/comms/transports/telegram/bot/*.py`, `src/comms/transports/telegram/chat_specs.py`, `src/comms/services/group_reads.py`, `src/comms/services/groups.py`, `src/comms/core/providers/semantics.py`, `src/comms/runtime/facades.py`, `src/comms/mcp/tools/admin.py`, `src/comms/mcp/egress.py`, `docs/verification/telegram-rpc-review.md`; tests (three new modules, plus updates), `tests/mcp/catalog_pin.json`; the matrix, the rulings, the ledger, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 16 new tests; no G6 cell is left in the matrix; the full gate passed (GATE ok=1).
+- **Follow-ups:** G7 (Telegram writes and A46's three tools).

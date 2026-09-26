@@ -53,6 +53,7 @@ BOT_METHODS = frozenset(
         "createChatInviteLink",
         "editChatInviteLink",
         "revokeChatInviteLink",
+        "exportChatInviteLink",  # G6: a new primary link revokes the old
         "approveChatJoinRequest",
         "declineChatJoinRequest",
         "createForumTopic",

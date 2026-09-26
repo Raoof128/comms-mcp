@@ -42,6 +42,7 @@ CHAT_SPECS = {
     C.INVITE_CREATE: specs.invite_create,
     C.INVITE_EDIT: specs.invite_edit,
     C.INVITE_REVOKE: specs.invite_revoke,
+    C.GROUP_INVITE_RESET: specs.no_args,
     C.JOIN_REQUEST_APPROVE: specs.member,
     C.JOIN_REQUEST_REJECT: specs.member,
     C.TOPIC_CREATE: specs.topic_create,

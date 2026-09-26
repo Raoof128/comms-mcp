@@ -120,7 +120,9 @@ READ_RPCS: Mapping[Capability, frozenset[str]] = MappingProxyType(
         Capability.ADMIN_LOG_READ: frozenset({"channels.GetAdminLogRequest"}),
         Capability.INVITE_LIST: frozenset({"messages.GetExportedChatInvitesRequest"}),
         Capability.JOIN_REQUEST_LIST: frozenset({"messages.GetChatInviteImportersRequest"}),
-        Capability.TOPIC_LIST: frozenset({"messages.GetForumTopicsRequest"}),
+        Capability.TOPIC_LIST: frozenset(
+            {"messages.GetForumTopicsRequest", "messages.GetForumTopicsByIDRequest"}  # G6
+        ),
     }
 )
 WRITE_RPCS: Mapping[Capability, frozenset[str]] = MappingProxyType(
@@ -153,6 +155,7 @@ ADMIN_RPCS: Mapping[Capability, frozenset[str]] = MappingProxyType(
         Capability.INVITE_CREATE: frozenset({"messages.ExportChatInviteRequest"}),
         Capability.INVITE_EDIT: _EDIT_INVITE,
         Capability.INVITE_REVOKE: _EDIT_INVITE,
+        Capability.GROUP_INVITE_RESET: frozenset({"messages.ExportChatInviteRequest"}),  # G6
         Capability.JOIN_REQUEST_APPROVE: _JOIN_REQUEST,
         Capability.JOIN_REQUEST_REJECT: _JOIN_REQUEST,
         Capability.CHAT_SET_TITLE: frozenset(
@@ -562,6 +565,14 @@ def _invite_create(
     return functions.messages.ExportChatInviteRequest(peer, **_invite_args(spec))
 
 
+def _invite_reset(
+    session: TelethonSession, peer_type: str, peer_id: int, spec: Mapping[str, Any]
+) -> Any:
+    """A new primary link that revokes the old (G6), as the Bot API's exportChatInviteLink."""
+    peer = session._admin_peer(peer_type, peer_id)
+    return functions.messages.ExportChatInviteRequest(peer, legacy_revoke_permanent=True)
+
+
 def _invite_edit(
     session: TelethonSession, peer_type: str, peer_id: int, spec: Mapping[str, Any]
 ) -> Any:
@@ -702,6 +713,7 @@ def _new_channel(result: Any) -> str | None:
 _CREATED_REF: Mapping[Capability, Callable[[Any], str | None]] = MappingProxyType(
     {
         Capability.INVITE_CREATE: _invite_link,
+        Capability.GROUP_INVITE_RESET: _invite_link,
         Capability.TOPIC_CREATE: _topic_id,
         Capability.GROUP_CREATE: _new_channel,
         Capability.GROUP_MIGRATE: _new_channel,
@@ -716,6 +728,7 @@ _ADMIN_BUILDERS: Mapping[Capability, Callable[..., Any]] = MappingProxyType(
         Capability.INVITE_CREATE: _invite_create,
         Capability.INVITE_EDIT: _invite_edit,
         Capability.INVITE_REVOKE: _invite_revoke,
+        Capability.GROUP_INVITE_RESET: _invite_reset,
         Capability.JOIN_REQUEST_APPROVE: _join(True),
         Capability.JOIN_REQUEST_REJECT: _join(False),
         Capability.TOPIC_CREATE: _topic_create,
@@ -1290,6 +1303,93 @@ class TelethonSession:
             for permission, flags in _BANNED_FOR_PERMISSION.items()
         }
 
+    async def exported_invites(
+        self,
+        peer_type: str,
+        peer_id: int,
+        *,
+        offset: tuple[datetime, str] | None,
+        limit: int,
+        timeout: float,
+    ) -> tuple[list[Any], tuple[datetime, str] | None]:
+        """One page of the account's own active invite links (G6), and the next offset (the
+        last link's date and link, as ``messages.getExportedChatInvites`` pages)."""
+        request = functions.messages.GetExportedChatInvitesRequest(
+            peer=self._admin_peer(peer_type, peer_id),
+            admin_id=types.InputUserSelf(),
+            limit=limit,
+            revoked=False,
+            offset_date=offset[0] if offset else None,
+            offset_link=offset[1] if offset else None,
+        )
+        result = await self.call_capability(Capability.INVITE_LIST, request, timeout=timeout)
+        invites = [i for i in result.invites if isinstance(i, types.ChatInviteExported)]
+        more = len(result.invites) == limit and invites
+        return invites, ((invites[-1].date, invites[-1].link) if more else None)
+
+    async def join_requests(
+        self,
+        peer_type: str,
+        peer_id: int,
+        *,
+        offset: tuple[datetime, int] | None,
+        limit: int,
+        timeout: float,
+    ) -> tuple[list[tuple[int, datetime | None, str | None]], tuple[datetime, int] | None]:
+        """One page of pending join requests (G6): ``(user id, date, display name)``, and the
+        next offset (the last requester's date and id)."""
+        offset_user: Any = types.InputUserEmpty()
+        if offset is not None:
+            offset_user = self._admin_user(offset[1])
+        request = functions.messages.GetChatInviteImportersRequest(
+            peer=self._admin_peer(peer_type, peer_id),
+            offset_date=offset[0] if offset else None,
+            offset_user=offset_user,
+            limit=limit,
+            requested=True,
+        )
+        result = await self.call_capability(Capability.JOIN_REQUEST_LIST, request, timeout=timeout)
+        names = {u.id: u for u in getattr(result, "users", None) or ()}
+        rows = []
+        for importer in result.importers:
+            user = names.get(importer.user_id)
+            name = " ".join(
+                filter(None, (getattr(user, "first_name", None), getattr(user, "last_name", None)))
+            )
+            rows.append((importer.user_id, importer.date, name or None))
+        last = result.importers[-1] if result.importers else None
+        if last is None or len(result.importers) < limit:
+            return rows, None
+        return rows, (last.date, last.user_id)
+
+    async def forum_topics(
+        self,
+        peer_id: int,
+        *,
+        offset: tuple[datetime, int, int] | None,
+        ids: list[int] | None = None,
+        limit: int,
+        timeout: float,
+    ) -> tuple[list[Any], tuple[datetime, int, int] | None]:
+        """A page of a forum's topics, or the topics with these ids (G6); the next offset is the
+        last topic's date, top message and id, as ``messages.getForumTopics`` pages."""
+        peer = self.input_peer("channel", peer_id)
+        if ids is not None:
+            request: Any = functions.messages.GetForumTopicsByIDRequest(peer=peer, topics=ids)
+        else:
+            request = functions.messages.GetForumTopicsRequest(
+                peer=peer,
+                offset_date=offset[0] if offset else None,
+                offset_id=offset[1] if offset else 0,
+                offset_topic=offset[2] if offset else 0,
+                limit=limit,
+            )
+        result = await self.call_capability(Capability.TOPIC_LIST, request, timeout=timeout)
+        topics = [x for x in result.topics if isinstance(x, types.ForumTopic)]
+        more = ids is None and len(result.topics) == limit and topics
+        last = topics[-1] if more else None
+        return topics, ((last.date, last.top_message, last.id) if last is not None else None)
+
     async def admin_log(
         self, peer_id: int, *, max_id: int, limit: int, timeout: float
     ) -> list[tuple[int, datetime, int, str]]:
@@ -1679,12 +1779,15 @@ class TelethonSession:
         client_ref: str,
         deadline: Deadline,
         budget: WorkBudget,
+        from_user: int | None = None,
     ) -> SearchPage:
         """One messages.Search page in one peer (never SearchGlobal).
 
-        ``None`` bounds are sent as 0, which Telegram reads as unbounded.
+        ``None`` bounds are sent as 0, which Telegram reads as unbounded. ``from_user`` narrows
+        it to one sender (G6, a person's group activity); left out, the request is unchanged.
         """
         peer = self.input_peer(peer_type, peer_id)
+        sender = None if from_user is None else self.input_peer("user", from_user)
         result = await self._call_reviewed(
             functions.messages.SearchRequest(
                 peer=peer,
@@ -1698,6 +1801,7 @@ class TelethonSession:
                 max_id=0,
                 min_id=0,
                 hash=0,
+                from_id=sender,
             ),
             operation="mcp.retrieval",
             client_ref=client_ref,

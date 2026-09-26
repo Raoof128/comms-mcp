@@ -46,6 +46,7 @@ _RIGHT = {
     C.INVITE_CREATE: "can_invite_users",
     C.INVITE_EDIT: "can_invite_users",
     C.INVITE_REVOKE: "can_invite_users",
+    C.GROUP_INVITE_RESET: "can_invite_users",
     C.JOIN_REQUEST_APPROVE: "can_invite_users",
     C.JOIN_REQUEST_REJECT: "can_invite_users",
     C.CHAT_SET_TITLE: "can_change_info",

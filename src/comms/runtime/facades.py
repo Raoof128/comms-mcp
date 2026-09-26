@@ -55,10 +55,6 @@ NOT_OFFERED = frozenset(
         "message.forward",
         "media.upload",
         "media.download",
-        "group.topic_get",
-        "group.invite_list",
-        "group.topic_list",
-        "group.admin_log",
         "group.create",
         "account.profile",
         "whatsapp.phone_status",
@@ -175,23 +171,28 @@ class _Facades:
 
     # -- group reads (catalog amendment G6) ----------------------------------------------
 
-    def join_requests(self, client: AuthenticatedClient, a: dict[str, Any]) -> dict[str, Any]:
-        """Pending join requests; a continuation names its ``cur_`` token, bound to the client
-        and to the group and actor that served the first page."""
-        group, cursor, actor = a["group"], None, None
-        if a.get("cursor") is not None:
-            handle, position = self.s.handles.position(client.client_ref, a["cursor"])
-            snapshot = handle.snapshot
-            if snapshot.get("kind") != "join_requests" or snapshot.get("group") != group:
-                raise CommsError("STALE_HANDLE")
-            cursor, actor = position["cursor"], snapshot["actor"]
-        targets = self.targets(group)
-        if actor is not None:  # the continuation stays with the actor that served page one
-            if actor not in targets:
-                raise CommsError("STALE_HANDLE")
-            targets = {actor: targets[actor]}
-        page, served_by = self.reads.join_requests(group, targets, cursor=cursor)
-        return self.tokened(client, page, "join_requests", group, served_by, {})
+    def listed(self, kind: str) -> Facade:
+        """A group list (G6); a continuation names its ``cur_`` token, bound to the client and
+        to the group and actor that served the first page."""
+
+        def call(client: AuthenticatedClient, a: dict[str, Any]) -> dict[str, Any]:
+            group, cursor, actor = a["group"], None, None
+            if a.get("cursor") is not None:
+                handle, position = self.s.handles.position(client.client_ref, a["cursor"])
+                snapshot = handle.snapshot
+                if snapshot.get("kind") != kind or snapshot.get("group") != group:
+                    raise CommsError("STALE_HANDLE")
+                cursor, actor = position["cursor"], snapshot["actor"]
+            targets = self.targets(group)
+            if actor is not None:  # the continuation stays with the actor that served page one
+                if actor not in targets:
+                    raise CommsError("STALE_HANDLE")
+                targets = {actor: targets[actor]}
+            limit = int(a.get("limit", 50))
+            page, served_by = self.reads.listed(kind, group, targets, limit=limit, cursor=cursor)
+            return self.tokened(client, page, kind, group, served_by, {})
+
+        return call
 
     # -- a person's communication (catalog amendment G5) --------------------------------
 
@@ -247,11 +248,12 @@ class _Facades:
             transport = next(iter(targets.values())).transport
             if transport not in mine:
                 raise CommsError("NOT_FOUND")
-            # only the local sources index a sender (the user account's messages.search by
-            # sender is G6 work), so a Telegram group is read from the bot's retained updates
-            target = targets.get("whatsapp_cloud") or targets.get("telegram_bot")
-            if target is None:
-                raise CommsError("PROVIDER_UNSUPPORTED")
+            # WhatsApp: the archive; Telegram: the user account's messages.search by sender
+            # when it can search the group (G6), else the bot's retained updates
+            if transport == "whatsapp":
+                target = targets[_WHATSAPP]
+            else:
+                target = engine.reader(targets, Capability.HISTORY_SEARCH, fallback=True)
             page = engine.from_sender(rest, target, mine[transport][1], limit=limit, cursor=cursor)
             return self.tokened(client, page, "person", recipient, target.actor, args)
         transport = rest if kind == "campaigns" else kind
@@ -496,7 +498,11 @@ class _Facades:
             "context.person": self.context_person,
             "group.members_get": lambda cl, a: self.reads.member(a["group"], self.targets(a["group"]), a["recipient"]),
             "group.permissions_get": lambda cl, a: self.reads.permissions(a["group"], self.targets(a["group"])),
-            "group.join_requests_list": self.join_requests,
+            "group.join_requests_list": self.listed("join_requests"),
+            "group.invite_list": self.listed("invites"),
+            "group.topic_list": self.listed("topics"),
+            "group.admin_log": self.listed("admin_log"),
+            "group.topic_get": lambda cl, a: self.reads.topic(a["group"], self.targets(a["group"]), a["topic"]),
             "directory.contact_add": lambda cl, a: s.directory.contact_add(c(cl), a["recipient"], a["transport"], a["identity"], a["request_id"]),
             "directory.contact_disable": lambda cl, a: s.directory.contact_disable(c(cl), a["contact"], a["request_id"]),
             "directory.contact_opt_out": lambda cl, a: s.directory.contact_opt_out(c(cl), a["contact"], a["request_id"]),

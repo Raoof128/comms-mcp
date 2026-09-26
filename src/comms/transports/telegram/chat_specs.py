@@ -65,6 +65,11 @@ def invite_edit(args: Mapping[str, Any]) -> Spec:
     return fields
 
 
+def no_args(args: Mapping[str, Any]) -> Spec:
+    """An operation that takes nothing (G6: resetting the primary invite link)."""
+    return take(args, {}, {})
+
+
 def invite_revoke(args: Mapping[str, Any]) -> Spec:
     return take(args, {"invite_link": _link}, {})
 

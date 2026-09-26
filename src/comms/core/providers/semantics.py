@@ -108,6 +108,9 @@ SUPPORT: Mapping[C, tuple[str, ...]] = MappingProxyType(
         **{c: (USER,) if c in _USER_ONLY else _TELEGRAM for c in _TELEGRAM_CAPS},
         **{c: (CLOUD,) for c in C if c not in _TELEGRAM_CAPS and c not in _HOOK_CAPS},
         **dict.fromkeys(_HOOK_CAPS, (HOOKS,)),
+        # G6: every actor resets a group's primary invite link (Telegram: a new primary link
+        # revokes the old; WhatsApp: the one link is reset)
+        C.GROUP_INVITE_RESET: (*_TELEGRAM, CLOUD),
     }
 )
 

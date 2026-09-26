@@ -11,8 +11,9 @@ page short, the cursor resumes right after the last item kept.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable, Coroutine, Mapping
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Protocol
 
 from comms.core import timeutil
@@ -58,6 +59,14 @@ class ReadSession(Protocol):
         self, peer_type: str, peer_id: int, *, timeout: float
     ) -> dict[str, bool]: ...
 
+    async def exported_invites(self, peer_type: str, peer_id: int, **kw: Any) -> Any: ...
+
+    async def join_requests(self, peer_type: str, peer_id: int, **kw: Any) -> Any: ...
+
+    async def forum_topics(self, peer_id: int, **kw: Any) -> Any: ...
+
+    async def admin_log(self, peer_id: int, **kw: Any) -> Any: ...
+
 
 Runner = Callable[[Coroutine[Any, Any, Any]], Any]
 
@@ -98,6 +107,12 @@ class UserContext:
             fields = take(args, {}, {})
         elif kind == "member":  # G6: one member's standing, by marked user id
             fields = take(args, {"user_id": _cursor}, {})
+        elif kind in ("invites", "join_requests", "topics", "admin_log"):  # G6 lists
+            fields = take(args, {}, {"limit": _limit, "cursor": _offset})
+        elif kind == "topic":  # G6: one topic by id
+            fields = take(args, {"topic_id": _cursor}, {})
+        elif kind == "from":  # G6: one sender's messages in a group (a person's activity)
+            fields = take(args, {"sender": _cursor}, {"limit": _limit, "cursor": _cursor})
         else:
             raise ContextRefused("PROVIDER_UNSUPPORTED")
         refused = self._session.readiness()
@@ -108,6 +123,77 @@ class UserContext:
         except GatewayError as failed:
             raise ContextRefused(_REFUSAL.get(failed.code, "UNAVAILABLE")) from None
 
+    async def _list(
+        self, kind: str, peer: tuple[str, int], fields: Mapping[str, Any], observed: str
+    ) -> ContextPage:
+        """G6's lists: invites, join requests, forum topics (or one), the admin log. Each item
+        still carries its provider ids; the group reads service maps them to refs."""
+        limit = fields.get("limit", 50)
+        raw = json.loads(fields["cursor"]) if "cursor" in fields else None
+        stamp = {"source": PROVENANCE, "observed_at": observed}
+        items: list[dict[str, Any]]
+        after: Any
+        if kind == "invites":
+            invites, after = await self._session.exported_invites(
+                *peer,
+                offset=(datetime.fromtimestamp(raw[0], UTC), str(raw[1])) if raw else None,
+                limit=limit,
+                timeout=READ_TIMEOUT_S,
+            )
+            items = [
+                {**stamp, "link": i.link, "usage": i.usage or 0, "usage_limit": i.usage_limit,
+                 "expires_at": _stamp(i.expire_date), "revoked": bool(i.revoked),
+                 "primary": bool(i.permanent), "request_needed": bool(i.request_needed),
+                 "requested": i.requested, "untrusted": {"title": i.title} if i.title else {}}
+                for i in invites
+            ]  # fmt: skip
+            after = [int(after[0].timestamp()), after[1]] if after else None
+        elif kind == "join_requests":
+            rows, after = await self._session.join_requests(
+                *peer,
+                offset=(datetime.fromtimestamp(raw[0], UTC), int(raw[1])) if raw else None,
+                limit=limit,
+                timeout=READ_TIMEOUT_S,
+            )
+            items = [
+                {**stamp, "user_id": uid, "requested_at": _stamp(date),
+                 "untrusted": {"name": clamp(name, NAME_MAX)[0]} if name else {}}
+                for uid, date, name in rows
+            ]  # fmt: skip
+            after = [int(after[0].timestamp()), after[1]] if after else None
+        elif kind in ("topics", "topic"):
+            if peer[0] != "channel":
+                return ContextPage((), PROVENANCE)  # a basic group has no topics
+            ids = [int(fields["topic_id"])] if kind == "topic" else None
+            topics, after = await self._session.forum_topics(
+                peer[1],
+                offset=(datetime.fromtimestamp(raw[0], UTC), int(raw[1]), int(raw[2]))
+                if raw
+                else None,
+                ids=ids,
+                limit=limit,
+                timeout=READ_TIMEOUT_S,
+            )
+            items = [
+                {**stamp, "topic_id": x.id, "closed": bool(x.closed), "pinned": bool(x.pinned),
+                 "hidden": bool(x.hidden), "untrusted": {"name": clamp(x.title, NAME_MAX)[0]}}
+                for x in topics
+            ]  # fmt: skip
+            after = [int(after[0].timestamp()), after[1], after[2]] if after else None
+        else:  # admin_log: event kinds only, no content; a basic group has none
+            if peer[0] != "channel":
+                return ContextPage((), PROVENANCE)
+            max_id = int(raw[0]) if raw else 0
+            events = await self._session.admin_log(
+                peer[1], max_id=max_id, limit=limit, timeout=READ_TIMEOUT_S
+            )
+            items = [
+                {**stamp, "event_id": eid, "at": _stamp(date), "user_id": uid, "action": action}
+                for eid, date, uid, action in events
+            ]  # fmt: skip
+            after = [min(e[0] for e in events), 0] if len(events) == limit and events else None
+        return ContextPage(tuple(items), PROVENANCE, json.dumps(after) if after else None)
+
     async def _read(
         self, kind: str, peer: tuple[str, int], fields: Mapping[str, Any]
     ) -> ContextPage:
@@ -117,6 +203,19 @@ class UserContext:
             "deadline": Deadline(READ_TIMEOUT_S),
             "budget": WorkBudget(max_rpcs=1),
         }
+        if kind in ("invites", "join_requests", "topics", "topic", "admin_log"):
+            return await self._list(kind, peer, fields, observed)
+        if kind == "from":
+            if peer[0] == "user":
+                raise ContextRefused("PROVIDER_UNSUPPORTED")
+            result = await self._session.search_peer(
+                *peer, "", min_date=None, max_date=None,
+                offset_id=int(fields.get("cursor", 0)), limit=fields.get("limit", 20),
+                from_user=int(fields["sender"]), **common,
+            )  # fmt: skip
+            items = [_message(view, observed) for view in result.views]
+            next_cursor = str(result.next_offset) if result.next_offset is not None else None
+            return _page(items, next_cursor, cursor_of=True)
         if kind == "admins":
             rows = await self._session.fetch_admins(*peer, timeout=READ_TIMEOUT_S)
             return _page([_member(row, observed) for row in rows], None, cursor_of=None)
@@ -171,6 +270,21 @@ class UserContext:
             )
         items = [_message(view, observed) for view in views]
         return _page(items, str(below) if below is not None else None, cursor_of=kind != "around")
+
+
+def _offset(value: object) -> bool:
+    """A list cursor this source made: a small JSON array (G6), held in a ``cur_`` handle."""
+    if not isinstance(value, str) or len(value) > 512:
+        return False
+    try:
+        parsed = json.loads(value)
+    except ValueError:
+        return False
+    return isinstance(parsed, list) and 2 <= len(parsed) <= 3
+
+
+def _stamp(value: datetime | None) -> str | None:
+    return None if value is None else timeutil.iso(value)
 
 
 def _cursor_int(value: object) -> bool:

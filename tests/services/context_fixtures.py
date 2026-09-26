@@ -30,6 +30,21 @@ class Source:
         if query.kind == "admins":
             item = {**stamp, "user_id": 42, "role": "creator", "untrusted": {"name": "Ali"}}
             return ContextPage((item,), self.provenance)
+        if query.kind in ("invites", "join_requests", "topics", "topic", "admin_log"):
+            item = {  # G6: the user source's list shapes, provider ids included
+                "invites": {"link": "https://t.me/+AbCdEf", "usage": 2, "usage_limit": None,
+                            "expires_at": None, "revoked": False, "primary": True,
+                            "request_needed": False, "requested": None,
+                            "untrusted": {"title": "Main"}},
+                "join_requests": {"user_id": 908180, "requested_at": "2026-09-25T00:00:00Z",
+                                  "untrusted": {"name": "Ali"}},
+                "topics": {"topic_id": 9, "closed": False, "pinned": True, "hidden": False,
+                           "untrusted": {"name": "Events"}},
+                "topic": {"topic_id": 9, "closed": True, "untrusted": {"name": "Events"}},
+                "admin_log": {"event_id": 50, "at": "2026-09-25T00:00:00Z", "user_id": 908180,
+                              "action": "ChannelAdminLogEventActionChangeTitle"},
+            }[query.kind]  # fmt: skip
+            return ContextPage(({**stamp, **item},), self.provenance)
         start = int(query.args.get("cursor") or 1000)
         items = tuple(
             {

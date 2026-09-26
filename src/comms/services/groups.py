@@ -205,6 +205,8 @@ class GroupService:
             raise CommsError("INVALID_ARGUMENT")
         transport = transport_of(targets)
         capability = by_transport.get(transport)
+        if tool == "group.invite.revoke" and "invite" not in args:
+            capability = C.GROUP_INVITE_RESET  # G6: no invite named: reset the primary link
         if capability is None:
             raise CommsError("PROVIDER_UNSUPPORTED")
         renamed = _RENAMED.get((tool, transport), {})

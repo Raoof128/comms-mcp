@@ -142,3 +142,96 @@ def test_default_permissions_of_a_basic_group(tmp_path):
                         "permissions", BASIC)  # fmt: skip
     assert page.items[0]["permissions"]["can_invite_users"] is False
     assert page.items[0]["permissions"]["can_send_messages"] is True
+
+
+# -- G6 part 2: the user account's lists ---------------------------------------------------
+
+
+def _list(tmp_path, script, kind, target=SUPER, args=None):
+    return _run(tmp_path, script, kind, target, args)
+
+
+def test_admin_log_pages_by_event_id_kinds_only(tmp_path):
+    def event(n):
+        return types.ChannelAdminLogEvent(id=n, date=NOW, user_id=42,
+                                          action=types.ChannelAdminLogEventActionChangeTitle("a", "b"))  # fmt: skip
+
+    full = types.channels.AdminLogResults(events=[event(50), event(49)], chats=[], users=[])
+    seen = []
+    page, calls = _list(tmp_path, {"channels.GetAdminLogRequest": lambda r: seen.append(r) or full},
+                        "admin_log", args={"limit": 2})  # fmt: skip
+    assert calls == ["channels.GetAdminLogRequest"] and (seen[0].limit, seen[0].max_id) == (2, 0)
+    assert [(i["event_id"], i["user_id"], i["action"]) for i in page.items] == [
+        (50, 42, "ChannelAdminLogEventActionChangeTitle"), (49, 42, "ChannelAdminLogEventActionChangeTitle")]  # fmt: skip
+    assert page.next_cursor == "[49, 0]"
+    last = types.channels.AdminLogResults(events=[event(48)], chats=[], users=[])
+    seen.clear()
+    page, _ = _list(tmp_path, {"channels.GetAdminLogRequest": lambda r: seen.append(r) or last},
+                    "admin_log", args={"limit": 2, "cursor": "[49, 0]"})  # fmt: skip
+    assert seen[0].max_id == 49 and page.next_cursor is None
+    page, calls = _list(tmp_path, {}, "admin_log", BASIC)
+    assert page.items == () and calls == []  # basic groups have no admin log
+
+
+def test_invites_are_the_accounts_own_active_links(tmp_path):
+    link = types.ChatInviteExported(link="https://t.me/+Abc", admin_id=4242, date=NOW, usage=3,
+                                    usage_limit=10, permanent=True, title="Family")  # fmt: skip
+    answer = types.messages.ExportedChatInvites(count=1, invites=[link], users=[])
+    seen = []
+    page, calls = _list(tmp_path, {"messages.GetExportedChatInvitesRequest":
+                                   lambda r: seen.append(r) or answer}, "invites")  # fmt: skip
+    assert calls == ["messages.GetExportedChatInvitesRequest"]
+    assert isinstance(seen[0].admin_id, types.InputUserSelf) and seen[0].revoked is False
+    (item,) = page.items
+    assert (item["link"], item["usage"], item["usage_limit"], item["primary"]) == (
+        "https://t.me/+Abc", 3, 10, True)  # fmt: skip
+    assert item["untrusted"] == {"title": "Family"} and page.next_cursor is None
+
+
+def test_join_requests_are_the_requested_importers(tmp_path):
+    answer = types.messages.ChatInviteImporters(
+        count=1, importers=[types.ChatInviteImporter(user_id=42, date=NOW, requested=True)],
+        users=[_user(42, "Jack")])  # fmt: skip
+    seen = []
+    page, calls = _list(tmp_path, {"messages.GetChatInviteImportersRequest":
+                                   lambda r: seen.append(r) or answer}, "join_requests")  # fmt: skip
+    assert calls == ["messages.GetChatInviteImportersRequest"] and seen[0].requested is True
+    assert [(i["user_id"], i["untrusted"]) for i in page.items] == [(42, {"name": "Jack"})]
+
+
+def _topic(tid, title, **kw):
+    return types.ForumTopic(id=tid, date=NOW, peer=types.PeerChannel(77), title=title,
+                            icon_color=0, top_message=tid, read_inbox_max_id=0,
+                            read_outbox_max_id=0, unread_count=0, unread_mentions_count=0,
+                            unread_reactions_count=0, unread_poll_votes_count=0,
+                            from_id=types.PeerUser(42),
+                            notify_settings=types.PeerNotifySettings(), **kw)  # fmt: skip
+
+
+def test_topics_listed_and_one_by_id(tmp_path):
+    answer = types.messages.ForumTopics(count=2, topics=[_topic(1, "General"),
+                                        _topic(9, "Events", closed=True)], messages=[], chats=[],
+                                        users=[], pts=1)  # fmt: skip
+    page, calls = _list(tmp_path, {"messages.GetForumTopicsRequest": answer}, "topics")
+    assert calls == ["messages.GetForumTopicsRequest"]
+    assert [(i["topic_id"], i["closed"], i["untrusted"]["name"]) for i in page.items] == [
+        (1, False, "General"), (9, True, "Events")]  # fmt: skip
+    seen = []
+    one = types.messages.ForumTopics(count=1, topics=[_topic(9, "Events")], messages=[],
+                                     chats=[], users=[], pts=1)  # fmt: skip
+    page, calls = _list(tmp_path, {"messages.GetForumTopicsByIDRequest":
+                                   lambda r: seen.append(r) or one}, "topic",
+                        args={"topic_id": "9"})  # fmt: skip
+    assert calls == ["messages.GetForumTopicsByIDRequest"] and seen[0].topics == [9]
+    page, calls = _list(tmp_path, {}, "topics", BASIC)
+    assert page.items == () and calls == []
+
+
+def test_one_senders_messages_narrow_the_same_search(tmp_path):
+    answer = types.messages.Messages(messages=[], topics=[], chats=[], users=[])
+    seen = []
+    _page, calls = _list(tmp_path, {"messages.SearchRequest": lambda r: seen.append(r) or answer},
+                         "from", args={"sender": "42"})  # fmt: skip
+    assert calls == ["messages.SearchRequest"]
+    assert seen[0].q == "" and isinstance(seen[0].from_id, types.InputPeerUser)
+    assert seen[0].from_id.user_id == 42
