@@ -36,6 +36,7 @@ __all__ = [
     "add_location_member_in_tx",
     "add_recipient",
     "add_recipient_in_tx",
+    "contact_targets",
     "destination_id",
     "has_recipient",
     "member_identity",
@@ -506,3 +507,18 @@ def has_recipient(conn: Any, recipient_ref: str) -> bool:
     """Whether the recipient ref names a recipient (read-only)."""
     row = conn.execute("SELECT 1 FROM recipients WHERE ref = ?", (recipient_ref,)).fetchone()
     return row is not None
+
+
+def contact_targets(conn: Any, recipient_ref: str) -> list[tuple[str, str, str]]:
+    """A person's enabled contact points as ``(transport, contact ref, delivery identity)``, for
+    building read targets only; never returned to a caller (G5). ``DirectoryNotFound`` for an
+    unknown person."""
+    _kind(recipient_ref, {"recipient"})
+    recipient_id = _id(conn, "recipient", recipient_ref)
+    rows = conn.execute(
+        "SELECT c.transport, c.ref, i.identity FROM contact_points c"
+        " JOIN delivery_identities i ON i.id = c.identity_id"
+        " WHERE c.recipient_id = ? AND c.enabled = 1 ORDER BY c.transport",
+        (recipient_id,),
+    ).fetchall()
+    return [(str(r[0]), str(r[1]), str(r[2])) for r in rows]

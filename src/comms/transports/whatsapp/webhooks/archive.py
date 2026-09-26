@@ -86,7 +86,8 @@ class CommsArchive:
 
 class ArchiveContext:
     """The archive as a context source for one WhatsApp conversation: ``recent`` (paged) and
-    ``around`` one message (newest first, as Telegram's history reads are). Any other kind is
+    ``around`` one message (newest first, as Telegram's history reads are), and ``from``: one
+    sender's messages in a group (G5, a person's group activity). Any other kind is
     refused ``PROVIDER_UNSUPPORTED``: the archive has no thread or search index (G1 found every
     kind was served as ``recent``)."""
 
@@ -103,9 +104,17 @@ class ArchiveContext:
             return self._recent(chat, query.args)
         if query.kind == "around":
             return self._around(chat, query.args)
+        if query.kind == "from" and chat.startswith("group:"):
+            return self._recent(chat, query.args, sender=query.args.get("sender"))
         raise ContextRefused("PROVIDER_UNSUPPORTED")
 
-    def _recent(self, chat: str, args: Mapping[str, Any]) -> ContextPage:
+    def _recent(self, chat: str, args: Mapping[str, Any], *, sender: object = None) -> ContextPage:
+        """A page of one conversation, or of one sender's messages in a group (``from``, G5)."""
+        wa_id = None
+        if sender is not None:
+            if not isinstance(sender, str) or not sender.startswith("+"):
+                raise ValueError("sender refused")
+            wa_id = sender[1:]
         limit = min(int(args.get("limit") or 20), _MAX_LIMIT)
         cursor = args.get("cursor")
         before = int(cursor) if isinstance(cursor, str) and cursor.isdigit() else None
@@ -119,9 +128,10 @@ class ArchiveContext:
                 return ContextPage((), PROVENANCE, None)
         rows = self._conn.execute(
             f"SELECT {_COLUMNS} FROM whatsapp_messages"
-            " WHERE chat = ? AND (? IS NULL OR sent_at < ? OR (sent_at = ? AND id < ?))"
+            " WHERE chat = ? AND (? IS NULL OR sender_wa_id = ?)"
+            " AND (? IS NULL OR sent_at < ? OR (sent_at = ? AND id < ?))"
             " ORDER BY sent_at DESC, id DESC LIMIT ?",
-            (chat, before, *(edge or (None,)) * 2, before, limit + 1),
+            (chat, wa_id, wa_id, before, *(edge or (None,)) * 2, before, limit + 1),
         ).fetchall()
         more = len(rows) > limit
         items = self._items(rows[:limit])

@@ -8,6 +8,7 @@ group destination is minted when it is created or restored, so every group is li
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
@@ -17,6 +18,7 @@ from comms.core.storage.db import write_tx
 __all__ = [
     "GroupError",
     "destination_of",
+    "enabled_groups",
     "group_identity",
     "group_ref",
     "group_ref_in_tx",
@@ -136,3 +138,15 @@ def group_identity(conn: Any, grp: str) -> tuple[str, str, str]:
     if row is None:
         raise GroupError("unknown group")
     return str(row[0]), str(row[1]), str(row[2])
+
+
+def enabled_groups(conn: Any, transports: Sequence[str], *, limit: int) -> tuple[list[str], bool]:
+    """Enabled groups on these transports, newest first, at most ``limit`` (a person's group
+    activity, G5); the flag says whether more were left out."""
+    marks = ",".join("?" * len(transports))
+    rows = conn.execute(
+        "SELECT g.ref FROM groups g JOIN destinations d ON d.id = g.destination_id"
+        f" WHERE d.enabled = 1 AND d.transport IN ({marks}) ORDER BY g.id DESC LIMIT ?",
+        (*transports, limit + 1),
+    ).fetchall()
+    return [str(r[0]) for r in rows[:limit]], len(rows) > limit

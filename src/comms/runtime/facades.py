@@ -17,10 +17,10 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from comms.core.campaigns.directory import member_identity
+from comms.core.campaigns.directory import DirectoryError, contact_targets, member_identity
 from comms.core.canonical import jcs_dumps
 from comms.core.errors import CommsError
-from comms.core.groups import GroupError, group_identity
+from comms.core.groups import GroupError, enabled_groups, group_identity
 from comms.core.objects import resolve_object
 from comms.core.providers.capability import Capability
 from comms.core.providers.protocols import ProviderTarget
@@ -45,6 +45,8 @@ __all__ = ["NOT_OFFERED", "Services", "build_registry", "group_targets"]
 Facade = Callable[[AuthenticatedClient, dict[str, Any]], dict[str, Any]]
 _TELEGRAM = ("telegram_bot", "telegram_user")
 _WHATSAPP = "whatsapp_cloud"
+_PERSON_TRANSPORTS = ("telegram", "whatsapp")
+_PERSON_GROUPS = 10  # P §71: one read spans at most ten groups, as comms_context_search
 _SOURCE_ACTOR = {"telegram_live": "telegram_user", "telegram_local": "telegram_bot"}
 # Tools whose services are not offered yet (each named in the D-task that catalogued it).
 NOT_OFFERED = frozenset(
@@ -160,6 +162,8 @@ class _Facades:
         self, client: AuthenticatedClient, kind: str, group: str, actor: str,
         args: Mapping[str, Any], cursor: str | None = None,
     ) -> dict[str, Any]:  # fmt: skip
+        if kind == "person":  # a section of comms_context_person (G5); group is the rcp_
+            return self.person_section(client, group, str(args["section"]), args, cursor=cursor)
         target = self.targets(group)[actor]
         limit = int(args.get("limit", 20))
         if kind == "recent":
@@ -169,6 +173,89 @@ class _Facades:
         else:
             raise CommsError("STALE_HANDLE")
         return self.tokened(client, page, kind, group, actor, args)
+
+    # -- a person's communication (catalog amendment G5) --------------------------------
+
+    def context_person(self, client: AuthenticatedClient, a: dict[str, Any]) -> dict[str, Any]:
+        """A person's direct communication by source, and (only when asked) their messages in
+        the directory's groups; named by ``rcp_`` only, identities never leave (A26)."""
+        recipient = a["recipient"]
+        mine = self.person_contacts(recipient, a.get("transports"))
+        args = {"limit": a.get("limit", 20)}
+        names = [n for t in sorted(mine) for n in (t, f"campaigns:{t}")]
+        truncated = False
+        if a.get("include_group_activity", False):
+            groups, truncated = enabled_groups(self.s.conn, sorted(mine), limit=_PERSON_GROUPS)
+            names += [f"groups:{g}" for g in groups]
+        sections, unavailable = [], []
+        for name in names:
+            try:
+                page = self.person_section(client, recipient, name, {"section": name, **args})
+            except CommsError as refused:
+                unavailable.append({"section": name, "code": refused.code})
+            else:
+                sections.append({"section": name, **page})
+        return {
+            "recipient": recipient,
+            "sections": sections,
+            "unavailable": unavailable,
+            "groups_truncated": truncated,
+        }
+
+    def person_contacts(self, recipient: str, transports: Any = None) -> dict[str, tuple[str, str]]:
+        """``{transport: (contact ref, identity)}``; NOT_FOUND for an unknown person or one
+        without a contact point on the transports asked for."""
+        try:
+            contacts = contact_targets(self.s.conn, recipient)
+        except DirectoryError:
+            raise CommsError("NOT_FOUND") from None
+        wanted = set(transports or _PERSON_TRANSPORTS)
+        mine = {t: (ref, identity) for t, ref, identity in contacts if t in wanted}
+        if not mine:
+            raise CommsError("NOT_FOUND")
+        return mine
+
+    def person_section(
+        self, client: AuthenticatedClient, recipient: str, name: str, args: Mapping[str, Any],
+        *, cursor: str | None = None,
+    ) -> dict[str, Any]:  # fmt: skip
+        mine = self.person_contacts(recipient)
+        limit = int(args.get("limit", 20))
+        kind, _sep, rest = name.partition(":")
+        engine = self.s.context
+        if kind == "groups":
+            targets = self.targets(rest)
+            transport = next(iter(targets.values())).transport
+            if transport not in mine:
+                raise CommsError("NOT_FOUND")
+            # only the local sources index a sender (the user account's messages.search by
+            # sender is G6 work), so a Telegram group is read from the bot's retained updates
+            target = targets.get("whatsapp_cloud") or targets.get("telegram_bot")
+            if target is None:
+                raise CommsError("PROVIDER_UNSUPPORTED")
+            page = engine.from_sender(rest, target, mine[transport][1], limit=limit, cursor=cursor)
+            return self.tokened(client, page, "person", recipient, target.actor, args)
+        transport = rest if kind == "campaigns" else kind
+        if transport not in mine:
+            raise CommsError("NOT_FOUND")
+        contact, identity = mine[transport]
+        if kind == "campaigns":
+            target = ProviderTarget(transport, "campaign_store", contact, identity)
+            page = engine.campaign_history(recipient, target, limit=limit, cursor=cursor)
+        elif transport == "whatsapp":
+            target = ProviderTarget("whatsapp", _WHATSAPP, contact, identity)
+            page = engine.archive(recipient, target, limit=limit, cursor=cursor)
+        else:
+            targets = {
+                actor: ProviderTarget("telegram", actor, contact, identity)
+                for actor in _TELEGRAM
+                if actor in self.s.actors
+            }
+            if not targets:
+                raise CommsError("NOT_CONFIGURED")
+            target = engine.reader(targets, Capability.HISTORY_READ, fallback=True)
+            page = engine.recent(recipient, target, limit=limit, cursor=cursor)
+        return self.tokened(client, page, "person", recipient, target.actor, args)
 
     # -- context ---------------------------------------------------------------------------
 
@@ -387,6 +474,7 @@ class _Facades:
             "directory.recipient_update": lambda cl, a: s.directory.recipient_update(c(cl), a["recipient"], a["display_name"], a["request_id"]),
             "directory.recipient_enable": lambda cl, a: s.directory.recipient_enable(c(cl), a["recipient"], a["request_id"]),
             "directory.recipient_disable": lambda cl, a: s.directory.recipient_disable(c(cl), a["recipient"], a["request_id"]),
+            "context.person": self.context_person,
             "directory.contact_add": lambda cl, a: s.directory.contact_add(c(cl), a["recipient"], a["transport"], a["identity"], a["request_id"]),
             "directory.contact_disable": lambda cl, a: s.directory.contact_disable(c(cl), a["contact"], a["request_id"]),
             "directory.contact_opt_out": lambda cl, a: s.directory.contact_opt_out(c(cl), a["contact"], a["request_id"]),

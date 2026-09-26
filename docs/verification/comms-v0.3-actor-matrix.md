@@ -60,6 +60,8 @@ MTProto rows cover both a basic group (`messages.*`) and a supergroup or channel
 | `comms_group_context` | A todo:G6 (local): `getChat`, `getChatAdministrators` + retained updates (the gauntlet found it refused for the bot: admins are derived from a member page the Bot API cannot produce) | A done [history.read]: `messages.getHistory`, `channels.getParticipants` | A todo:G8 (local): the archive + `GET /{group_id}?fields=participants` (G1 found it refused: the archive has messages only, and before G1 it answered a members read with messages) |
 | `comms_context_around_message` / `comms_message_context` | A todo:G6 (local): retained updates around one update, as the archive does (the Bot API has no history method) | A done [history.read]: `messages.getHistory` (offset) | A done (local): the archive around one `wamid`, newest first (the Cloud API has no history method) |
 | `comms_context_thread` | B [history.read]: the Bot API has no history or thread method, and retained updates carry no thread index | A done [history.read]: `messages.getReplies` | B [history.read]: the Cloud API has no history method; the archive has no thread index |
+| `comms_context_person` | A done (local): the bot's retained private-chat updates (`telegram_local`), when the user account cannot read the chat | A done [history.read]: `messages.getHistory` on the user peer (`telegram_live`) | A done (local): the archive's direct messages (`whatsapp_webhook_archive`), plus `campaign_store` on every transport |
+| `comms_context_person` (variant: include_group_activity) | A done (local): retained group updates from that sender | A todo:G6 [history.search]: `messages.search(from_id)` per group (today the group section reads the bot's retained updates, or is unavailable) | A done (local): the archive's group messages from that sender |
 | `comms_context_search` / `comms_message_search` | B [history.search]: the Bot API has no search | A done [history.search]: `messages.search` | B [history.search]: the Cloud API has no search |
 | `comms_context_summarize_source` | A done: local (what each source can serve) | A done: local | A done: local |
 
@@ -135,7 +137,7 @@ These tools become rows here when G7 and G8 add them to the catalog. The row tes
 
 ## Local tools (no provider actor)
 
-`comms_capability_list`, `comms_group_list`, `comms_group_get`, every `comms_campaign_*`, `comms_location_*` and `comms_audience_*` tool, `comms_admin_identity_inspect`, and the `comms_directory_*` and `comms_context_person` tools that G2–G5 add. These read or write `comms.db` only. A campaign's delivery goes through the transports' delivery adapters, not these tools.
+`comms_capability_list`, `comms_group_list`, `comms_group_get`, every `comms_campaign_*`, `comms_location_*` and `comms_audience_*` tool, `comms_admin_identity_inspect`, the `comms_directory_*` tools G2–G4 add, and `comms_location_member_*`. These read or write `comms.db` only. A campaign's delivery goes through the transports' delivery adapters, not these tools.
 
 ## Checked against the 2026 developer docs (2026-09-26)
 

@@ -24,6 +24,7 @@ from comms.mcp.spec import ToolSpec
 
 __all__ = [
     "CONTEXT_FAILURES",
+    "CONTEXT_PERSON_TOOLS",
     "CONTEXT_TOOLS",
     "CURSOR",
     "ITEM",
@@ -205,6 +206,54 @@ CONTEXT_TOOLS: tuple[ToolSpec, ...] = (
         {"cursor": CURSOR},
         ["cursor"],
         PAGE,
+        failures=CONTEXT_FAILURES,
+        open_world=True,
+    ),
+)
+
+# catalog amendment G5: one person's communication, by source (appended as its own family)
+_SECTION = obj(
+    {
+        "section": {
+            "type": "string",
+            "pattern": r"^(whatsapp|telegram|campaigns:(whatsapp|telegram)|groups:grp_[a-z2-7]{26})$",
+        },
+        "group_ref": SUBJECT,
+        "source": enum(PROVENANCE),
+        "items": array(ITEM, high=100),
+        "next_cursor": nullable(CURSOR),
+    },
+    ["section", "group_ref", "source", "items", "next_cursor"],
+)
+CONTEXT_PERSON_TOOLS: tuple[ToolSpec, ...] = (
+    read(
+        "comms_context_person",
+        "A person's messages",
+        "One person's direct communication, by source: the WhatsApp archive, the Telegram "
+        "private chat (live via the user account, else the bot's retained updates) and campaign "
+        "history. Their messages in the directory's groups only with include_group_activity "
+        "(at most ten groups). Named by ref; numbers and ids never appear. Each section pages "
+        "with comms_context_page.",
+        "context.person",
+        {
+            "recipient": ref("recipient"),
+            "transports": array(enum(("telegram", "whatsapp")), low=1, high=2),
+            "include_group_activity": BOOL,
+            "limit": integer(1, 100),
+        },
+        ["recipient"],
+        obj(
+            {
+                "recipient": ref("recipient"),
+                "sections": array(_SECTION, high=16),
+                "unavailable": array(
+                    obj({"section": string(1, 64), "code": string(1, 64)}, ["section", "code"]),
+                    high=16,
+                ),
+                "groups_truncated": BOOL,
+            },
+            ["recipient", "sections", "unavailable", "groups_truncated"],
+        ),
         failures=CONTEXT_FAILURES,
         open_world=True,
     ),

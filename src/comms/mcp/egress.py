@@ -34,6 +34,7 @@ _BODY = frozenset(
         "comms_message_search",
         "comms_message_context",
         "comms_group_context",
+        "comms_context_person",  # G5
     }
 )
 _NAMES = frozenset(
@@ -45,6 +46,7 @@ _NAMES = frozenset(
         # catalog amendment G2: people's labels, owner-typed but model-visible
         "comms_directory_recipient_list",
         "comms_directory_recipient_get",
+        "comms_context_person",  # G5: senders' names, under untrusted
     }
 )
 _IDENTITY = frozenset({"comms_admin_identity_inspect"})

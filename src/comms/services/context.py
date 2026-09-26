@@ -187,6 +187,20 @@ class ContextEngine:
     ) -> dict[str, Any]:
         return self._page(group, target, "recent", {"limit": _limit(limit), **_cursor(cursor)})
 
+    def from_sender(
+        self,
+        group: str,
+        target: ProviderTarget,
+        sender: str,
+        *,
+        limit: int = 20,
+        cursor: str | None = None,
+    ) -> dict[str, Any]:
+        """One sender's messages in a group (G5: a person's group activity)."""
+        return self._page(
+            group, target, "from", {"sender": sender, "limit": _limit(limit), **_cursor(cursor)}
+        )
+
     def around_message(
         self,
         group: str,

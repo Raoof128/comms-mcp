@@ -3,7 +3,8 @@
 A bot sees only what Telegram gives it now and what this installation retained as it arrived
 (P §20). ``info`` reads current provider data (chat, administrators, member count) and is
 ``telegram_live``; ``recent`` pages the locally retained updates for the chat and is
-``telegram_local``. History, search and member enumeration are ``PROVIDER_UNSUPPORTED`` and
+``telegram_local``; ``from`` pages one sender's retained updates in a group (G5). History,
+search and member enumeration are ``PROVIDER_UNSUPPORTED`` and
 never reach Telegram: the bot never presents local retention as full history. Every item
 carries its ``source`` and ``observed_at`` (P §21); provider text sits under ``untrusted``
 (A32). A failed live lookup refuses the whole read rather than returning part of it.
@@ -49,6 +50,11 @@ class BotContext:
         if query.kind == "recent":
             args = take(query.args, {}, {"limit": _limit, "cursor": _cursor})
             return self._recent(chat_id, args.get("limit", 20), args.get("cursor"))
+        if query.kind == "from" and chat_id < 0:  # one sender in a group (G5), retained only
+            args = take(query.args, {"sender": _sender}, {"limit": _limit, "cursor": _cursor})
+            return self._recent(
+                chat_id, args.get("limit", 20), args.get("cursor"), sender=int(args["sender"])
+            )
         raise ContextRefused("PROVIDER_UNSUPPORTED")
 
     def _info(self, chat_id: int) -> ContextPage:
@@ -88,16 +94,24 @@ class BotContext:
                 )
         return ContextPage(tuple(items), "telegram_live")
 
-    def _recent(self, chat_id: int, limit: int, cursor: str | None) -> ContextPage:
+    def _recent(
+        self, chat_id: int, limit: int, cursor: str | None, *, sender: int | None = None
+    ) -> ContextPage:
         before = int(cursor) if cursor is not None else None
         rows = self._conn.execute(
             "SELECT update_id, kind, payload, received_at FROM bot_updates WHERE chat_id = ?"
+            " AND (? IS NULL OR json_extract(payload, '$.' || kind || '.from.id') = ?)"
             " AND (? IS NULL OR update_id < ?) ORDER BY update_id DESC LIMIT ?",
-            (chat_id, before, before, limit + 1),
+            (chat_id, sender, sender, before, before, limit + 1),
         ).fetchall()
         items = tuple(_local_item(*row) for row in rows[:limit])
         next_cursor = str(rows[limit - 1][0]) if len(rows) > limit else None
         return ContextPage(items, "telegram_local", next_cursor)
+
+
+def _sender(value: object) -> bool:
+    """A Telegram user's marked id: a positive integer, as a string (G5)."""
+    return isinstance(value, str) and value.isascii() and value.isdigit() and int(value) > 0
 
 
 def _limit(value: object) -> bool:

@@ -1,5 +1,5 @@
 {
-  "count": 122,
+  "count": 123,
   "names": [
     "comms_capability_list",
     "comms_context_get",
@@ -122,7 +122,8 @@
     "comms_directory_destination_create",
     "comms_directory_destination_disable",
     "comms_location_member_add",
-    "comms_location_member_remove"
+    "comms_location_member_remove",
+    "comms_context_person"
   ],
   "tools": {
     "comms_capability_list": "52c9c68aadd227b8eafb7c50d6676e6543c5e46109c51939cffc8b142737e8bb",
@@ -246,7 +247,8 @@
     "comms_directory_destination_create": "fa1cfac3cf4415ecaed3f368c504a2c4c18065f731741fbec02b8cb14689ebd6",
     "comms_directory_destination_disable": "a42db0786d2a4adef5893d0e843a15badc3ae5bd6e0150b0d14ac3933f927332",
     "comms_location_member_add": "bf08e116e723da87279206a12db401f5f6d0f707fc0cdddbbe3548fe620e565e",
-    "comms_location_member_remove": "07cdab0ad039b63c1541e5c70f5745066cd349980c1b87339d410226f3a96280"
+    "comms_location_member_remove": "07cdab0ad039b63c1541e5c70f5745066cd349980c1b87339d410226f3a96280",
+    "comms_context_person": "8b146afb6a24c7f8a5a5dd74fd62abe2bc12e3c29ef2aa1b58baf7255be9220f"
   },
-  "catalog": "52c0cc9be09e9a9378e8ce9c5facba759eff5252094f924605598894e90475c5"
+  "catalog": "c5ea122dac23a44a587739b15c9c3e1185aadedb1086a1d6bcc91cb0dd1912c7"
 }

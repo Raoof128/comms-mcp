@@ -620,3 +620,11 @@
 - **Files changed:** `src/comms/core/backup/payload.py`, `src/comms/core/backup/export_import.py`, `src/comms/services/directory.py`, `src/comms/runtime/comms_runtime.py`, `src/comms/runtime/facades.py`, `src/comms/mcp/tools/directory_people.py`, `.claude/settings.json`; tests `tests/mcp/test_catalog_directory_places.py` and `tests/core/backup/test_backup_groups.py` (both new), `tests/mcp/catalog_pin.json`; the rulings, the ledger, `AGENT.md`, `CHANGELOG.md`.
 - **Verification:** 32 new tests; the full gate passed (GATE ok=1).
 - **Follow-ups:** G5 adds per-person context.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Catalog amendment G5: `comms_context_person` (branch `comms-v0.3-catalog`).
+- **Summary:** One person's direct communication, by source: WhatsApp archive DMs, the Telegram private chat (live, else the bot's retained updates) and campaign history. Their messages in up to ten groups appear only when asked, read by a new sender-filtered `from` kind in the archive and the bot's context. Every section is a normal context page that pages through `comms_context_page`. No number or id appears.
+- **Files changed:** `src/comms/runtime/facades.py`, `src/comms/services/context.py`, `src/comms/core/campaigns/directory.py`, `src/comms/core/groups.py`, `src/comms/transports/whatsapp/webhooks/archive.py`, `src/comms/transports/telegram/bot/context.py`, `src/comms/mcp/tools/context.py`, `src/comms/mcp/tools/__init__.py`, `src/comms/mcp/egress.py`; tests `tests/runtime/test_context_person.py` (new), `tests/mcp/catalog_pin.json`; the matrix, the rulings, the ledger, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 6 new tests; the actor matrix covers the tool on all three actors; the full gate passed (GATE ok=1).
+- **Follow-ups:** G6 adds the user account's sender search.
