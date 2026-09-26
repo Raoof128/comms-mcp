@@ -2046,6 +2046,31 @@ class MessageView:
     # contract carries only forum_topic, and raw topic ids must not leave.
     reply_to_top_id: int | None = None
     topic_root: bool = False
+    # A47 (H2): ``(kind, mime, size)`` of a photo or a document, the facts its ``med_`` records
+    media_facts: tuple[str, str, int | None] | None = None
+
+
+def _photo_bytes(size: Any) -> int | None:
+    if isinstance(size, types.PhotoSizeProgressive):
+        return max(size.sizes) if size.sizes else None
+    if isinstance(size, types.PhotoCachedSize):
+        return len(size.bytes)
+    return int(size.size) if isinstance(size, types.PhotoSize) else None
+
+
+def _media_facts(media: Any) -> tuple[str, str, int | None] | None:
+    """A photo (always a JPEG; its largest size, the one ``utils.get_input_location`` picks) or
+    any document, with its declared MIME type; anything else has no ``med_`` (A47)."""
+    if isinstance(media, types.MessageMediaPhoto) and isinstance(media.photo, types.Photo):
+        full = [s for s in media.photo.sizes if _photo_bytes(s) is not None]
+        if not full:
+            return None
+        largest = max(full, key=lambda s: s.w * s.h)
+        return "photo", "image/jpeg", _photo_bytes(largest)
+    if isinstance(media, types.MessageMediaDocument) and isinstance(media.document, types.Document):
+        mime = media.document.mime_type if 3 <= len(media.document.mime_type or "") <= 128 else None
+        return "document", mime or "application/octet-stream", int(media.document.size)
+    return None
 
 
 def _media_kind(media: Any) -> str | None:
@@ -2113,6 +2138,7 @@ def _message_view(
         edited=bool(getattr(message, "edit_date", None)) and not bool(message.edit_hide),
         reply_to_top_id=reply_to_top_id,
         topic_root=topic_root,
+        media_facts=None if service else _media_facts(getattr(message, "media", None)),
     )
 
 

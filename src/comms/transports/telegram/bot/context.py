@@ -250,7 +250,44 @@ def _local_item(update_id: int, kind: str, payload: str, received_at: str) -> Ma
         "date": body.get("date"),
         "from_id": sender.get("id"),
         "untrusted": {"text": text} if isinstance(text, str) else _name(kind, sender),
+        **_media(body),
     }
+
+
+def _unique(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and 0 < len(value) <= 128
+        and value.isascii()
+        and value.isprintable()
+        and " " not in value
+    )
+
+
+def _media(body: Mapping[str, Any]) -> dict[str, Any]:
+    """A47 (H2): a photo's largest size or a document, keyed by ``file_unique_id`` (one file
+    can have several ``file_id``s, Gf4). The ``file_id`` stays in the retained update, the one
+    copy (Gx9); the engine keeps only the key and the facts."""
+    photo = body.get("photo")
+    if isinstance(photo, list):
+        sizes = [p for p in photo if isinstance(p, dict) and _unique(p.get("file_unique_id"))]
+        if not sizes:
+            return {}
+        largest = max(sizes, key=lambda p: int(p.get("width") or 0) * int(p.get("height") or 0))
+        size = largest.get("file_size")
+        return {"media": {"kind": "photo", "mime": "image/jpeg",
+                          "size": size if type(size) is int and size >= 0 else None},
+                "media_key": largest["file_unique_id"]}  # fmt: skip
+    document = body.get("document")
+    if isinstance(document, dict) and _unique(document.get("file_unique_id")):
+        mime = document.get("mime_type")
+        size = document.get("file_size")
+        return {"media": {"kind": "document",
+                          "mime": mime if isinstance(mime, str) and 3 <= len(mime) <= 128
+                          else "application/octet-stream",
+                          "size": size if type(size) is int and size >= 0 else None},
+                "media_key": document["file_unique_id"]}  # fmt: skip
+    return {}
 
 
 def _name(kind: str, sender: Mapping[str, Any]) -> dict[str, Any]:

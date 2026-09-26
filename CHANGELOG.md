@@ -732,3 +732,11 @@
 - **Files changed:** `src/comms/core/providers/semantics.py`, `src/comms/transports/telegram/user/{capability,admin,admin_messages}.py`, `src/comms/transports/telegram/telegram/telethon_adapter.py`, `src/comms/services/{messages,writes}.py`, `src/comms/runtime/facades.py`, `tests/transports/test_mark_read.py` (new), `tests/security/test_phase4_architecture.py`, `tests/integration/test_actor_matrix_behaviour.py`, `docs/verification/{telegram-rpc-review.md,comms-v0.3-actor-matrix.md,comms-v0.3-rulings.md}`, `AGENT.md`, `CHANGELOG.md`.
 - **Verification:** 10 new tests, written first and seen failing; the full gate (GATE ok=1).
 - **Follow-ups:** H2 (Telegram `med_` refs and schema v8).
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** A47 H2: Telegram media as `med_` refs (branch `comms-v0.3-a47`).
+- **Summary:** Schema v8 `media_facts`. A photo or document in a context item gets a `media_ref`: the user account's is keyed by the message locator, the bot's by `file_unique_id`. Kind, MIME type and size are recorded; no file id or file reference is stored a second time or output.
+- **Files changed:** `src/comms/core/storage/migrations.py`, `src/comms/core/objects.py`, `src/comms/services/context.py`, `src/comms/mcp/tools/context.py`, `src/comms/transports/telegram/telegram/telethon_adapter.py`, `src/comms/transports/telegram/{user,bot}/context.py`, `tests/runtime/test_telegram_media_refs.py` (new), `tests/mcp/catalog_pin.json` (14 context tools gain `media_ref`), the rulings, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 6 new tests, written first and seen failing; the full gate (GATE ok=1).
+- **Follow-ups:** H3 (Telegram download).

@@ -20,7 +20,7 @@ from comms.core import timeutil
 from comms.core.campaigns.directory import destination_id, recipient_of_identity
 from comms.core.campaigns.history import identity_history
 from comms.core.errors import CommsError
-from comms.core.objects import message_identity, object_ref
+from comms.core.objects import message_identity, object_ref, record_media
 from comms.core.providers.capability import Capability, CapabilityState
 from comms.core.providers.protocols import (
     ContextPage,
@@ -50,7 +50,13 @@ _PROVENANCE = MappingProxyType(
 )
 # G8: WhatsApp group facts (never its messages) are read live from the Groups API.
 _WHATSAPP_LIVE_KINDS = frozenset({"members", "member", "join_requests", "invites"})
-_IDENTITIES = frozenset({"message_id", "sender_id", "from_id", "chat_id", "update_id", "user_id"})
+_IDENTITIES = frozenset(
+    {"message_id", "sender_id", "from_id", "chat_id", "update_id", "user_id", "media_key"}
+)
+# A47 (H2): where a Telegram ``med_`` comes from, by the actor that read it
+_MEDIA_ORIGIN = MappingProxyType(
+    {"telegram_user": "telegram_message", "telegram_bot": "telegram_bot_update"}
+)
 _MAX_PAGE = 100
 
 
@@ -359,7 +365,8 @@ class ContextEngine:
         return page
 
     def _item(self, group: str, target: ProviderTarget, item: Mapping[str, Any]) -> dict[str, Any]:
-        out = {k: v for k, v in item.items() if k not in _IDENTITIES and k != "untrusted"}
+        out = {k: v for k, v in item.items()
+               if k not in _IDENTITIES and k not in ("untrusted", "media")}  # fmt: skip
         untrusted = dict(item.get("untrusted") or {})
         out["untrusted_text"] = untrusted.pop("text", None)
         out["untrusted"] = untrusted
@@ -378,7 +385,36 @@ class ContextEngine:
                 message_identity(target.identity, item["message_id"]),
                 now=self._clock(),
             )
+            media = self._media(target, item)
+            if media is not None:
+                out["media_ref"] = media
         return out
+
+    def _media(self, target: ProviderTarget, item: Mapping[str, Any]) -> str | None:
+        """A47 (H2): a Telegram photo's or document's ``med_``. The user account's identity is
+        the message's locator (its file reference is fetched again whenever it is used); the
+        bot's is the ``file_unique_id``, since one file has several ``file_id``s (Gf4)."""
+        facts, origin = item.get("media"), _MEDIA_ORIGIN.get(target.actor)
+        if not isinstance(facts, Mapping) or origin is None or target.transport != "telegram":
+            return None
+        if target.actor == "telegram_bot":
+            key = item.get("media_key")
+        else:
+            key = message_identity(target.identity, item["message_id"])
+        kind, mime, size = facts.get("kind"), facts.get("mime"), facts.get("size")
+        if (
+            not isinstance(key, str)
+            or not key
+            or not isinstance(kind, str)
+            or not isinstance(mime, str)
+        ):
+            return None
+        now = self._clock()
+        ref = object_ref(self._conn, "media", "telegram", target.actor,
+                         destination_id(self._conn, target.destination_ref), key, now=now)  # fmt: skip
+        record_media(self._conn, ref, kind, mime, size if type(size) is int else None, origin,
+                     now=now)  # fmt: skip
+        return ref
 
 
 # A source's refusal code → the service error (P §54).
