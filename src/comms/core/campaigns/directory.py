@@ -52,6 +52,7 @@ __all__ = [
     "set_display_name_in_tx",
     "set_enabled",
     "set_enabled_in_tx",
+    "settle_group_creation_in_tx",
 ]
 
 Normalizer = Callable[[str], str]
@@ -535,3 +536,62 @@ def recipient_of_identity(conn: Any, transport: str, identity: str) -> str | Non
         (transport, identity),
     ).fetchone()
     return None if row is None else str(row[0])
+
+
+def pend_group_creation_in_tx(
+    conn: Any, request_id: str, location_ref: str, name: str, *, now: datetime
+) -> None:
+    """A WhatsApp group Meta is creating (G8): where it belongs, until its webhook arrives."""
+    require_tx(conn)
+    _kind(location_ref, {"location"})
+    if not isinstance(request_id, str) or not request_id or len(request_id) > 256:
+        raise DirectoryError("request id refused")
+    conn.execute(
+        "INSERT INTO pending_group_creations (request_id, location_id, name, created_at)"
+        " VALUES (?, ?, ?, ?)",
+        (request_id, _id(conn, "location", location_ref), _display_name(name), timeutil.iso(now)),
+    )
+
+
+def settle_group_creation_in_tx(
+    conn: Any,
+    request_id: str,
+    platform_identity: str | None,
+    *,
+    normalize: Normalizer,
+    now: datetime,
+) -> str | None:
+    """Meta's webhook for a pending creation (G8): the created group becomes a WhatsApp
+    destination with its ``grp_`` (``platform_identity`` given), or the creation is marked
+    failed (``None``). An unknown or already settled request changes nothing; returns the new
+    destination ref or None."""
+    require_tx(conn)
+    row = conn.execute(
+        "SELECT p.id, l.ref, p.name FROM pending_group_creations p"
+        " JOIN locations l ON l.id = p.location_id"
+        " WHERE p.request_id = ? AND p.destination_id IS NULL AND p.failed_at IS NULL",
+        (request_id,),
+    ).fetchone()
+    if row is None:
+        return None
+    if platform_identity is None:
+        conn.execute(
+            "UPDATE pending_group_creations SET failed_at = ? WHERE id = ?",
+            (timeutil.iso(now), row[0]),
+        )
+        return None
+    destination = add_destination_in_tx(
+        conn, row[1], "whatsapp", platform_identity, row[2], normalize=normalize, now=now
+    )
+    conn.execute(
+        "UPDATE pending_group_creations SET destination_id = ? WHERE id = ?",
+        (_id(conn, "destination", destination), row[0]),
+    )
+    return destination
+
+
+def pend_group_creation(
+    conn: Any, request_id: str, location_ref: str, name: str, *, now: datetime
+) -> None:
+    with write_tx(conn):
+        pend_group_creation_in_tx(conn, request_id, location_ref, name, now=now)

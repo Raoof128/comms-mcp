@@ -45,6 +45,13 @@ def _created(capability):
     }.get(capability)
 
 
+def _created_for(capability, target):
+    """What the real adapter names its creation by: WhatsApp answers a request id (G8)."""
+    if capability is C.GROUP_CREATE and target.transport == "whatsapp":
+        return f"request:REQ{next(_SERIAL)}"
+    return _created(capability)
+
+
 class Admin:
     """Real adapter validation; outcomes scripted as "ok", "refused", "unknown" or a code."""
 
@@ -66,7 +73,7 @@ class Admin:
         return ProviderResult(
             "SUCCEEDED",
             None,
-            provider_ref=_created(op.capability),
+            provider_ref=_created_for(op.capability, target),
             detail=self.details.get(op.capability, {}),
         )
 

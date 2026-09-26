@@ -214,17 +214,30 @@ class _Facades:
             for actor in _TELEGRAM
             if actor in self.s.actors
         }
+        if _WHATSAPP in self.s.actors:  # G8: a WhatsApp group, created asynchronously by Meta
+            targets[_WHATSAPP] = ProviderTarget("whatsapp", _WHATSAPP, location, "account")
         if not targets:
             raise CommsError("NOT_CONFIGURED")
-        args: dict[str, Any] = {k: a[k] for k in ("title", "kind", "about", "forum") if k in a}
+        actor = a.get("actor")
+        if actor is None and len({t.transport for t in targets.values()}) > 1:
+            raise CommsError("AMBIGUOUS_TARGET")  # a Telegram or a WhatsApp group: say which
+        if actor is not None and actor in targets:
+            targets = {actor: targets[actor]}
+        transport = next(iter(targets.values())).transport
+        if transport == "whatsapp":
+            args: dict[str, Any] = {"subject": a["title"]}
+            if "about" in a:
+                args["description"] = a["about"]
+        else:
+            args = {k: a[k] for k in ("title", "kind", "about", "forum") if k in a}
 
-        def created(conn: Any, marked: str) -> Mapping[str, Any]:
+        def created(conn: Any, ref: str) -> Mapping[str, Any]:
             return self.s.directory.adopt_group(
-                conn, location, marked, a["title"], now=datetime.now(UTC)
+                conn, location, ref, a["title"], transport=transport, now=datetime.now(UTC)
             )
 
         return self.s.groups.create(
-            _ctx(client), targets, args, a["request_id"], actor=a.get("actor"), on_created=created
+            _ctx(client), targets, args, a["request_id"], actor=actor, on_created=created
         )
 
     # -- group reads (catalog amendment G6) ----------------------------------------------

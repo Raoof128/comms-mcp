@@ -27,7 +27,7 @@ from comms.transports.whatsapp.cloud.templates import (
     check_delete,
     check_edit,
 )
-from comms.transports.whatsapp.numbers import wa_group_id
+from comms.transports.whatsapp.numbers import WA_GROUP_ID, wa_group_id
 
 __all__ = ["GROUP_CAPABILITIES", "GroupDiscovery", "WhatsAppAdmin", "group_id_of"]
 
@@ -45,6 +45,8 @@ GROUP_CAPABILITIES = (
     C.JOIN_REQUEST_LIST,
     C.JOIN_REQUEST_APPROVE,
     C.JOIN_REQUEST_REJECT,
+    C.GROUP_CREATE,  # G8
+    C.GROUP_DELETE,
 )
 _PERMISSION_CODES = frozenset({3, 10, 200, 131005})
 _UNKNOWN_PATH_CODES = frozenset({2500})
@@ -284,6 +286,47 @@ def _join(approve: bool) -> Call:
     return call
 
 
+_CREATE = {
+    "subject": lambda v: isinstance(v, str) and 1 <= len(v) <= 128,
+    "description": lambda v: isinstance(v, str) and len(v) <= 2048,
+    "join_approval_mode": lambda v: v in ("auto_approve", "approval_required"),
+}
+
+
+def _create_args(args: Mapping[str, Any]) -> None:
+    if (
+        "subject" not in args
+        or not set(args) <= set(_CREATE)
+        or not all(_CREATE[k](v) for k, v in args.items())
+    ):
+        raise ValueError("operation arguments are malformed")
+
+
+def _create(api: GraphApi, _phone: str, args: Mapping[str, Any]) -> ProviderResult:
+    """Meta creates the group asynchronously: its ``request_id`` names it until the
+    ``group_lifecycle_update`` webhook does; a group ``id`` in the answer names it at once."""
+    result = admin_call(lambda: api.create_group({"messaging_product": "whatsapp", **args}))
+    if result.outcome != "SUCCEEDED":
+        return result
+    group, request = result.detail.get("id"), result.detail.get("request_id")
+    if isinstance(group, str) and WA_GROUP_ID.match(group):
+        return ProviderResult("SUCCEEDED", None, provider_ref=f"group:{group}")
+    if isinstance(request, str) and 0 < len(request) <= 256:
+        return ProviderResult("SUCCEEDED", None, provider_ref=f"request:{request}")
+    return ProviderResult("OUTCOME_UNKNOWN", None)  # accepted, but nothing to name it by
+
+
+def _delete(api: GraphApi, group_id: str, args: Mapping[str, Any]) -> ProviderResult:
+    return admin_call(lambda: api.delete_group(group_id))
+
+
+def phone_account(target: ProviderTarget) -> str:
+    """The account-level target (no group yet): ``group.create`` (G8)."""
+    if target.actor != ACTOR or target.identity != "account":
+        raise ValueError("a group is created from the account")
+    return "account"
+
+
 Check = Callable[[Mapping[str, Any]], None]
 Call = Callable[[GraphApi, str, Mapping[str, Any]], ProviderResult]
 Where = Callable[[ProviderTarget], str]
@@ -301,6 +344,8 @@ _OPERATIONS: Mapping[C, tuple[Check, Call, Where]] = {
     C.MESSAGE_PIN: (_pin_args, _pin, group_id_of),
     C.JOIN_REQUEST_APPROVE: (_join_args, _join(True), group_id_of),
     C.JOIN_REQUEST_REJECT: (_join_args, _join(False), group_id_of),
+    C.GROUP_CREATE: (_create_args, _create, phone_account),
+    C.GROUP_DELETE: (_reset_args, _delete, group_id_of),
 }
 
 

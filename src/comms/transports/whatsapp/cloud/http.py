@@ -169,6 +169,13 @@ class GraphApi:
         path = f"/{API_VERSION}/{self._group(group_id)}/join_requests"
         return self._call("POST" if approve else "DELETE", path, body=body)
 
+    def create_group(self, body: Mapping[str, Any]) -> GraphResponse:
+        """``POST /{phone-number-id}/groups``: Meta creates the group asynchronously."""
+        return self._post(f"/{API_VERSION}/{self._phone}/groups", body)
+
+    def delete_group(self, group_id: str) -> GraphResponse:
+        return self._call("DELETE", f"/{API_VERSION}/{self._group(group_id)}")
+
     def business_profile(self) -> GraphResponse:
         params = {"fields": "about,address,description,email,websites,vertical"}
         path = f"/{API_VERSION}/{self._phone}/whatsapp_business_profile"

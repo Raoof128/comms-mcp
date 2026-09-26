@@ -69,6 +69,8 @@ def test_oracle_serves_every_endpoint_the_adapter_calls():
         "answer_join_requests": lambda: api.answer_join_requests(
             "120363049891234567", ["JR1"], approve=True
         ),
+        "create_group": lambda: api.create_group({"messaging_product": "whatsapp", "subject": "X"}),
+        "delete_group": lambda: api.delete_group("120363049891234567"),
         "business_profile": lambda: api.business_profile(),
         "health_status": lambda: api.health_status(),
     }

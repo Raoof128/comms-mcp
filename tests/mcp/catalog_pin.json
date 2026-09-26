@@ -184,7 +184,7 @@
     "comms_group_topic_edit": "dbe550b4e1fdd7db5e49906570f755db3b9f1bc477e248226e85cdaeed627003",
     "comms_group_topic_close": "2123da0c53ded2167c4a8b0b2ffef3d6f586dab9dbe522931c00f786dfee140f",
     "comms_group_topic_reopen": "fe7ba49966bbaf8c39651431d07170c96493799c16e7d062ace2091ac321c79a",
-    "comms_group_create": "136afe4bf2e9ead9f554250ccb6139a9fc812077f64c218741610a45f68a6cf6",
+    "comms_group_create": "51c09366298aa09af3cf676045350c58587ddfec06ed6c0f4e1ef69c951b3c4c",
     "comms_group_delete": "e9f8d07009fed976fe4400c2f485453ecfef7fa4ee16287475ddde75d8733c86",
     "comms_group_migrate": "4791d58e68b0f18fb3505f4f442f00637c1a1e6ba434f95d44e7d5efa59d3f70",
     "comms_group_admin_log": "5369db94bf87e378bad4ead1ddef4d1590676606212d78a322b66120ed050bb8",
@@ -256,5 +256,5 @@
     "comms_message_reaction_remove": "c23723c70cf4cb62e3919c5134b6b943f0549dcae58e70c4e4c8d6f7d59ece3e",
     "comms_group_member_reactions_clear": "0ce6cf04af121a2c52cefe6eca8af7997e185c729cb4f71c8095a0bfb5c026ed"
   },
-  "catalog": "1cdf5be0e151f53c6cdf4101a0c89ac1b150bd50edcd1f34c83e8e8ff2e8e1c7"
+  "catalog": "2730be6c73a1103404a8479ebaf74eca1203ec903552fe5e4600c2b0f537236c"
 }

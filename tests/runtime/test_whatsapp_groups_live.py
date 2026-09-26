@@ -58,7 +58,7 @@ class Meta:
         path = request.url.path.split("/", 2)[-1]  # drop the version
         self.sent.append((request.method, path, body))
         answer: Any = {"success": True}
-        if path.endswith("/groups"):
+        if path.endswith("/groups") and request.method == "GET":
             answer = {"data": [{"id": GROUP}]}
         elif path == GROUP and request.method == "GET":
             answer = {"id": GROUP, "participants": [{"wa_id": WA_PHONE[1:]}, {"wa_id": STRANGER}],
@@ -73,6 +73,10 @@ class Meta:
         elif path.endswith("/join_requests"):
             key = "approved_join_requests" if request.method == "POST" else "rejected_join_requests"
             answer = {"messaging_product": "whatsapp", key: body["join_requests"]}
+        elif path == f"{PHONE_ID}/groups" and request.method == "POST":
+            answer = {"messaging_product": "whatsapp", "request_id": "REQ1"}
+        elif path == GROUP and request.method == "DELETE":
+            answer = {"success": True}
         elif path.endswith("/messages"):
             answer = {"messaging_product": "whatsapp", "messages": [{"id": "wamid.NEW1"}]}
         return httpx.Response(200, json=answer)
@@ -100,6 +104,7 @@ def world(tmp_path):
                    transport=httpx.MockTransport(meta.handle))  # fmt: skip
     discovery = GroupDiscovery(api)
     discovery.discover()
+    w["loc"] = loc
     adapters = Adapters(
         capability={"whatsapp_cloud": Provider(S.AVAILABLE)},
         admin={"whatsapp_cloud": WhatsAppAdmin(api, discovery)},
@@ -192,3 +197,82 @@ def test_join_requests_are_answered_by_metas_own_id(world):
 def test_the_groups_api_has_no_roles(world):
     got = world["call"]("comms_group_admins_list", {"group": world["wa"]})
     assert got.error_code == "PROVIDER_UNSUPPORTED"
+
+
+# -- G8 part b: create (asynchronous, settled by Meta's webhook) and delete ----------------------
+
+NEW = "Y2FwaV9ncm91cDpORVdHUk9VUDEyMzQ1Njc4OQ"
+
+
+def _lifecycle(request_id, group_id=None, errors=None):
+    event = {"timestamp": "1790000000", "type": "group_create", "request_id": request_id,
+             "subject": "Families"}  # fmt: skip
+    if group_id:
+        event["group_id"] = group_id
+    if errors:
+        event["errors"] = errors
+    return json.dumps({"object": "whatsapp_business_account", "entry": [{"id": "waba",
+        "changes": [{"field": "group_lifecycle_update", "value": {"messaging_product": "whatsapp",
+        "groups": [event]}}]}]}).encode()  # fmt: skip
+
+
+def _groups(conn):
+    return dict(conn.execute(
+        "SELECT d.platform_identity, g.ref FROM groups g JOIN destinations d"
+        " ON d.id = g.destination_id").fetchall())  # fmt: skip
+
+
+def test_a_whatsapp_group_is_filed_when_metas_webhook_names_it(world):
+    got = _ok(world["call"]("comms_group_create", {"location": world["loc"], "title": "Families",
+                            "kind": "supergroup", "request_id": refs.mint("request")}))  # fmt: skip
+    assert (got["result"], got["group"]) == ("SUCCEEDED", None)  # Meta creates asynchronously
+    assert world["meta"].sent[-1] == ("POST", f"{PHONE_ID}/groups",
+                                      {"messaging_product": "whatsapp", "subject": "Families"})  # fmt: skip
+    conn = world["conn"]
+    CommsArchive(conn, clock=lambda: NOW).ingest(_lifecycle("REQ-unknown", NEW))
+    assert f"group:{NEW}" not in _groups(conn)  # a request this installation never made
+    CommsArchive(conn, clock=lambda: NOW).ingest(_lifecycle("REQ1", NEW))
+    grp = _groups(conn)[f"group:{NEW}"]
+    assert grp.startswith("grp_")
+    CommsArchive(conn, clock=lambda: NOW).ingest(_lifecycle("REQ1", NEW))  # a redelivery
+    assert list(_groups(conn)).count(f"group:{NEW}") == 1
+    listed = _ok(world["call"]("comms_group_get", {"group": grp}))
+    assert (listed["name"], listed["location"]) == ("Families", world["loc"])
+
+
+def test_a_failed_creation_is_marked_and_files_nothing(world):
+    _ok(world["call"]("comms_group_create", {"location": world["loc"], "title": "Nope",
+                      "kind": "supergroup", "request_id": refs.mint("request")}))  # fmt: skip
+    conn = world["conn"]
+    CommsArchive(conn, clock=lambda: NOW).ingest(
+        _lifecycle("REQ1", NEW, errors=[{"code": 131000, "title": "x"}]))  # fmt: skip
+    assert f"group:{NEW}" not in _groups(conn)
+    row = conn.execute("SELECT failed_at, destination_id FROM pending_group_creations").fetchone()
+    assert row[0] is not None and row[1] is None
+
+
+def test_delete_asks_meta(world):
+    got = _ok(_write(world, "comms_group_delete"))
+    assert got["result"] == "SUCCEEDED" and world["meta"].sent[-1][:2] == ("DELETE", GROUP)
+
+
+def test_with_both_platforms_a_create_must_say_which(tmp_path):
+    from tests.services.group_fixtures import fixtures
+
+    w = group_world(tmp_path)
+    _cap, _ex, admins = fixtures(w)
+    adapters = Adapters(
+        capability={a: Provider(S.AVAILABLE) for a in ("telegram_user", "whatsapp_cloud")},
+        admin={a: admins[a] for a in ("telegram_user", "whatsapp_cloud")},
+    )
+    built = build_comms_runtime(w["conn"], w["writer"], w["store"], adapters, clock=lambda: NOW,
+                                monotonic=Clock(), host="127.0.0.1", local_port=8765)  # fmt: skip
+    loc = d.add_location(w["conn"], "Both", now=NOW)
+    args = {"location": loc, "title": "T", "kind": "supergroup", "request_id": refs.mint("request")}
+    assert (
+        built.dispatcher.call(CLIENT, "comms_group_create", args).error_code == "AMBIGUOUS_TARGET"
+    )
+    assert admins["telegram_user"].calls == admins["whatsapp_cloud"].calls == []
+    chosen = built.dispatcher.call(CLIENT, "comms_group_create", {**args, "actor": "telegram_user",
+                                   "request_id": refs.mint("request")})  # fmt: skip
+    assert chosen.error_code is None and [c for c, _a in admins["telegram_user"].calls]

@@ -331,13 +331,24 @@ class DirectoryService:
         )
 
     def adopt_group(
-        self, conn: Any, location: str, marked: str, name: str, *, now: datetime
-    ) -> dict[str, Any]:
+        self, conn: Any, location: str, created: str, name: str, *, transport: str = "telegram",
+        now: datetime,
+    ) -> dict[str, Any]:  # fmt: skip
         """A group this account just created, filed as a destination in ``location`` with its
-        ``grp_`` (G7), in the core's own transaction."""
-        rule = self._rules[("destination", "telegram")]
+        ``grp_`` (G7), in the core's own transaction. WhatsApp (G8) names a group at once
+        (``group:<id>``) or only a pending request (``request:<id>``), filed when Meta's
+        webhook names it; then there is no ``grp_`` yet."""
+        if transport == "whatsapp":
+            kind, _sep, value = created.partition(":")
+            if kind == "request":
+                d.pend_group_creation(conn, value, location, _name(name), now=now)
+                return {"group": None}
+            platform, rule = created, self._rules[("destination", "whatsapp")]
+        else:
+            rule = self._rules[("destination", "telegram")]
+            platform = rule.platform(created)
         destination = d.add_destination(
-            conn, location, "telegram", rule.platform(marked), _name(name),
+            conn, location, transport, platform, _name(name),
             normalize=rule.canonical, now=now,
         )  # fmt: skip
         row = conn.execute(

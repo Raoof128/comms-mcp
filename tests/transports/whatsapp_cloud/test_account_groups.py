@@ -100,6 +100,8 @@ def test_the_group_capabilities_are_p16s():
         C.JOIN_REQUEST_LIST,
         C.JOIN_REQUEST_APPROVE,
         C.JOIN_REQUEST_REJECT,
+        C.GROUP_CREATE,
+        C.GROUP_DELETE,
     }
 
 

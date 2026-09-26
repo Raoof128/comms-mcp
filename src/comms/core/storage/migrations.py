@@ -578,6 +578,24 @@ CREATE TRIGGER job_origins_endpoint_matches_job BEFORE INSERT ON job_origins
 """
 SCHEMA_V6: tuple[str, ...] = _statements(_SCHEMA_V6_SQL)
 
+# Catalog amendment G8: a WhatsApp group is created asynchronously (Meta answers a request id; the
+# group id arrives in a group_lifecycle_update webhook carrying it). The pending creation keeps
+# where the group belongs until the webhook files it as a destination; nothing is ever deleted.
+_SCHEMA_V7_SQL = """
+CREATE TABLE pending_group_creations (id INTEGER PRIMARY KEY, request_id TEXT NOT NULL UNIQUE,
+  location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE RESTRICT,
+  name TEXT NOT NULL, created_at TEXT NOT NULL,
+  destination_id INTEGER REFERENCES destinations(id) ON DELETE RESTRICT,
+  failed_at TEXT, CHECK (destination_id IS NULL OR failed_at IS NULL));
+CREATE TRIGGER pending_group_creations_settle_once BEFORE UPDATE ON pending_group_creations
+  WHEN OLD.destination_id IS NOT NULL OR OLD.failed_at IS NOT NULL
+    OR NEW.request_id IS NOT OLD.request_id OR NEW.location_id IS NOT OLD.location_id
+  BEGIN SELECT RAISE(ABORT, 'a pending group creation settles once'); END;
+CREATE TRIGGER pending_group_creations_kept BEFORE DELETE ON pending_group_creations
+  BEGIN SELECT RAISE(ABORT, 'pending group creations are kept'); END;
+"""
+SCHEMA_V7: tuple[str, ...] = _statements(_SCHEMA_V7_SQL)
+
 MIGRATIONS: tuple[Migration, ...] = (
     Migration(1, SCHEMA_V1),
     Migration(2, SCHEMA_V2),
@@ -585,6 +603,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(4, SCHEMA_V4),
     Migration(5, SCHEMA_V5),
     Migration(6, SCHEMA_V6, rebuild=True),
+    Migration(7, SCHEMA_V7),
 )
 
 

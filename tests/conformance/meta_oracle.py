@@ -37,6 +37,10 @@ def _g8(request: httpx.Request) -> tuple[int, dict] | None:
             {"entity_type": "PHONE_NUMBER", "id": PHONE_ID, "can_send_message": "AVAILABLE"},
             {"entity_type": "WABA", "id": WABA_ID, "can_send_message": "AVAILABLE"}]},
             "id": PHONE_ID}  # fmt: skip
+    if parts == [PHONE_ID, "groups"] and method == "POST":
+        # Meta documents no synchronous body for a create; the webhook carries a request_id,
+        # so this oracle answers one (an assumption live acceptance must confirm, R-G8b)
+        return 200, {"messaging_product": "whatsapp", "request_id": "REQ-oracle"}
     if parts == [PHONE_ID, "whatsapp_business_profile"]:
         return 200, {"data": [{"about": "Succulent specialists!", "vertical": "RETAIL",
                                "websites": ["https://example.org"]}]}  # fmt: skip
@@ -46,6 +50,8 @@ def _g8(request: httpx.Request) -> tuple[int, dict] | None:
         return 200, {"messaging_product": "whatsapp", "id": GROUP, "subject": "Fixture group",
                      "participants": [{"wa_id": "61400000001"}],
                      "total_participant_count": "1"}  # fmt: skip
+    if parts == [GROUP] and method == "DELETE":
+        return 200, {"success": True}
     if parts == [GROUP, "invite_link"] and method == "GET":
         return 200, {"messaging_product": "whatsapp",
                      "invite_link": "https://chat.whatsapp.com/Fixture"}  # fmt: skip

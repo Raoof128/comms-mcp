@@ -79,7 +79,7 @@ ADMIN: Mapping[str, Mapping[str, C]] = MappingProxyType(
         "group.topic.reopen": {"telegram": C.TOPIC_REOPEN},
         "group.topic.hide": {},
         "group.topic.unhide": {},
-        "group.delete": {"telegram": C.GROUP_DELETE},
+        "group.delete": {"telegram": C.GROUP_DELETE, "whatsapp": C.GROUP_DELETE},
         "group.migrate": {"telegram": C.GROUP_MIGRATE},
     }
 )

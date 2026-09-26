@@ -38,7 +38,7 @@ def upgraded(tmp_path):
     d.add_audience_member(conn, aud, dst)
     grp = group_ref(conn, dst, now=NOW)
     before, objects = _rows(conn), _objects(conn)
-    assert migrate(conn) == 6
+    assert migrate(conn, MIGRATIONS[:6]) == 6
     return conn, w, {"dst": dst, "dm": dm, "grp": grp, "loc": loc}, before, objects
 
 

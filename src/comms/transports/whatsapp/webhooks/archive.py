@@ -25,8 +25,10 @@ from typing import Any
 from whatsvault.ingest import normalise  # type: ignore[import-untyped]
 
 from comms.core import timeutil
+from comms.core.campaigns.directory import settle_group_creation_in_tx
 from comms.core.providers.protocols import ContextPage, ContextQuery, ContextRefused
 from comms.core.storage.db import write_tx
+from comms.transports.whatsapp.numbers import wa_group_id
 
 __all__ = ["PROVENANCE", "ArchiveContext", "CommsArchive"]
 
@@ -42,6 +44,22 @@ class CommsArchive:
     def __repr__(self) -> str:
         return "CommsArchive(<redacted>)"
 
+    def _settle_created_groups(self, payload: Mapping[str, Any]) -> None:
+        """A group this account asked Meta to create (G8) is filed in the directory when its
+        webhook names the request, or marked failed; an unknown request changes nothing."""
+        for event in _lifecycle(payload):
+            request_id, group_id = event.get("request_id"), event.get("group_id")
+            if not isinstance(request_id, str):
+                continue
+            created = not event.get("errors") and isinstance(group_id, str)
+            try:
+                identity = wa_group_id(f"group:{group_id}") if created else None
+            except ValueError:
+                identity = None
+            settle_group_creation_in_tx(
+                self._conn, request_id, identity, normalize=wa_group_id, now=self._clock()
+            )
+
     def ingest(self, raw: bytes) -> None:
         try:
             payload = json.loads(raw)
@@ -52,6 +70,7 @@ class CommsArchive:
             raise ValueError("the webhook body is not a Meta webhook")
         received = timeutil.iso(self._clock())
         with write_tx(self._conn):
+            self._settle_created_groups(payload)
             for atom in atoms:
                 family, key = normalise.semantic_key(atom)
                 if family not in _MESSAGES:
@@ -82,6 +101,21 @@ class CommsArchive:
                         received,
                     ),
                 )
+
+
+def _lifecycle(payload: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    """The ``group_create`` events of a ``group_lifecycle_update`` webhook (G8)."""
+    found: list[Mapping[str, Any]] = []
+    for entry in payload.get("entry") or ():
+        for change in (entry.get("changes") or ()) if isinstance(entry, dict) else ():
+            if not isinstance(change, dict) or change.get("field") != "group_lifecycle_update":
+                continue
+            value = change.get("value")
+            groups = value.get("groups") if isinstance(value, dict) else None
+            for group in groups or ():
+                if isinstance(group, dict) and group.get("type") == "group_create":
+                    found.append(group)
+    return found
 
 
 class ArchiveContext:

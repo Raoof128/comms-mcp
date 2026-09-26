@@ -668,3 +668,11 @@
 - **Files changed:** `src/comms/transports/whatsapp/cloud/{http,groups,context}.py` (`context.py` is new), `src/comms/runtime/adapters.py`, `src/comms/runtime/facades.py`, `src/comms/services/{context,messages,groups}.py`, `src/comms/core/providers/semantics.py`, `src/comms/mcp/tools/{context,admin,messages}.py`; tests; `tests/mcp/catalog_pin.json`; the matrix, the rulings, the ledger, `AGENT.md`, `CHANGELOG.md`.
 - **Verification:** 11 new tests; the Meta oracle covers every Graph call; the full gate passed (GATE ok=1).
 - **Follow-ups:** G8 parts b to d: WhatsApp group create and delete, account and health, and media.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Catalog amendment G8, part b: WhatsApp group create and delete (branch `comms-v0.3-catalog`).
+- **Summary:** Meta creates a group asynchronously. The request is kept pending (schema v7) until the `group_lifecycle_update` webhook names it; the group is then filed with its `grp_`, or the creation is marked failed. Delete asks Meta. A create naming no actor when both platforms are configured is refused as ambiguous.
+- **Files changed:** `src/comms/core/storage/migrations.py` (v7), `src/comms/core/campaigns/directory.py`, `src/comms/core/providers/semantics.py`, `src/comms/transports/whatsapp/cloud/{http,groups}.py`, `src/comms/transports/whatsapp/webhooks/archive.py`, `src/comms/services/{directory,groups}.py`, `src/comms/runtime/facades.py`, `src/comms/mcp/tools/admin.py`; tests; `tests/mcp/catalog_pin.json`; the matrix, the rulings, the ledger, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 5 new tests; the full gate passed (GATE ok=1).
+- **Follow-ups:** Live acceptance must confirm Meta's synchronous create body (R-G8b). Next: G8 parts c and d.

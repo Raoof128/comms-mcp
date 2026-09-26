@@ -363,8 +363,10 @@ ADMIN_TOOLS: tuple[ToolSpec, ...] = (
     write(
         "comms_group_create",
         "Create a group",
-        "Create a supergroup or channel as the owner's account and register it at a location. "
-        "A CREATE: an ambiguous outcome is resolved, never retried.",
+        "Create a group at a location: a Telegram supergroup or channel from the owner's account "
+        "(its grp_ at once), or a WhatsApp group (Meta creates it asynchronously: group is null "
+        "until Meta's webhook names it). Say actor when both platforms are configured. A CREATE: "
+        "an ambiguous outcome is resolved, never retried.",
         "group.create",
         {
             "location": ref("location"),

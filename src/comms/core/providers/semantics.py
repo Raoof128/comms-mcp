@@ -117,6 +117,8 @@ SUPPORT: Mapping[C, tuple[str, ...]] = MappingProxyType(
         C.JOIN_REQUEST_LIST: (USER, CLOUD),
         C.JOIN_REQUEST_APPROVE: (*_TELEGRAM, CLOUD),
         C.JOIN_REQUEST_REJECT: (*_TELEGRAM, CLOUD),
+        C.GROUP_CREATE: (USER, CLOUD),  # G8: WhatsApp creates asynchronously
+        C.GROUP_DELETE: (USER, CLOUD),
     }
 )
 
