@@ -700,3 +700,11 @@
 - **Files changed:** `src/comms/transports/whatsapp/cloud/http.py`, `scripts/{smoke_daemon,e2e_smoke}.py`, `tests/security/test_catalog_amendment_exit.py` (new), `tests/security/test_d39_pre_exit.py`, `tests/conformance/meta_oracle.py`, `tests/core/providers/test_actor_matrix.py`, `tests/transports/whatsapp_cloud/test_{account_groups,classify,media,templates}.py`, `docs/verification/{comms-v0.3.md,comms-v0.3-rulings.md,comms-v0.3-actor-matrix.md,comms-v0.3-smoke-map.json}`, `docs/runbooks/clients-*.md`, `CLAUDE.md`, `AGENT.md`, `CHANGELOG.md`.
 - **Verification:** the full gate passed (GATE ok=1): 5420 passed, 4 skipped; smoke 103/103 (29 against the daemon); formal 57; ruff, format, mypy, build clean; WhatsVault 450.
 - **Follow-ups:** the owner decides Telegram mark-read, Telegram media objects, and merge/push/tag push; D39-B confirms WhatsApp group create's synchronous response live.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** The owner's answers to G9's open questions: spec A47, its plan, and a WhatsApp group-photo fix (branch `comms-v0.3-catalog`).
+- **Summary:** The owner allowed Telegram user mark-read and asked for Telegram media to be built; A47 specifies both (one prohibition lifted, narrowly; `comms_message_send_media` on all three actors; Telegram `med_` refs, download, user upload). The 2026-docs search confirmed WhatsApp group create answers `request_id` (pywa 4.5.0) and found a defect: the group photo must be the multipart part `profile_picture_file`, not `file`. The oracle now refuses any other part.
+- **Files changed:** `src/comms/transports/whatsapp/cloud/http.py`, `tests/conformance/meta_oracle.py`, `docs/comms-spec-v0.3.md` (A47), `docs/verification/{comms-v0.3.md,comms-v0.3-rulings.md}` (A47 pin, R-G9b), `docs/superpowers/plans/2026-09-26-comms-v0.3-a47.md` (new), `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** the oracle test failed on the old part name and passes on the fix; the capability-id test now bounds each amendment's section (it read A47 as part of A46); the full gate (GATE ok=1).
+- **Follow-ups:** the owner approves the A47 plan (H1–H6); merge and push of `comms-v0.3-catalog`.

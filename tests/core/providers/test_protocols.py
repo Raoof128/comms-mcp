@@ -38,22 +38,26 @@ def test_capability_states_are_p_section_9():
     ]
 
 
-def _a46_ids() -> set[str]:
-    """The capabilities spec amendment A46 adds (owner, 2026-09-26), named in its text."""
+def _amendment_ids(number: int) -> set[str]:
+    """The capabilities a spec amendment (A46, A47: owner, 2026-09-26) names in its text."""
     spec = (PROPOSAL.parents[1] / "comms-spec-v0.3.md").read_text(encoding="utf-8")
-    start = spec.index("- **A46.")
-    section = spec[start : spec.index("\n## ", start)]
-    return set(re.findall(r"capability `([a-z_.]+)`", section))
+    start = spec.index(f"- **A{number}.")
+    ends = [
+        i for i in (spec.find(f"- **A{number + 1}.", start), spec.index("\n## ", start)) if i > 0
+    ]
+    return set(re.findall(r"capability `([a-z_.]+)`", spec[start : min(ends)]))
 
 
 def test_capability_ids_match_p_sections():
     expected = _section_ids(11) | _section_ids(14) | _section_ids(16)
     assert len(expected) > 60
-    a46 = _a46_ids()
+    a46 = _amendment_ids(46)
     assert a46 == {"member.tag", "reaction.remove", "reaction.clear", "phone_number.health"}
-    assert {c.value for c in Capability} <= expected | a46
+    a47 = _amendment_ids(47)
+    assert a47 == {"message.mark_read", "message.send_media"}  # mark_read was already P §14's
+    assert {c.value for c in Capability} <= expected | a46 | a47
     assert expected <= {c.value for c in Capability}
-    # A46's capabilities arrive with the task that builds them (G7; phone_number.health in G8)
+    # an amendment's capabilities arrive with the task that builds them (A46: G7, G8; A47: H4)
     assert all(c.name == c.value.upper().replace(".", "_") for c in Capability)
 
 

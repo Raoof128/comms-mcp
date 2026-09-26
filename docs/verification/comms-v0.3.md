@@ -637,9 +637,9 @@ R-G6a-docs, R-A46, R-G1 to R-G8d and R-G9 are in `docs/verification/comms-v0.3-r
 
 ### Waiting on the owner
 
-- **Telegram user mark-read.** The frozen spec prohibits `messages.readHistory`, so the cell is a policy B until the owner rules.
-- **Telegram media objects** are marked `—`, because no catalog tool consumes them. A media send tool would change that.
-- **WhatsApp group create's synchronous response** is undocumented. The oracle assumes `request_id`, and D39-B must confirm it live.
+- **Telegram mark-read and Telegram media:** the owner ruled on both on 2026-09-26. They are spec A47 (R-G9b), planned in `docs/superpowers/plans/2026-09-26-comms-v0.3-a47.md`, and the plan awaits approval.
+- **WhatsApp group create's synchronous response:** a second source (pywa 4.5.0, which follows Meta's Groups reference) documents `{"request_id": ...}`, matching the oracle. D39-B still observes it live.
+- **Found by that search and fixed (R-G9b):** the group-photo upload used the multipart part `file`, but Meta reads `profile_picture_file`.
 - **Merge and push** of `comms-v0.3-catalog`, and the tag.
 - **D39-B:** live acceptance of the P §88 rows.
 

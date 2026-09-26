@@ -170,12 +170,13 @@ class GraphApi:
         return self._call("POST" if approve else "DELETE", path, body=body)
 
     def update_group_photo(self, group_id: str, data: bytes) -> GraphResponse:
-        """``POST /{group-id}`` multipart: the group's profile picture (JPEG, G8)."""
+        """``POST /{group-id}`` multipart: the group's profile picture (JPEG, G8). Meta reads the
+        part named ``profile_picture_file``, not the media upload's ``file`` (R-G9b)."""
         return self._call(
             "POST",
             f"/{API_VERSION}/{self._group(group_id)}",
             form={"messaging_product": "whatsapp"},
-            files={"file": ("photo.jpg", data, "image/jpeg")},
+            files={"profile_picture_file": ("photo.jpg", data, "image/jpeg")},
         )
 
     def create_group(self, body: Mapping[str, Any]) -> GraphResponse:
