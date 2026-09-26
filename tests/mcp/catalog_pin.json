@@ -151,7 +151,7 @@
     "comms_group_context": "3ba00748dce4e35704296585a07106de41075286daafa307f58f08132d4bf3e6",
     "comms_group_capabilities": "a84a81451642d91208e72131dfb098827437ec5a8cf3b02ef65b5fb0b76cd4ec",
     "comms_group_members_list": "3f86e6234854f5bb7408ae639b8467d81a5d9ec735409a747238a7d477c4cb9d",
-    "comms_group_members_get": "75408725e9855d0b3b29ef38690d1e4bfc971d444ed3ac0cd4c9c2977c8e439c",
+    "comms_group_members_get": "6447908ed44b200b2d6cd6202fa742994b034b4bd5ec8577d0f960bdea86e9d8",
     "comms_group_admins_list": "16e411e2262e00e855e7f68b004e36408c58becd95cfc83e02c604fed208ce5b",
     "comms_group_member_add": "286edd9ac12f06240354a9f4f681f03383793476f0f84914860fd57385d64723",
     "comms_group_member_invite": "2c40f2e18977a449503914a685ca94ae8a77513aefd2ef99b92ed0de7e7d072d",
@@ -163,7 +163,7 @@
     "comms_group_admin_promote": "aa0466f2ede1a79020f0e0f0b15f2e25320fef6473f7a81afd296193b06e32b1",
     "comms_group_admin_update_rights": "aeea1c8b1ea65894cb228a3b16d0c665ea458240ba14382fdf46d54d526d4874",
     "comms_group_admin_demote": "0cc6addc2d29337fe217cb9fa1d79d558d35abbc2756e545080b6098339d127f",
-    "comms_group_permissions_get": "fa3bd4f75e0ef5c4f9c2eb97006811c50cc2e9f09dfc81cc223b3e2a5f996eb8",
+    "comms_group_permissions_get": "8b945c285a7afe17746321b55e78101f798d36a7568d4389c690a48c85020184",
     "comms_group_permissions_set": "a0970946541d08e8cc4e86ff9e270e81aef715ee804269289d55694d2d6df00b",
     "comms_group_info_set_title": "8e632a36a06ac1ea176ed1bf76ce9d6f661b2324a9cec52e294571f4b2e6be5b",
     "comms_group_info_set_description": "1c13ea7fa003a76180636c644bf003f781186c7009c5b566aed7080a88403dc0",
@@ -172,7 +172,7 @@
     "comms_group_invite_create": "0a91ec7e34332f9d681364e0648450c6f6b0dce0352461ac25d6c0ce2229014a",
     "comms_group_invite_edit": "fd9c06c0d927a3e0743b4abf4f2ac71368e46c0e169c0c5114fe383be11a92ff",
     "comms_group_invite_revoke": "a391c6874bf70987edd6f973f12f9a54fe6a64addd93d7f462c8436a288a0c23",
-    "comms_group_join_requests_list": "05cd4aa7b870d4e5c1b0e07650e611ee8688367665ce0076a77038df37bfaaba",
+    "comms_group_join_requests_list": "4cb26a056f1ca3f0263624c04b676fd1def664ab1a02892501175572412c1055",
     "comms_group_join_requests_approve": "67e2125f8d1b7b92b03ca94dacf5ee0d5f8ee62119e724dad8dabf597ec34c81",
     "comms_group_join_requests_reject": "1c23a5152c585483d713a526cdbe161fd5fc05e57a5113a7aec2e63b0594f514",
     "comms_group_topic_list": "f68048d5e359f0c301fef2351e73f710824f5ab8e69f55242b4a57afd97b9298",
@@ -250,5 +250,5 @@
     "comms_location_member_remove": "07cdab0ad039b63c1541e5c70f5745066cd349980c1b87339d410226f3a96280",
     "comms_context_person": "8b146afb6a24c7f8a5a5dd74fd62abe2bc12e3c29ef2aa1b58baf7255be9220f"
   },
-  "catalog": "c5ea122dac23a44a587739b15c9c3e1185aadedb1086a1d6bcc91cb0dd1912c7"
+  "catalog": "efed9b5da628c78107f48dcb404eab0026289647f32881335c87a7e548d6781e"
 }

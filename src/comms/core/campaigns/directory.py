@@ -42,6 +42,7 @@ __all__ = [
     "member_identity",
     "opt_out",
     "opt_out_in_tx",
+    "recipient_of_identity",
     "remove_audience_member",
     "remove_audience_member_in_tx",
     "remove_location_member",
@@ -522,3 +523,15 @@ def contact_targets(conn: Any, recipient_ref: str) -> list[tuple[str, str, str]]
         (recipient_id,),
     ).fetchall()
     return [(str(r[0]), str(r[1]), str(r[2])) for r in rows]
+
+
+def recipient_of_identity(conn: Any, transport: str, identity: str) -> str | None:
+    """The person whose contact point on ``transport`` is this delivery identity, or None: how
+    a provider id in a read becomes a ``rcp_`` ref before it leaves (G6)."""
+    row = conn.execute(
+        "SELECT r.ref FROM contact_points c JOIN recipients r ON r.id = c.recipient_id"
+        " JOIN delivery_identities i ON i.id = c.identity_id"
+        " WHERE i.transport = ? AND i.identity = ? ORDER BY c.enabled DESC, c.id LIMIT 1",
+        (transport, identity),
+    ).fetchone()
+    return None if row is None else str(row[0])

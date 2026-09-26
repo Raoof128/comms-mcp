@@ -19,6 +19,17 @@ class Source:
         self.queries.append(query)
         if self.refuse:
             raise ContextRefused(self.refuse)
+        stamp = {"source": self.provenance, "observed_at": "2026-09-25T00:00:00.000000Z"}
+        if query.kind == "member":  # G6: the real sources' shapes
+            item = {**stamp, "user_id": int(query.args["user_id"]), "role": "member",
+                    "status": "member"}  # fmt: skip
+            return ContextPage((item,), self.provenance)
+        if query.kind == "permissions":
+            item = {**stamp, "permissions": {"can_send_messages": True, "can_pin_messages": False}}
+            return ContextPage((item,), self.provenance)
+        if query.kind == "admins":
+            item = {**stamp, "user_id": 42, "role": "creator", "untrusted": {"name": "Ali"}}
+            return ContextPage((item,), self.provenance)
         start = int(query.args.get("cursor") or 1000)
         items = tuple(
             {

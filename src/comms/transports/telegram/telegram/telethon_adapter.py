@@ -749,6 +749,21 @@ _ROLE: Mapping[type, str] = MappingProxyType(
 )
 
 
+MAX_ADMINS = 200  # a channel's administrators (Telegram caps them at 50; one page holds all)
+
+
+def _standing(part: Any) -> tuple[str | None, str]:
+    """A participant's ``(role, status)`` (G6)."""
+    if isinstance(part, types.ChannelParticipantLeft):
+        return None, "left"
+    if isinstance(part, types.ChannelParticipantBanned):
+        rights = getattr(part, "banned_rights", None)
+        if rights is not None and rights.view_messages:
+            return None, "banned"
+        return "member", "restricted"
+    return _ROLE.get(type(part), "member"), "member"
+
+
 def _sent_message_id(result: Any, random_id: int) -> int | None:
     if isinstance(result, types.UpdateShortSentMessage):
         return int(result.id)
@@ -1175,6 +1190,105 @@ class TelethonSession:
             )
             rows.append((user_id, _ROLE.get(type(part), "member"), name or None))
         return rows, (offset + len(parts) if more else None)
+
+    async def fetch_participant(
+        self, peer_type: str, peer_id: int, user_id: int, *, timeout: float
+    ) -> tuple[str | None, str]:
+        """One member's ``(role, status)`` (G6): ``channels.getParticipant`` for a channel or
+        supergroup, ``messages.getFullChat`` for a basic group. Not a member is ``(None,
+        "left")``; a banned member is ``(None, "banned")``, a restricted one ``("member",
+        "restricted")``."""
+        if peer_type == "channel":
+            request = functions.channels.GetParticipantRequest(
+                self.input_peer("channel", peer_id), self._admin_user(user_id)
+            )
+            try:
+                result = await self.call_capability(
+                    Capability.MEMBER_GET,
+                    request,
+                    timeout=timeout,
+                    passthrough=(errors.UserNotParticipantError,),
+                )
+            except errors.UserNotParticipantError:
+                return None, "left"
+            return _standing(result.participant)
+        if peer_type == "chat":
+            result = await self.call_capability(
+                Capability.MEMBER_GET,
+                functions.messages.GetFullChatRequest(peer_id),
+                timeout=timeout,
+            )
+            every = getattr(result.full_chat.participants, "participants", None) or ()
+            part = next((p for p in every if getattr(p, "user_id", None) == user_id), None)
+            return (None, "left") if part is None else _standing(part)
+        raise GatewayError("NOT_ACCESSIBLE")
+
+    async def fetch_admins(
+        self, peer_type: str, peer_id: int, *, timeout: float
+    ) -> list[tuple[int, str, str | None]]:
+        """Every administrator, ``(user id, role, display name)`` (G6): ``channels.
+        getParticipants(admins)`` for a channel or supergroup, the full chat's for a basic one."""
+        if peer_type == "channel":
+            request = functions.channels.GetParticipantsRequest(
+                utils.get_input_channel(self.input_peer("channel", peer_id)),
+                types.ChannelParticipantsAdmins(),
+                0,
+                MAX_ADMINS,
+                hash=0,
+            )
+            result = await self.call_capability(Capability.ADMIN_LIST, request, timeout=timeout)
+            parts = list(getattr(result, "participants", None) or ())
+        elif peer_type == "chat":
+            result = await self.call_capability(
+                Capability.ADMIN_LIST,
+                functions.messages.GetFullChatRequest(peer_id),
+                timeout=timeout,
+            )
+            parts = list(getattr(result.full_chat.participants, "participants", None) or ())
+        else:
+            raise GatewayError("NOT_ACCESSIBLE")
+        names = {u.id: u for u in getattr(result, "users", None) or ()}
+        rows = []
+        for part in parts:
+            role = _ROLE.get(type(part))
+            user_id = getattr(part, "user_id", None)
+            if role not in ("creator", "admin") or type(user_id) is not int:
+                continue
+            user = names.get(user_id)
+            name = " ".join(
+                filter(None, (getattr(user, "first_name", None), getattr(user, "last_name", None)))
+            )
+            rows.append((user_id, role, name or None))
+        return rows
+
+    async def default_permissions(
+        self, peer_type: str, peer_id: int, *, timeout: float
+    ) -> dict[str, bool]:
+        """The chat's default member permissions, as the Bot API names them (G6): a permission
+        holds unless one of the ``ChatBannedRights`` flags it lifts is in force. The chat object
+        comes with ``channels.getParticipant(self)`` or ``messages.getFullChat``; the frozen
+        spec keeps ``channels.getChannels`` absent in every phase."""
+        if peer_type == "channel":  # the account's own participant read carries the channel
+            request = functions.channels.GetParticipantRequest(
+                self.input_peer("channel", peer_id), types.InputUserSelf()
+            )
+            result = await self.call_capability(Capability.MEMBER_GET, request, timeout=timeout)
+        elif peer_type == "chat":
+            result = await self.call_capability(
+                Capability.MEMBER_GET,
+                functions.messages.GetFullChatRequest(peer_id),
+                timeout=timeout,
+            )
+        else:
+            raise GatewayError("NOT_ACCESSIBLE")
+        chat = next((c for c in result.chats if getattr(c, "id", None) == peer_id), None)
+        if chat is None:
+            raise GatewayError("NOT_ACCESSIBLE")
+        banned = _flags(getattr(chat, "default_banned_rights", None))
+        return {
+            permission: not (set(flags) & banned)
+            for permission, flags in _BANNED_FOR_PERMISSION.items()
+        }
 
     async def admin_log(
         self, peer_id: int, *, max_id: int, limit: int, timeout: float

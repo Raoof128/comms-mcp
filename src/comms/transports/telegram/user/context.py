@@ -46,6 +46,18 @@ class ReadSession(Protocol):
         self, peer_type: str, peer_id: int, *, offset: int, limit: int, timeout: float
     ) -> tuple[list[tuple[int, str, str | None]], int | None]: ...
 
+    async def fetch_admins(
+        self, peer_type: str, peer_id: int, *, timeout: float
+    ) -> list[tuple[int, str, str | None]]: ...
+
+    async def fetch_participant(
+        self, peer_type: str, peer_id: int, user_id: int, *, timeout: float
+    ) -> tuple[str | None, str]: ...
+
+    async def default_permissions(
+        self, peer_type: str, peer_id: int, *, timeout: float
+    ) -> dict[str, bool]: ...
+
 
 Runner = Callable[[Coroutine[Any, Any, Any]], Any]
 
@@ -82,6 +94,10 @@ class UserContext:
             fields = take(args, {"query": text(1, 256)}, {"limit": _limit, "cursor": _cursor})
         elif kind == "members":
             fields = take(args, {}, {"limit": _limit, "cursor": _cursor})
+        elif kind in ("admins", "permissions"):  # G6
+            fields = take(args, {}, {})
+        elif kind == "member":  # G6: one member's standing, by marked user id
+            fields = take(args, {"user_id": _cursor}, {})
         else:
             raise ContextRefused("PROVIDER_UNSUPPORTED")
         refused = self._session.readiness()
@@ -101,6 +117,21 @@ class UserContext:
             "deadline": Deadline(READ_TIMEOUT_S),
             "budget": WorkBudget(max_rpcs=1),
         }
+        if kind == "admins":
+            rows = await self._session.fetch_admins(*peer, timeout=READ_TIMEOUT_S)
+            return _page([_member(row, observed) for row in rows], None, cursor_of=None)
+        if kind == "member":
+            user_id = int(fields["user_id"])
+            role, status = await self._session.fetch_participant(
+                *peer, user_id, timeout=READ_TIMEOUT_S
+            )
+            item = {"source": PROVENANCE, "observed_at": observed, "user_id": user_id,
+                    "role": role, "status": status}  # fmt: skip
+            return ContextPage((item,), PROVENANCE)
+        if kind == "permissions":
+            permissions = await self._session.default_permissions(*peer, timeout=READ_TIMEOUT_S)
+            item = {"source": PROVENANCE, "observed_at": observed, "permissions": permissions}
+            return ContextPage((item,), PROVENANCE)
         if kind == "members":
             offset = int(fields.get("cursor", 0))
             rows, more = await self._session.fetch_participants(

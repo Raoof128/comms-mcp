@@ -753,3 +753,11 @@ Follow the user's engineering lifecycle: design/security analysis, implementatio
 - **Files changed:** `src/comms/runtime/facades.py`, `src/comms/services/context.py`, `src/comms/core/campaigns/directory.py`, `src/comms/core/groups.py`, `src/comms/transports/whatsapp/webhooks/archive.py`, `src/comms/transports/telegram/bot/context.py`, `src/comms/mcp/tools/context.py`, `src/comms/mcp/tools/__init__.py`, `src/comms/mcp/egress.py`; tests `tests/runtime/test_context_person.py` (new), `tests/mcp/catalog_pin.json`; the matrix, the rulings, the ledger, `AGENT.md`, `CHANGELOG.md`.
 - **Verification:** 6 new tests; the actor matrix covers the tool on all three actors; the full gate passed (GATE ok=1).
 - **Follow-ups:** G6 adds the user account's sender search.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Catalog amendment G6, part 1: Telegram group reads (branch `comms-v0.3-catalog`).
+- **Summary:** Admins are read as admins, which fixes the bot's admin list and group context. One member's standing, default permissions and join requests are served on both actors where the API allows, with every user id mapped to a `rcp_` ref or `null`. The bot serves `around`, `message_get` and join requests from its retained updates. A prohibited RPC (`channels.getChannels`) was caught by the independent guard and replaced with a reviewed one. User mark-read waits on the owner, because the frozen spec prohibits `messages.readHistory`.
+- **Files changed:** `src/comms/services/group_reads.py` (new), `src/comms/services/context.py`, `src/comms/runtime/facades.py`, `src/comms/transports/telegram/bot/context.py`, `src/comms/transports/telegram/user/context.py`, `src/comms/transports/telegram/telegram/telethon_adapter.py`, `src/comms/core/campaigns/directory.py`, `src/comms/mcp/tools/admin.py`, `src/comms/mcp/tools/groups.py`, `src/comms/mcp/egress.py`; tests (three new modules, plus updates), `tests/mcp/catalog_pin.json`; the matrix, the rulings, the ledger, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 22 new tests; the behaviour matrix passes on all three actors; the full gate passed (GATE ok=1).
+- **Follow-ups:** G6 part 2: the user account's invite list, join requests, topics, admin log and sender search.

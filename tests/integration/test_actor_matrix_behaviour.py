@@ -58,7 +58,17 @@ def _bot_api() -> BotApi:
                 for n in (1, 2, 3) if n >= offset
             ]  # fmt: skip
         elif method == "getChat":
-            result = {"id": -77, "type": "group", "title": "G"}
+            result = {
+                "id": -77,
+                "type": "group",
+                "title": "G",
+                "permissions": {"can_send_messages": True, "can_pin_messages": False},
+            }
+        elif method == "getChatMember":
+            result = {
+                "status": "member",
+                "user": {"id": 908180, "is_bot": False, "first_name": "A"},
+            }
         elif method == "getChatAdministrators":
             result = []
         elif method == "getChatMemberCount":

@@ -116,8 +116,32 @@ def _member(
     )
 
 
+def _listed(item: Mapping[str, Any]) -> dict[str, Any]:
+    return obj(
+        {"group": _GROUP, "items": array(item, high=100), "next_cursor": nullable(string(1, 64))},
+        ["group", "items", "next_cursor"],
+    )
+
+
+# G6: a pending join request, its requester by ref (null when not in the directory)
+_JOIN_REQUEST = obj(
+    {
+        "source": enum(("telegram_live", "telegram_local")),
+        "recipient": nullable(ref("recipient")),
+        "requested_at": nullable(string(1, 64)),
+        "untrusted": obj({"name": nullable(string(0, 256))}, []),
+    },
+    ["source", "recipient", "requested_at", "untrusted"],
+)
+
+
 def _list(
-    name: str, title: str, description: str, inputs: Mapping[str, Any] | None = None
+    name: str,
+    title: str,
+    description: str,
+    inputs: Mapping[str, Any] | None = None,
+    *,
+    item: Mapping[str, Any] | None = None,
 ) -> ToolSpec:
     return read(
         f"comms_{name}",
@@ -126,7 +150,7 @@ def _list(
         name.replace("_", ".", 1),
         {"group": _GROUP, "cursor": string(1, 64), **(inputs or {})},
         ["group"],
-        _LISTED,
+        _LISTED if item is None else _listed(item),
         failures=CONTEXT_FAILURES,
         open_world=True,
     )
@@ -162,7 +186,7 @@ ADMIN_TOOLS: tuple[ToolSpec, ...] = (
     read(
         "comms_group_permissions_get",
         "Default permissions",
-        "The group's default member permissions. Not offered yet: answers PROVIDER_UNSUPPORTED.",
+        "The group's default member permissions, by their Bot API names.",
         "group.permissions_get",
         {"group": _GROUP},
         ["group"],
@@ -235,7 +259,13 @@ ADMIN_TOOLS: tuple[ToolSpec, ...] = (
         {"invite": _INVITE},
         destructive=True,
     ),
-    _list("group_join_requests_list", "List join requests", "Pending requests to join the group."),
+    _list(
+        "group_join_requests_list",
+        "List join requests",
+        "Pending requests to join the group, newest first: each requester by ref when they are "
+        "in the directory, their name untrusted. The bot lists the requests it has received.",
+        item=_JOIN_REQUEST,
+    ),
     _member(
         "group_join_requests_approve",
         "Approve a join request",

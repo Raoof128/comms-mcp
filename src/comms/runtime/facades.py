@@ -31,6 +31,7 @@ from comms.services.campaigns import CampaignService
 from comms.services.capability import CapabilityService
 from comms.services.context import ContextEngine
 from comms.services.directory import DirectoryService
+from comms.services.group_reads import GroupReads
 from comms.services.groups import GroupService
 from comms.services.handles import ContextHandles
 from comms.services.identity import IdentityService
@@ -54,11 +55,8 @@ NOT_OFFERED = frozenset(
         "message.forward",
         "media.upload",
         "media.download",
-        "group.members_get",
-        "group.permissions_get",
         "group.topic_get",
         "group.invite_list",
-        "group.join_requests_list",
         "group.topic_list",
         "group.admin_log",
         "group.create",
@@ -116,6 +114,7 @@ def _not_offered(client: AuthenticatedClient, arguments: dict[str, Any]) -> dict
 class _Facades:
     def __init__(self, s: Services) -> None:
         self.s = s
+        self.reads = GroupReads(s.conn, s.context)
 
     # -- shared --------------------------------------------------------------------------
 
@@ -173,6 +172,26 @@ class _Facades:
         else:
             raise CommsError("STALE_HANDLE")
         return self.tokened(client, page, kind, group, actor, args)
+
+    # -- group reads (catalog amendment G6) ----------------------------------------------
+
+    def join_requests(self, client: AuthenticatedClient, a: dict[str, Any]) -> dict[str, Any]:
+        """Pending join requests; a continuation names its ``cur_`` token, bound to the client
+        and to the group and actor that served the first page."""
+        group, cursor, actor = a["group"], None, None
+        if a.get("cursor") is not None:
+            handle, position = self.s.handles.position(client.client_ref, a["cursor"])
+            snapshot = handle.snapshot
+            if snapshot.get("kind") != "join_requests" or snapshot.get("group") != group:
+                raise CommsError("STALE_HANDLE")
+            cursor, actor = position["cursor"], snapshot["actor"]
+        targets = self.targets(group)
+        if actor is not None:  # the continuation stays with the actor that served page one
+            if actor not in targets:
+                raise CommsError("STALE_HANDLE")
+            targets = {actor: targets[actor]}
+        page, served_by = self.reads.join_requests(group, targets, cursor=cursor)
+        return self.tokened(client, page, "join_requests", group, served_by, {})
 
     # -- a person's communication (catalog amendment G5) --------------------------------
 
@@ -475,6 +494,9 @@ class _Facades:
             "directory.recipient_enable": lambda cl, a: s.directory.recipient_enable(c(cl), a["recipient"], a["request_id"]),
             "directory.recipient_disable": lambda cl, a: s.directory.recipient_disable(c(cl), a["recipient"], a["request_id"]),
             "context.person": self.context_person,
+            "group.members_get": lambda cl, a: self.reads.member(a["group"], self.targets(a["group"]), a["recipient"]),
+            "group.permissions_get": lambda cl, a: self.reads.permissions(a["group"], self.targets(a["group"])),
+            "group.join_requests_list": self.join_requests,
             "directory.contact_add": lambda cl, a: s.directory.contact_add(c(cl), a["recipient"], a["transport"], a["identity"], a["request_id"]),
             "directory.contact_disable": lambda cl, a: s.directory.contact_disable(c(cl), a["contact"], a["request_id"]),
             "directory.contact_opt_out": lambda cl, a: s.directory.contact_opt_out(c(cl), a["contact"], a["request_id"]),

@@ -139,7 +139,7 @@ GROUP_TOOLS: tuple[ToolSpec, ...] = (
     read(
         "comms_group_members_get",
         "Get a member",
-        "One recipient's membership of the group. Not offered yet: answers PROVIDER_UNSUPPORTED.",
+        "One recipient's role and status in the group (member, restricted, banned or left).",
         "group.members_get",
         {"group": _GROUP, "recipient": _RECIPIENT},
         ["group", "recipient"],

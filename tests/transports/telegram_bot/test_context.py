@@ -63,23 +63,21 @@ def test_live_info_is_chat_admins_and_member_count(conn):
 
 def test_recent_is_the_locally_retained_updates_newest_first(conn):
     items = _context(conn).read(ContextQuery(GROUP, "recent")).items
-    assert [(i["update_id"], i["kind"]) for i in items] == [
-        (501, "chat_join_request"),
-        (500, "message"),
-    ]
-    message = items[1]
+    # G6: a join request is not a message; it is served by the join_requests kind
+    assert [(i["update_id"], i["kind"]) for i in items] == [(500, "message")]
+    requests = _context(conn).read(ContextQuery(GROUP, "join_requests")).items
+    assert [(i["update_id"], i["kind"]) for i in requests] == [(501, "chat_join_request")]
+    message = items[0]
     assert (message["message_id"], message["from_id"]) == (10, 42)
     assert message["untrusted"] == {"text": "hello"}
     assert message["observed_at"]  # when this installation received it
 
 
 def test_recent_pages_by_update_id(conn):
-    first = _context(conn).read(ContextQuery(GROUP, "recent", {"limit": 1}))
-    assert [i["update_id"] for i in first.items] == [501] and first.next_cursor == "501"
-    second = _context(conn).read(
-        ContextQuery(GROUP, "recent", {"limit": 1, "cursor": first.next_cursor})
-    )
-    assert [i["update_id"] for i in second.items] == [500] and second.next_cursor is None
+    first = _context(conn).read(ContextQuery(GROUP, "join_requests", {"limit": 1}))
+    assert [i["update_id"] for i in first.items] == [501] and first.next_cursor is None
+    recent = _context(conn).read(ContextQuery(GROUP, "recent", {"limit": 1}))
+    assert [i["update_id"] for i in recent.items] == [500] and recent.next_cursor is None
 
 
 def test_recent_reads_only_this_chat(conn):
@@ -89,7 +87,7 @@ def test_recent_reads_only_this_chat(conn):
 
 def test_bot_history_is_local_only(conn):
     seen = []
-    for kind in ("history", "search", "around", "members"):
+    for kind in ("history", "search", "members"):  # G6: around is served from retained updates
         with pytest.raises(ContextRefused) as refused:
             _context(conn, seen=seen).read(ContextQuery(GROUP, kind, {"query": "x"}))
         assert refused.value.code == "PROVIDER_UNSUPPORTED"

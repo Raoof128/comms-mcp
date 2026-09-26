@@ -47,6 +47,7 @@ _NAMES = frozenset(
         "comms_directory_recipient_list",
         "comms_directory_recipient_get",
         "comms_context_person",  # G5: senders' names, under untrusted
+        "comms_group_join_requests_list",  # G6: requesters' names, under untrusted
     }
 )
 _IDENTITY = frozenset({"comms_admin_identity_inspect"})

@@ -235,16 +235,40 @@ class ContextEngine:
         if not wanted <= _SERVED:
             raise CommsError("PROVIDER_UNSUPPORTED")
         result: dict[str, Any] = {"group_ref": group}
-        if "messages" in wanted:
-            result["messages"] = self.recent(group, target, limit=message_limit)
-        if wanted & {"members", "admins"}:
-            members = self._page(group, target, "members", {"limit": _MAX_PAGE})
-            if "members" in wanted:
-                result["members"] = members
-            if "admins" in wanted:
-                admins = [i for i in members["items"] if i.get("role") in ("creator", "admin")]
-                result["admins"] = {**members, "items": admins, "next_cursor": None}
+        parts = {
+            "messages": lambda: self.recent(group, target, limit=message_limit),
+            "members": lambda: self._page(group, target, "members", {"limit": _MAX_PAGE}),
+            # G6: read as admins, not derived from a member page the bot cannot produce
+            "admins": lambda: self._admins(group, target),
+        }
+        for part in ("messages", "members", "admins"):
+            if part not in wanted:
+                continue
+            try:
+                result[part] = parts[part]()
+            except CommsError as refused:
+                # a part this source cannot serve at all is left out when another part is
+                # served (G6: the bot has no member list); any other failure refuses the read
+                if refused.code != "PROVIDER_UNSUPPORTED" or len(wanted) == 1:
+                    raise
+        if set(result) == {"group_ref"}:
+            raise CommsError("PROVIDER_UNSUPPORTED")
         return result
+
+    def _admins(self, group: str, target: ProviderTarget) -> dict[str, Any]:
+        """Administrators only, whatever the source returns (a role, never message text)."""
+        page = self._page(group, target, "admins", {})
+        items = [
+            {k: v for k, v in i.items() if k != "untrusted_text"}
+            for i in page["items"]
+            if i.get("role") in ("creator", "admin")
+        ]
+        return {**page, "items": items, "next_cursor": None}
+
+    def read(self, target: ProviderTarget, kind: str, args: Mapping[str, Any]) -> ContextPage:
+        """One raw provider read of any kind, provenance-checked, for the group reads service
+        (G6); it maps every identity to a ref before anything leaves."""
+        return self._read(target, kind, args)
 
     def search(
         self,
