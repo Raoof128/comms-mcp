@@ -11,6 +11,8 @@ import json
 import httpx
 from whatsvault.providers.fake_meta import FakeGraph
 
+from comms.transports.whatsapp.cloud.http import API_VERSION
+
 PHONE_ID = "106540352242922"
 WABA_ID = "102290129340398"
 APP_SECRET = b"fixture-app-secret-not-a-real-one"
@@ -72,6 +74,12 @@ def _g8(request: httpx.Request) -> tuple[int, dict] | None:
     return None
 
 
+def _as_fake_version(path: str) -> str:
+    """G9 moved the adapter to Graph v26.0; WhatsVault's FakeGraph (the subtree is not edited)
+    still routes v21.0. The contract under test is the path after the version, unchanged."""
+    return path.replace(f"/{API_VERSION}/", f"/{FakeGraph.VERSION}/", 1)
+
+
 def oracle_transport(graph: FakeGraph) -> httpx.MockTransport:
     def handler(request: httpx.Request) -> httpx.Response:
         answered = _g8(request)
@@ -82,7 +90,7 @@ def oracle_transport(graph: FakeGraph) -> httpx.MockTransport:
         status, body, content_type = graph.handle(
             request.method,
             request.url.host,
-            request.url.path,
+            _as_fake_version(request.url.path),
             query,
             request.content,
             request.headers.get("content-type", ""),

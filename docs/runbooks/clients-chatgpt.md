@@ -2,10 +2,9 @@
 
 Owner-run, against disposable groups only (P §84); its results are evidence, never a gate.
 
-**Prerequisites.** The daemon now serves the comms surface (D39-PRE; install with
-`docs/runbooks/install.md`, including `comms cutover run`). The directory entries this run needs
-(the disposable groups and people) arrive with the catalog amendment's `comms_directory_*` tools,
-or a backup restore; until one of those, every field below stays `PENDING OWNER`.
+**Prerequisites.** The daemon serves the comms surface (install with
+`docs/runbooks/install.md`, including `comms cutover run`). Add the disposable groups and people
+this run needs with the `comms_directory_*` tools (or a backup restore) before starting.
 
 ## Connect
 

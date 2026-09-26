@@ -24,7 +24,7 @@ from comms.transports.whatsapp.numbers import WA_GROUP_ID
 __all__ = ["GRAPH_ORIGIN", "GraphApi", "GraphRefused", "GraphResponse", "GraphTransportError"]
 
 GRAPH_ORIGIN = "https://graph.facebook.com"
-API_VERSION = "v21.0"
+API_VERSION = "v26.0"  # G9: v21.0 expires 2027-01-21; Meta's current (2026-07-29)
 TOKEN_ITEM = "meta-access-token"
 _TOKEN = re.compile(r"\A[A-Za-z0-9_.\-]{20,512}\Z")
 _NUMBER_ID = re.compile(r"\A[0-9]{5,20}\Z")

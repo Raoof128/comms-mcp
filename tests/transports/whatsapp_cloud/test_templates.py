@@ -39,17 +39,17 @@ def _ops(routes, seen=None):
     return TemplateOps(api), seen
 
 
-LIST = ("GET", f"/v21.0/{WABA}/message_templates", None)
+LIST = ("GET", f"/v26.0/{WABA}/message_templates", None)
 
 
 def test_list_get_create_edit_delete_classified():
     ops, seen = _ops(
         {
             LIST: "templates_page1",
-            ("GET", f"/v21.0/{WABA}/message_templates", "QVFC"): "templates_page2",
-            ("POST", f"/v21.0/{WABA}/message_templates", None): "template_created",
-            ("POST", "/v21.0/1111", None): "template_success",
-            ("DELETE", f"/v21.0/{WABA}/message_templates", None): "template_success",
+            ("GET", f"/v26.0/{WABA}/message_templates", "QVFC"): "templates_page2",
+            ("POST", f"/v26.0/{WABA}/message_templates", None): "template_created",
+            ("POST", "/v26.0/1111", None): "template_success",
+            ("DELETE", f"/v26.0/{WABA}/message_templates", None): "template_success",
         }
     )
     page = ops.list(limit=2)
@@ -101,7 +101,7 @@ def test_create_is_create_class():
         ("err_130429_throughput", ("FAILED", "RATE_LIMITED")),
     ):
         seen = []
-        ops, seen = _ops({("POST", f"/v21.0/{WABA}/message_templates", None): answer}, seen)
+        ops, seen = _ops({("POST", f"/v26.0/{WABA}/message_templates", None): answer}, seen)
         result = ops.create(body)
         assert (result.outcome, result.code) == expected and len(seen) == 1
 
@@ -110,7 +110,7 @@ def test_template_status_feeds_availability():
     ops, _ = _ops(
         {
             LIST: "templates_page1",
-            ("GET", f"/v21.0/{WABA}/message_templates", "QVFC"): "templates_page2",
+            ("GET", f"/v26.0/{WABA}/message_templates", "QVFC"): "templates_page2",
         }
     )
     catalog = TemplateCatalog()

@@ -45,7 +45,7 @@ def test_a_send_is_one_post_to_the_pinned_origin_with_a_bearer_header():
     _api(fixture_transport("send_ok", seen)).send_message(BODY)
     (request,) = seen
     assert (request.method, f"{request.url.scheme}://{request.url.host}") == ("POST", GRAPH_ORIGIN)
-    assert request.url.path == f"/v21.0/{PHONE_ID}/messages" and CANARY not in str(request.url)
+    assert request.url.path == f"/v26.0/{PHONE_ID}/messages" and CANARY not in str(request.url)
     assert request.headers["authorization"] == f"Bearer {CANARY}"
     assert json.loads(request.content) == BODY
 

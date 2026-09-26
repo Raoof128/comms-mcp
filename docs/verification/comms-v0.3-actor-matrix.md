@@ -26,7 +26,7 @@ only a genuine API gap is `B`, reported by that actor's capability as `PROVIDER_
 **Sources.**
 - **Bot API:** Bot API 10.3 (24 August 2026), `core.telegram.org/bots/api` and its changelog; re-checked 2026-09-26.
 - **MTProto:** Telethon 1.45.0's TL layer 229 (`functions.*`); every cited method re-checked against `core.telegram.org/methods` and its method page on 2026-09-26 (forum topics are `messages.*`, taking an `InputPeer`).
-- **WhatsApp Cloud API:** the code pins Graph API v21.0 (`developers.facebook.com/documentation/business-messaging/whatsapp`), which **expires 21 January 2027**; Meta's current examples use v26.0 (29 July 2026). The Groups API reference (read 2026-09-25, re-checked 2026-09-26) supports:
+- **WhatsApp Cloud API:** the code pins Graph API v26.0 (`developers.facebook.com/documentation/business-messaging/whatsapp`), Meta's current version (29 July 2026); G9 moved it off v21.0, which expires on 21 January 2027. The Groups API reference (read 2026-09-25, re-checked 2026-09-26) supports:
   - create and delete a group; get and list groups;
   - update the subject, description and photo;
   - get and reset the invite link;
@@ -132,7 +132,7 @@ Every cell was re-checked against the live docs. None flipped between A and B. W
 - **Details for the builders.**
   - G6: `getChatAdministrators` needs `return_bots=True` to list other bot admins.
   - G8: WhatsApp pin needs `expiration_days`; groups cap at 8 participants.
-  - G9: the Graph API pin (v21.0) expires on 21 January 2027 and must move to a current version before release.
+  - G9: the Graph API pin moved from v21.0 (expires 21 January 2027) to v26.0.
 - **New admin surface beyond A45's catalog.** The owner added it to the catalog as A46 on 2026-09-26; its four tools are rows above.
   - member tags: Bot API `setChatMemberTag` with the `can_manage_tags` right (9.5); MTProto `messages.editChatParticipantRank`;
   - reaction moderation: Bot API `deleteMessageReaction` / `deleteAllMessageReactions` (10.0); MTProto `messages.deleteParticipantReaction(s)`;

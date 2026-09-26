@@ -389,11 +389,106 @@ def drive_directory_and_campaigns(root: Path) -> dict[str, Any]:
         stale = d.http(seed, "comms_context_page", {"cursor": cursor})
         fresh = d.http(seed, "comms_context_recent", {"group": grp, "limit": 2})
         out["cursor_rotation"] = bool(cursor) and stale["isError"] and not fresh["isError"]
+        out.update(_catalog_checks(d, seed, webhook_port))
         out["verify_after"] = d.json("audit", "verify", "--all")["ok"] is True
         out.update(_webhook_checks(d, webhook_port))
     finally:
         if d.proc is not None and d.proc.poll() is None:
             d.stop()
+    return out
+
+
+WA_GROUP = "Y2FwaV9ncm91cDpTTU9LRTEyMzQ1Njc4OQ"  # a Meta-shaped (opaque) group id
+SMOKE_PHONE = "61400000077"
+
+
+def _signed_post(port: int, body: bytes) -> int:
+    """One webhook POST signed with the selftest app secret; the status code."""
+    import hashlib
+    import hmac
+
+    import httpx
+
+    from comms.runtime.selftest import SELFTEST_APP_SECRET
+
+    signed = "sha256=" + hmac.new(SELFTEST_APP_SECRET, body, hashlib.sha256).hexdigest()
+    headers = {"content-type": "application/json", "x-hub-signature-256": signed}
+    return httpx.post(
+        f"http://127.0.0.1:{port}/webhooks/meta", content=body, headers=headers
+    ).status_code
+
+
+def _message(wamid: str, text: str, group: str | None = None) -> bytes:
+    message = {"from": SMOKE_PHONE, "id": wamid, "timestamp": "1758800100", "type": "text",
+               "text": {"body": text}, **({"group_id": group} if group else {})}  # fmt: skip
+    return json.dumps({"object": "whatsapp_business_account", "entry": [{"changes": [{"value": {
+        "metadata": {"phone_number_id": "1234567890"},
+        "contacts": [{"wa_id": SMOKE_PHONE, "profile": {"name": "Smoke"}}],
+        "messages": [message]}}]}]}).encode()  # fmt: skip
+
+
+def _catalog_checks(d: Daemon, seed: Path, port: int) -> dict[str, Any]:
+    """Catalog amendment G9 (D39-A): the directory, WhatsApp groups and a person's context over
+    MCP against the real daemon: create a person, a WhatsApp contact, a location with the person
+    in it, a Telegram and a WhatsApp group; a location campaign reaches the person; a signed
+    webhook for the WhatsApp group is read by its grp_; comms_context_person serves the DM."""
+    from comms.core import refs
+
+    def call(name: str, arguments: dict[str, Any], *, write: bool = True) -> dict[str, Any]:
+        extra = {"request_id": refs.mint("request")} if write else {}
+        answer = d.http(seed, name, {**arguments, **extra})
+        return {} if answer["isError"] else dict(answer["structuredContent"])
+
+    out: dict[str, Any] = {}
+    rcp = call("comms_directory_recipient_create", {"display_name": "Smoke Person"}).get(
+        "recipient"
+    )
+    rct = call("comms_directory_contact_add", {"recipient": rcp, "transport": "whatsapp",
+                                               "identity": f"+{SMOKE_PHONE}"}).get("contact")  # fmt: skip
+    loc = call("comms_location_create", {"name": "Smoke place"}).get("location")
+    member = call("comms_location_member_add", {"location": loc, "recipient": rcp})
+    tg = call("comms_directory_destination_create", {"location": loc, "transport": "telegram",
+                                                     "identity": "-4242", "name": "Smoke TG"})  # fmt: skip
+    wa = call("comms_directory_destination_create", {"location": loc, "transport": "whatsapp",
+                                                     "identity": WA_GROUP, "name": "Smoke WA"})  # fmt: skip
+    listed = {g["group"] for g in call("comms_group_list", {}, write=False).get("items", [])}
+    out["catalog_directory"] = (
+        all(isinstance(x, str) for x in (rcp, rct, loc)) and member.get("replayed") is False
+        and {tg.get("group"), wa.get("group")} <= listed and None not in (tg.get("group"), wa.get("group"))
+    )  # fmt: skip
+
+    cmp = str(d.json("campaign", "create", "--title", "Place")["result"]["campaign"])
+    d.json("campaign", "set-content", "--campaign", cmp, "--content", '{"canonical": "Salaam"}')
+    d.json("campaign", "set-targets", "--campaign", cmp, "--targets",
+           json.dumps({"locations": [loc]}), "--transports", '["whatsapp"]')  # fmt: skip
+    d.json("campaign", "validate", "--campaign", cmp)
+    d.json("campaign", "send", "--campaign", cmp)
+    out["catalog_location_campaign"] = _until(
+        lambda: (jobs := _jobs(d, cmp)) and "PENDING" not in jobs and sum(jobs.values()) == 1,
+        seconds=30,
+    )
+
+    sent = _signed_post(port, _message("wamid.GRP1", "in the group", WA_GROUP))
+    sent_dm = _signed_post(port, _message("wamid.DM1", "a direct word"))
+
+    def group_texts() -> list[str]:
+        page = call("comms_context_recent", {"group": wa.get("group"), "limit": 5}, write=False)
+        return [i.get("untrusted_text") for i in page.get("items", [])
+                if i.get("source") == "whatsapp_webhook_archive"]  # fmt: skip
+
+    out["catalog_whatsapp_group_context"] = sent == 200 and _until(
+        lambda: group_texts() == ["in the group"]
+    )
+
+    def person_dm() -> list[str]:
+        got = call("comms_context_person", {"recipient": rcp, "transports": ["whatsapp"]},
+                   write=False)  # fmt: skip
+        sections = {s["section"]: s for s in got.get("sections", [])}
+        return [i.get("untrusted_text") for i in sections.get("whatsapp", {}).get("items", [])]
+
+    out["catalog_context_person"] = sent_dm == 200 and _until(
+        lambda: person_dm() == ["a direct word"]
+    )
     return out
 
 

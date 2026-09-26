@@ -692,3 +692,11 @@
 - **Files changed:** `src/comms/services/uploads.py` (new), `src/comms/services/{media,mutations,groups}.py`, `src/comms/core/refs.py`, `src/comms/runtime/facades.py`, `src/comms/transports/telegram/{chat_specs,bot/http,bot/admin,bot/admin_chat,user/admin,user/admin_chat,telegram/telethon_adapter}.py`, `src/comms/transports/whatsapp/cloud/{http,groups,media}.py`, `src/comms/mcp/tools/{account,admin,__init__}.py`, `docs/verification/telegram-rpc-review.md`; tests; `tests/mcp/catalog_pin.json`; the matrix, the rulings, the ledger, `AGENT.md`, `CHANGELOG.md`.
 - **Verification:** 15 new tests; the full gate passed (GATE ok=1).
 - **Follow-ups:** G9 (the pin, the guards, D39-A, the exit test and the evidence). The owner decides on Telegram media objects and on Telegram mark-read (the frozen spec prohibits `readHistory`).
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Catalog amendment G9: the pin, the guards, D39-A, the exit gate and the evidence (branch `comms-v0.3-catalog`).
+- **Summary:** The Graph API is pinned at v26.0 (v21.0 expires on 2027-01-21). The real-daemon smoke gains four `catalog_*` checks (the directory, a location campaign, a WhatsApp group webhook read by `grp_`, `comms_context_person`). The exit test re-runs every G-task's tests from the plan's headings with nothing skipped, plus one end-to-end MCP path. The client runbooks no longer wait on the amendment.
+- **Files changed:** `src/comms/transports/whatsapp/cloud/http.py`, `scripts/{smoke_daemon,e2e_smoke}.py`, `tests/security/test_catalog_amendment_exit.py` (new), `tests/security/test_d39_pre_exit.py`, `tests/conformance/meta_oracle.py`, `tests/core/providers/test_actor_matrix.py`, `tests/transports/whatsapp_cloud/test_{account_groups,classify,media,templates}.py`, `docs/verification/{comms-v0.3.md,comms-v0.3-rulings.md,comms-v0.3-actor-matrix.md,comms-v0.3-smoke-map.json}`, `docs/runbooks/clients-*.md`, `CLAUDE.md`, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** the full gate passed (GATE ok=1): 5420 passed, 4 skipped; smoke 103/103 (29 against the daemon); formal 57; ruff, format, mypy, build clean; WhatsVault 450.
+- **Follow-ups:** the owner decides Telegram mark-read, Telegram media objects, and merge/push/tag push; D39-B confirms WhatsApp group create's synchronous response live.

@@ -136,7 +136,7 @@ def test_the_open_work_is_named_by_task():
 
 def test_the_matrix_names_the_pinned_graph_version():
     """The 2026-docs gauntlet: the matrix's WhatsApp sources name the Graph version the code pins,
-    so moving the pin (G9: v21.0 expires on 2027-01-21) cannot leave the evidence behind."""
+    so moving the pin (G9 moved v21.0, which expires on 2027-01-21, to v26.0) cannot leave the evidence behind."""
     from comms.transports.whatsapp.cloud.http import API_VERSION
 
     sources = MATRIX.read_text(encoding="utf-8").split("## Messages", 1)[0]
