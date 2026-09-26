@@ -31,11 +31,14 @@ from comms.runtime.selftest import _OneSecret
 from comms.transports.telegram.bot.context import BotContext
 from comms.transports.telegram.bot.http import BotApi
 from comms.transports.telegram.bot.updates import BotPoller
+from comms.transports.whatsapp.cloud.context import WhatsAppContext
+from comms.transports.whatsapp.cloud.http import GraphApi
 from comms.transports.whatsapp.numbers import wa_group_id
 from comms.transports.whatsapp.webhooks.archive import ArchiveContext, CommsArchive
 from tests.core import fakes
 from tests.core.campaign_helpers import NOW
 from tests.core.providers.test_actor_matrix import CATALOG, _rows
+from tests.runtime.test_whatsapp_groups_live import Meta, Token
 from tests.services.context_fixtures import Clock, Source
 from tests.services.group_fixtures import WA_PHONE, Provider, fixtures, group_world
 from tests.services.test_templates_media_account import ACCOUNT, Media, Templates
@@ -114,7 +117,14 @@ def _world(actor, tmp_path):
         )
         w["grp"] = group_ref(conn, dst, now=NOW)
         CommsArchive(conn, clock=lambda: NOW).ingest(_group_webhook())
-        source: Any = ArchiveContext(conn, clock=lambda: NOW)
+        graph = GraphApi(
+            Token(), version=1, phone_number_id="106540352242922",
+            transport=httpx.MockTransport(Meta().handle),
+        )  # fmt: skip
+        # G8: group facts live from a scripted Groups API, messages from the archive
+        source: Any = WhatsAppContext(
+            ArchiveContext(conn, clock=lambda: NOW), graph, clock=lambda: NOW
+        )
     elif actor == "telegram_bot":
         api = _bot_api()
         BotPoller(api, conn, clock=lambda: NOW).poll_once()

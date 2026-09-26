@@ -120,3 +120,15 @@ def test_the_comms_archive_through_the_engine_is_labelled_and_stripped(wa_world)
     assert item["untrusted_text"] == "salaam" and item["untrusted"]["sender_name"] == "Sara"
     assert item["message_ref"].startswith("cmg_")
     assert "wamid.X1" not in json.dumps(page) and digits not in json.dumps(page)
+
+
+@pytest.mark.parametrize("kind", ["members", "join_requests", "invites"])
+def test_whatsapp_group_facts_are_live_and_only_live(wa_world, kind):
+    """G8: participants, join requests and the link are read live; the archive label is refused
+    for them, as the live label is refused for messages."""
+    engine = _engine(
+        wa_world["conn"], {"whatsapp_cloud": Source(provenance="whatsapp_webhook_archive")}
+    )
+    with pytest.raises(CommsError) as refused:
+        engine.read(wa_world["target"], kind, {})
+    assert refused.value.code == "PROVIDER_UNAVAILABLE"

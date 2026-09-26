@@ -41,6 +41,10 @@ GROUP_CAPABILITIES = (
     C.GROUP_INVITE_RESET,
     C.GROUP_SETTINGS_UPDATE,
     C.GROUP_MESSAGE_SEND,
+    C.MESSAGE_PIN,  # G8: pins, join requests and participants are the Groups API's too
+    C.JOIN_REQUEST_LIST,
+    C.JOIN_REQUEST_APPROVE,
+    C.JOIN_REQUEST_REJECT,
 )
 _PERMISSION_CODES = frozenset({3, 10, 200, 131005})
 _UNKNOWN_PATH_CODES = frozenset({2500})
@@ -198,6 +202,88 @@ def _media_delete(api: GraphApi, _waba: str, args: Mapping[str, Any]) -> Provide
     return admin_call(lambda: api.delete_media(args["media_id"]))
 
 
+# -- catalog amendment G8: group sends, pins and join requests ------------------------------
+
+TEXT_MAX = 4096
+PIN_DAYS = range(1, 31)  # Meta: a pin lasts 1-30 days, and the days are required to pin
+JOIN_PAGE = 100
+
+
+def _send_args(args: Mapping[str, Any]) -> None:
+    text = args.get("text")
+    if set(args) != {"text"} or not (isinstance(text, str) and 1 <= len(text) <= TEXT_MAX):
+        raise ValueError("operation arguments are malformed")
+
+
+def _send(api: GraphApi, group_id: str, args: Mapping[str, Any]) -> ProviderResult:
+    body = {"messaging_product": "whatsapp", "recipient_type": "group", "to": group_id,
+            "type": "text", "text": {"body": args["text"]}}  # fmt: skip
+    return _sent_wamid(admin_call(lambda: api.send_message(body)))
+
+
+def _pin_args(args: Mapping[str, Any]) -> None:
+    days = args.get("expire_days", 30)
+    if (
+        not {"message_id", "pinned"} <= set(args) <= {"message_id", "pinned", "expire_days"}
+        or not (isinstance(args["message_id"], str) and _WAMID.match(args["message_id"]))
+        or type(args["pinned"]) is not bool
+        or type(days) is not int
+        or days not in PIN_DAYS
+    ):
+        raise ValueError("operation arguments are malformed")
+
+
+def _pin(api: GraphApi, group_id: str, args: Mapping[str, Any]) -> ProviderResult:
+    pin: dict[str, Any] = {"type": "pin" if args["pinned"] else "unpin",
+                           "message_id": args["message_id"]}  # fmt: skip
+    if args["pinned"]:
+        pin["expiration_days"] = args.get("expire_days", 30)
+    body = {"messaging_product": "whatsapp", "recipient_type": "group", "to": group_id,
+            "type": "pin", "pin": pin}  # fmt: skip
+    result = admin_call(lambda: api.send_message(body))
+    return ProviderResult(result.outcome, result.code)  # the pin's own wamid names nothing
+
+
+def _sent_wamid(result: ProviderResult) -> ProviderResult:
+    if result.outcome != "SUCCEEDED":
+        return result
+    messages = result.detail.get("messages")
+    first = messages[0] if isinstance(messages, list) and messages else None
+    wamid = first.get("id") if isinstance(first, dict) else None
+    if not isinstance(wamid, str) or not _WAMID.match(wamid):
+        return ProviderResult("OUTCOME_UNKNOWN", None)
+    return ProviderResult("SUCCEEDED", None, provider_ref=wamid)
+
+
+def _join_args(args: Mapping[str, Any]) -> None:
+    _remove_args(args)  # the requester by wa_id, as a removal names its participant
+
+
+def _join(approve: bool) -> Call:
+    def call(api: GraphApi, group_id: str, args: Mapping[str, Any]) -> ProviderResult:
+        """The member's pending request, found by ``wa_id`` (Meta answers requests by their
+        own id), then approved or rejected: one read, one write."""
+        listed = api.join_requests(group_id, limit=JOIN_PAGE, after=None)
+        rows = (listed.envelope or {}).get("data") if listed.http_status == 200 else None
+        if not isinstance(rows, list):
+            return ProviderResult("FAILED", "PROVIDER_UNAVAILABLE")  # nothing was sent
+        request_id = next(
+            (r.get("join_request_id") for r in rows
+             if isinstance(r, dict) and r.get("wa_id") == args["wa_id"]),
+            None,
+        )  # fmt: skip
+        if not isinstance(request_id, str):
+            return ProviderResult("FAILED", "TARGET_NOT_FOUND")
+        result = admin_call(lambda: api.answer_join_requests(group_id, [request_id],
+                                                             approve=approve))  # fmt: skip
+        done = result.detail.get("approved_join_requests" if approve else "rejected_join_requests")
+        if result.outcome == "SUCCEEDED" and not (isinstance(done, list) and request_id in done):
+            return ProviderResult("FAILED", "PROVIDER_UNAVAILABLE")  # Meta listed it as failed
+        return result
+
+    return call
+
+
 Check = Callable[[Mapping[str, Any]], None]
 Call = Callable[[GraphApi, str, Mapping[str, Any]], ProviderResult]
 Where = Callable[[ProviderTarget], str]
@@ -211,6 +297,10 @@ _OPERATIONS: Mapping[C, tuple[Check, Call, Where]] = {
     C.TEMPLATE_EDIT: (_template_edit_args, _template_edit, account_of),
     C.TEMPLATE_DELETE: (_template_delete_args, _template_delete, account_of),
     C.MEDIA_DELETE: (_media_delete_args, _media_delete, account_of),
+    C.GROUP_MESSAGE_SEND: (_send_args, _send, group_id_of),  # G8
+    C.MESSAGE_PIN: (_pin_args, _pin, group_id_of),
+    C.JOIN_REQUEST_APPROVE: (_join_args, _join(True), group_id_of),
+    C.JOIN_REQUEST_REJECT: (_join_args, _join(False), group_id_of),
 }
 
 

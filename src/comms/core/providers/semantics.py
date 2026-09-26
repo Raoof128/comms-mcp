@@ -112,6 +112,11 @@ SUPPORT: Mapping[C, tuple[str, ...]] = MappingProxyType(
         # G6: every actor resets a group's primary invite link (Telegram: a new primary link
         # revokes the old; WhatsApp: the one link is reset)
         C.GROUP_INVITE_RESET: (*_TELEGRAM, CLOUD),
+        # G8: the Groups API pins messages and lists, approves and rejects join requests
+        C.MESSAGE_PIN: (*_TELEGRAM, CLOUD),
+        C.JOIN_REQUEST_LIST: (USER, CLOUD),
+        C.JOIN_REQUEST_APPROVE: (*_TELEGRAM, CLOUD),
+        C.JOIN_REQUEST_REJECT: (*_TELEGRAM, CLOUD),
     }
 )
 

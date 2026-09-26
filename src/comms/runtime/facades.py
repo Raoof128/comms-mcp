@@ -17,7 +17,12 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from comms.core.campaigns.directory import DirectoryError, contact_targets, member_identity
+from comms.core.campaigns.directory import (
+    DirectoryError,
+    contact_targets,
+    has_recipient,
+    member_identity,
+)
 from comms.core.canonical import jcs_dumps
 from comms.core.errors import CommsError
 from comms.core.groups import GroupError, enabled_groups, group_identity
@@ -166,6 +171,21 @@ class _Facades:
         else:
             raise CommsError("STALE_HANDLE")
         return self.tokened(client, page, kind, group, actor, args)
+
+    def whatsapp_invite(
+        self, a: dict[str, Any], targets: Mapping[str, ProviderTarget]
+    ) -> dict[str, Any]:
+        """G8: a WhatsApp group has one invite link; inviting someone is sharing it, a read."""
+        if not has_recipient(self.s.conn, a["recipient"]):
+            raise CommsError("NOT_FOUND")
+        page, actor = self.reads.listed("invites", a["group"], targets)
+        invite = page["items"][0]["invite"] if page["items"] else None
+        return {
+            "group": a["group"], "recipient": a["recipient"], "operation": "invite",
+            "result": "SUCCEEDED" if invite else "FAILED",
+            "code": None if invite else "PROVIDER_UNAVAILABLE",
+            "actor": actor, "op_ref": None, "replayed": False, "invite": invite,
+        }  # fmt: skip
 
     # -- forward (catalog amendment G7) -------------------------------------------------
 
@@ -376,6 +396,9 @@ class _Facades:
             args = {
                 k: v for k, v in a.items() if k not in ("group", "recipient", "actor", "request_id")
             }
+            targets = self.targets(a["group"])
+            if tool == "group.member.invite" and _WHATSAPP in targets:
+                return self.whatsapp_invite(a, targets)
             return self.s.groups.member(
                 _ctx(client), tool, a["group"], self.targets(a["group"]), a["recipient"], args,
                 a["request_id"], actor=a.get("actor"),
@@ -413,7 +436,7 @@ class _Facades:
         def call(client: AuthenticatedClient, a: dict[str, Any]) -> dict[str, Any]:
             return self.s.messages.pin(_ctx(client), a["group"], self.targets(a["group"]),
                                        a["message"], a["request_id"], pinned=pinned,
-                                       actor=a.get("actor"))  # fmt: skip
+                                       actor=a.get("actor"), expire_days=a.get("expire_days"))  # fmt: skip
 
         return call
 

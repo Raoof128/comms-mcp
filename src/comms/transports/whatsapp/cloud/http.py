@@ -146,6 +146,39 @@ class GraphApi:
             f"/{API_VERSION}/{self._group(group_id)}", {"messaging_product": "whatsapp", **body}
         )
 
+    # -- catalog amendment G8: the rest of the Groups API, the profile and health ---------------
+
+    def group_info(self, group_id: str) -> GraphResponse:
+        """``GET /{group-id}?fields=participants,total_participant_count,subject``."""
+        params = {"fields": "participants,total_participant_count,subject"}
+        return self._call("GET", f"/{API_VERSION}/{self._group(group_id)}", params=params)
+
+    def group_invite(self, group_id: str) -> GraphResponse:
+        return self._call("GET", f"/{API_VERSION}/{self._group(group_id)}/invite_link")
+
+    def join_requests(self, group_id: str, *, limit: int, after: str | None) -> GraphResponse:
+        params = {"limit": str(limit), **({"after": after} if after else {})}
+        path = f"/{API_VERSION}/{self._group(group_id)}/join_requests"
+        return self._call("GET", path, params=params)
+
+    def answer_join_requests(
+        self, group_id: str, request_ids: list[str], *, approve: bool
+    ) -> GraphResponse:
+        """``POST`` (approve) or ``DELETE`` (reject) ``/{group-id}/join_requests``."""
+        body = {"messaging_product": "whatsapp", "join_requests": request_ids}
+        path = f"/{API_VERSION}/{self._group(group_id)}/join_requests"
+        return self._call("POST" if approve else "DELETE", path, body=body)
+
+    def business_profile(self) -> GraphResponse:
+        params = {"fields": "about,address,description,email,websites,vertical"}
+        path = f"/{API_VERSION}/{self._phone}/whatsapp_business_profile"
+        return self._call("GET", path, params=params)
+
+    def health_status(self) -> GraphResponse:
+        return self._call(
+            "GET", f"/{API_VERSION}/{self._phone}", params={"fields": "health_status"}
+        )
+
     @staticmethod
     def _group(group_id: str) -> str:
         if not isinstance(group_id, str) or not WA_GROUP_ID.match(group_id):

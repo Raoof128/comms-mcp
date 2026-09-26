@@ -660,3 +660,11 @@
 - **Files changed:** `src/comms/core/providers/capability.py`, `src/comms/core/providers/semantics.py`, `src/comms/transports/telegram/chat_specs.py`, `src/comms/transports/telegram/bot/{admin_members,capability,http}.py`, `src/comms/transports/telegram/user/{admin_members,capability}.py`, `src/comms/transports/telegram/telegram/telethon_adapter.py`, `src/comms/services/groups.py`, `src/comms/runtime/facades.py`, `src/comms/mcp/tools/{groups,__init__}.py`, `.claude/settings.json`, `docs/verification/telegram-rpc-review.md`; tests; `tests/mcp/catalog_pin.json`; the matrix, the rulings, the ledger, `AGENT.md`, `CHANGELOG.md`.
 - **Verification:** 16 new tests; the full gate passed (GATE ok=1).
 - **Follow-ups:** G8: WhatsApp group writes, account and media, and A46's health status.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Catalog amendment G8, part a: WhatsApp group writes and live group reads (branch `comms-v0.3-catalog`).
+- **Summary:** Group send and pin; join requests listed, approved and rejected; participants and the invite link. Group facts are read live under `whatsapp_live`, which is never allowed for messages. People appear as `rcp_` refs; no number or id leaves.
+- **Files changed:** `src/comms/transports/whatsapp/cloud/{http,groups,context}.py` (`context.py` is new), `src/comms/runtime/adapters.py`, `src/comms/runtime/facades.py`, `src/comms/services/{context,messages,groups}.py`, `src/comms/core/providers/semantics.py`, `src/comms/mcp/tools/{context,admin,messages}.py`; tests; `tests/mcp/catalog_pin.json`; the matrix, the rulings, the ledger, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 11 new tests; the Meta oracle covers every Graph call; the full gate passed (GATE ok=1).
+- **Follow-ups:** G8 parts b to d: WhatsApp group create and delete, account and health, and media.

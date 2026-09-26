@@ -37,6 +37,7 @@ from comms.transports.telegram.user.context import UserContext
 from comms.transports.telegram.user.delivery import UserDelivery
 from comms.transports.telegram.user.updates import UserUpdateConsumer
 from comms.transports.whatsapp.cloud.account import WhatsAppCapability
+from comms.transports.whatsapp.cloud.context import WhatsAppContext
 from comms.transports.whatsapp.cloud.delivery import WhatsAppDelivery
 from comms.transports.whatsapp.cloud.groups import GroupDiscovery, WhatsAppAdmin
 from comms.transports.whatsapp.cloud.http import GraphApi
@@ -75,6 +76,7 @@ class Adapters:
     catalog: TemplateCatalog = field(default_factory=TemplateCatalog)
     # G2 prerequisite: the WhatsApp account's template and media sources, and the WABA target
     # the account tools act on (templates need the business-account id; media only the number)
+    graph: GraphApi | None = None  # G8: the Groups API's live reads
     templates: TemplateOps | None = None
     media: MediaOps | None = None
     account: ProviderTarget | None = None
@@ -133,6 +135,10 @@ def build_adapters(
         adapters.delivery["telegram"] = chosen
     _whatsapp(adapters, conn, secrets, settings, clock)
     _webhooks(adapters, conn, secrets, clock, monotonic, archive)
+    if adapters.graph is not None:  # G8: group reads live, messages from the archive (if any)
+        adapters.context["whatsapp_cloud"] = WhatsAppContext(
+            adapters.context.get("whatsapp_cloud"), adapters.graph, clock=clock
+        )
     return adapters
 
 
@@ -187,6 +193,7 @@ def _whatsapp(
     adapters.admin["whatsapp_cloud"] = WhatsAppAdmin(api, discovery)
     adapters.delivery["whatsapp"] = WhatsAppDelivery(api, catalog=adapters.catalog)
     adapters.media = MediaOps(api)
+    adapters.graph = api
     if settings.meta_waba_id is not None:
         adapters.templates = TemplateOps(api)
         adapters.account = ProviderTarget(

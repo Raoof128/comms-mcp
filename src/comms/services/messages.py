@@ -33,12 +33,12 @@ _MESSAGE = ("message", "message_id")
 _TEXT_MAX = 4096
 # tool → the capability that performs it on each transport (P §23).
 _OPERATIONS: Mapping[str, Mapping[str, C]] = {
-    "message.send": {"telegram": C.MESSAGE_SEND},
+    "message.send": {"telegram": C.MESSAGE_SEND, "whatsapp": C.GROUP_MESSAGE_SEND},  # G8
     "message.reply": {"telegram": C.MESSAGE_SEND},
     "message.edit": {"telegram": C.MESSAGE_EDIT},
     "message.delete": {"telegram": C.MESSAGE_DELETE},
-    "message.pin": {"telegram": C.MESSAGE_PIN},
-    "message.unpin": {"telegram": C.MESSAGE_PIN},
+    "message.pin": {"telegram": C.MESSAGE_PIN, "whatsapp": C.MESSAGE_PIN},  # G8
+    "message.unpin": {"telegram": C.MESSAGE_PIN, "whatsapp": C.MESSAGE_PIN},
     "message.mark_read": {"whatsapp": C.MESSAGE_MARK_READ},
     "message.forward": {"telegram": C.MESSAGE_FORWARD},  # G7
 }
@@ -133,10 +133,17 @@ class MessageService:
         *,
         pinned: bool = True,
         actor: str | None = None,
+        expire_days: int | None = None,
     ) -> dict[str, Any]:
+        """A pin; ``expire_days`` (1-30) is WhatsApp's, which requires days to pin (G8)."""
         tool = "message.pin" if pinned else "message.unpin"
+        args: dict[str, Any] = {"pinned": pinned}
+        if expire_days is not None:
+            if transport_of(targets) != "whatsapp" or not pinned:
+                raise CommsError("INVALID_ARGUMENT")
+            args["expire_days"] = expire_days
         chosen, outcome = self._run(
-            ctx, tool, targets, {"pinned": pinned}, request_id, actor, {_MESSAGE: message}
+            ctx, tool, targets, args, request_id, actor, {_MESSAGE: message}
         )
         return self._head(group, tool, chosen, outcome)
 

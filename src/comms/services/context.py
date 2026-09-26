@@ -17,7 +17,7 @@ from types import MappingProxyType
 from typing import Any
 
 from comms.core import timeutil
-from comms.core.campaigns.directory import destination_id
+from comms.core.campaigns.directory import destination_id, recipient_of_identity
 from comms.core.campaigns.history import identity_history
 from comms.core.errors import CommsError
 from comms.core.objects import message_identity, object_ref
@@ -41,13 +41,15 @@ INCLUDES = frozenset(
 )
 _SERVED = frozenset({"messages", "members", "admins"})  # the rest arrive with D15
 # P §20–21: what each transport's sources may call themselves. WhatsApp has no provider
-# history (the Cloud API is not a chat-search database), so it is only ever the archive.
+# history (the Cloud API is not a chat-search database), so its messages are only ever the archive.
 _PROVENANCE = MappingProxyType(
     {
         "telegram": frozenset({"telegram_live", "telegram_local"}),
         "whatsapp": frozenset({"whatsapp_webhook_archive"}),
     }
 )
+# G8: WhatsApp group facts (never its messages) are read live from the Groups API.
+_WHATSAPP_LIVE_KINDS = frozenset({"members", "member", "join_requests", "invites"})
 _IDENTITIES = frozenset({"message_id", "sender_id", "from_id", "chat_id", "update_id", "user_id"})
 _MAX_PAGE = 100
 
@@ -348,6 +350,8 @@ class ContextEngine:
         except ValueError:
             raise CommsError("INVALID_ARGUMENT") from None
         allowed = _PROVENANCE.get(target.transport, frozenset())
+        if target.transport == "whatsapp" and kind in _WHATSAPP_LIVE_KINDS:
+            allowed = frozenset({"whatsapp_live"})
         if page.provenance not in allowed or any(
             item.get("source") != page.provenance for item in page.items
         ):
@@ -360,6 +364,10 @@ class ContextEngine:
         out["untrusted_text"] = untrusted.pop("text", None)
         out["untrusted"] = untrusted
         out["group_ref"] = group
+        if item.get("user_id") is not None:  # G8: a person by ref, when in the directory
+            out["recipient"] = recipient_of_identity(
+                self._conn, target.transport, str(item["user_id"])
+            )
         if item.get("message_id") is not None:
             out["message_ref"] = object_ref(
                 self._conn,

@@ -33,7 +33,13 @@ __all__ = [
     "SEARCH_RESULT",
 ]
 
-PROVENANCE = ("telegram_live", "telegram_local", "whatsapp_webhook_archive", "campaign_store")
+PROVENANCE = (
+    "telegram_live",
+    "telegram_local",
+    "whatsapp_webhook_archive",
+    "whatsapp_live",  # G8: the Groups API's live group facts
+    "campaign_store",
+)
 INCLUDES = (
     "messages",
     "members",

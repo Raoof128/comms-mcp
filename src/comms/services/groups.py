@@ -50,8 +50,14 @@ MEMBERSHIP: Mapping[str, Mapping[str, C]] = MappingProxyType(
         "group.admin.promote": {"telegram": C.ADMIN_PROMOTE},
         "group.admin.demote": {"telegram": C.ADMIN_DEMOTE},
         "group.admin.update_rights": {"telegram": C.ADMIN_PROMOTE},
-        "group.join_requests.approve": {"telegram": C.JOIN_REQUEST_APPROVE},
-        "group.join_requests.reject": {"telegram": C.JOIN_REQUEST_REJECT},
+        "group.join_requests.approve": {
+            "telegram": C.JOIN_REQUEST_APPROVE,
+            "whatsapp": C.JOIN_REQUEST_APPROVE,
+        },
+        "group.join_requests.reject": {
+            "telegram": C.JOIN_REQUEST_REJECT,
+            "whatsapp": C.JOIN_REQUEST_REJECT,
+        },
     }
 )
 # tool → capability per transport (P §26–29). Hiding a topic has no capability id (C11).

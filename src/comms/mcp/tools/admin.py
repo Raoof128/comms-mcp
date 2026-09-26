@@ -118,7 +118,7 @@ def _listed(item: Mapping[str, Any]) -> dict[str, Any]:
 # G6: a pending join request, its requester by ref (null when not in the directory)
 _JOIN_REQUEST = obj(
     {
-        "source": enum(("telegram_live", "telegram_local")),
+        "source": enum(("telegram_live", "telegram_local", "whatsapp_live")),
         "recipient": nullable(ref("recipient")),
         "requested_at": nullable(string(1, 64)),
         "untrusted": obj({"name": nullable(string(0, 256))}, []),
@@ -134,7 +134,7 @@ _INVITE_ITEM = obj(
         "invite": ref("invite"),
         "primary": BOOL,
         "revoked": BOOL,
-        "usage": integer(0),
+        "usage": nullable(integer(0)),  # WhatsApp reports no usage
         "usage_limit": nullable(integer(0)),
         "expires_at": nullable(string(1, 64)),
         "request_needed": BOOL,

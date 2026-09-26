@@ -95,6 +95,11 @@ def test_the_group_capabilities_are_p16s():
         C.GROUP_INVITE_RESET,
         C.GROUP_SETTINGS_UPDATE,
         C.GROUP_MESSAGE_SEND,
+        # G8: the Groups API's pins and join requests are gated by the same discovery
+        C.MESSAGE_PIN,
+        C.JOIN_REQUEST_LIST,
+        C.JOIN_REQUEST_APPROVE,
+        C.JOIN_REQUEST_REJECT,
     }
 
 
