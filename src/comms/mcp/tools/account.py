@@ -213,14 +213,28 @@ ACCOUNT_TOOLS: tuple[ToolSpec, ...] = (
     _status(
         "account_profile",
         "Account profile",
-        "The accounts in use, by actor and kind — never a phone number or user id.",
+        "The accounts in use, by actor and kind, with what each calls itself (the bot's and the "
+        "user's name, the WhatsApp business profile), untrusted — never a phone number, user id "
+        "or username.",
         "account.profile",
         obj(
             {
                 "actors": {
                     "type": "object",
                     "additionalProperties": obj(
-                        {"configured": BOOL, "kind": string(1, 32)}, ["configured", "kind"]
+                        {
+                            "configured": BOOL,
+                            "kind": string(1, 32),
+                            "reachable": nullable(BOOL),
+                            "untrusted": obj(
+                                {
+                                    k: nullable(string(0, 512))
+                                    for k in ("name", "about", "description", "vertical")
+                                },
+                                [],
+                            ),
+                        },
+                        ["configured", "kind", "reachable", "untrusted"],
                     ),
                 }
             },

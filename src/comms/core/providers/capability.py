@@ -46,6 +46,7 @@ class Capability(StrEnum):
     MEMBER_TAG = "member.tag"  # A46: a regular member's tag
     REACTION_REMOVE = "reaction.remove"  # A46: one member's reaction on one message
     REACTION_CLEAR = "reaction.clear"  # A46: a member's recent reactions in the group
+    PHONE_NUMBER_HEALTH = "phone_number.health"  # A46: messaging health (WhatsApp)
     ADMIN_LIST = "admin.list"
     ADMIN_PROMOTE = "admin.promote"
     ADMIN_DEMOTE = "admin.demote"

@@ -1571,6 +1571,21 @@ class TelethonSession:
         )
         return int(users[0].id)
 
+    async def own_name(self, deadline: Deadline) -> str | None:
+        """The account's own display name (G8: ``comms_account_profile``); never its id."""
+        users = await self._call_reviewed(
+            functions.users.GetUsersRequest([types.InputUserSelf()]),
+            operation="admin.status",
+            client_ref="operator",
+            deadline=deadline,
+            budget=WorkBudget(max_rpcs=1),
+        )
+        user = users[0] if users else None
+        name = " ".join(
+            filter(None, (getattr(user, "first_name", None), getattr(user, "last_name", None)))
+        )
+        return name or None
+
     async def admin_log_out(self, deadline: Deadline) -> None:
         """Exactly one ``auth.LogOutRequest`` (comms v0.3 B14); only ``admin_rpc`` calls this."""
         await self._call_reviewed(

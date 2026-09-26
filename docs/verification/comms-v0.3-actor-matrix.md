@@ -108,23 +108,16 @@ MTProto rows cover both a basic group (`messages.*`) and a supergroup or channel
 
 | Tool | telegram_bot | telegram_user | whatsapp_cloud |
 |---|---|---|---|
-| `comms_account_profile` | A todo:G8 [account.inspect]: `getMe` | A todo:G8 [account.inspect]: `users.getFullUser(self)` | A todo:G8 [account.inspect]: `GET /{phone}/whatsapp_business_profile` |
+| `comms_account_profile` | A done: `getMe` → the bot's name, untrusted; the username is a handle and is dropped (G8) | A done: `users.getUsers(self)` (reviewed on the admin.status operation) → the account's name, untrusted; never its id (G8) | A done [account.inspect]: `GET /{phone}/whatsapp_business_profile` → `about`, `description`, `vertical`, untrusted (G8) |
 | `comms_account_status` / `comms_account_capabilities` / `comms_telegram_*_status` / `comms_whatsapp_account_status` | A done: capability snapshot (`getMe`, rights) | A done: session readiness, `users.getUsers(self)` | A done [account.inspect]: `GET /{waba}` |
-| `comms_whatsapp_phone_status` | — : a WhatsApp account tool | — : a WhatsApp account tool | A todo:G8 [phone_number.inspect]: `GET /{phone}?fields=` (`quality_rating`, `status`, `name_status`, `code_verification_status`) |
+| `comms_whatsapp_phone_status` | — : a WhatsApp account tool | — : a WhatsApp account tool | A done [phone_number.inspect]: `GET /{phone}?fields=` (`quality_rating`, `status`; G8) |
+| `comms_whatsapp_health_status` | — : a WhatsApp account tool | — : a WhatsApp account tool | A done [phone_number.health]: `GET /{phone}?fields=health_status`, entity ids dropped, Meta's notes untrusted (A46; G8) |
 | `comms_media_upload` | B [media.upload]: the Bot API has no standalone upload (files upload only inside a send) | A todo:G8 [media.upload]: `upload.saveFilePart` → `messages.uploadMedia` | A todo:G8 [media.upload]: `POST /{phone}/media` (multipart; Meta allows up to 100 MB documents, but the `upl_` stage caps at 16 MiB) |
 | `comms_media_download` | A todo:G8 [media.retrieve]: `getFile` + file download | A todo:G8 [media.retrieve]: `upload.getFile` | A todo:G8 [media.retrieve]: `GET /{media_id}` → bounded Meta-URL download |
 | `comms_media_inspect` / `comms_media_delete` | — : WhatsApp media by `med_` id (Telegram files are message attachments, G8) | — : WhatsApp media by `med_` id (Telegram files are message attachments, G8) | A done [media.delete]: `GET` / `DELETE /{media_id}` |
 | `comms_whatsapp_template_*` | — : a WhatsApp account tool | — : a WhatsApp account tool | A done [template.list]/[template.get]/[template.create]/[template.edit]/[template.delete]: `/{waba}/message_templates` |
 | `comms_whatsapp_webhook_status` | — : a local report on the WhatsApp webhook inbox | — : a local report on the WhatsApp webhook inbox | A done: the local inbox counts |
 | `comms_capability_get` / `comms_capability_for_group` / `comms_capability_for_actor` / `comms_capability_refresh` / `comms_group_capabilities` | A done: capability service | A done: capability service | A done: capability service |
-
-## Added by A46, not yet in the catalog
-
-These tools become rows when their task adds them to the catalog. The row test requires every cited tool to exist, and G9 requires this section to be empty.
-
-- `comms_whatsapp_health_status`:
-  - both Telegram actors: `—`, because it is a WhatsApp account tool;
-  - WhatsApp: A todo:G8 [phone_number.health] `GET /{phone}?fields=health_status`.
 
 ## Local tools (no provider actor)
 
@@ -140,7 +133,7 @@ Every cell was re-checked against the live docs. None flipped between A and B. W
   - G6: `getChatAdministrators` needs `return_bots=True` to list other bot admins.
   - G8: WhatsApp pin needs `expiration_days`; groups cap at 8 participants.
   - G9: the Graph API pin (v21.0) expires on 21 January 2027 and must move to a current version before release.
-- **New admin surface beyond A45's catalog.** The owner added it to the catalog as A46 on 2026-09-26; see "Added by A46" above.
+- **New admin surface beyond A45's catalog.** The owner added it to the catalog as A46 on 2026-09-26; its four tools are rows above.
   - member tags: Bot API `setChatMemberTag` with the `can_manage_tags` right (9.5); MTProto `messages.editChatParticipantRank`;
   - reaction moderation: Bot API `deleteMessageReaction` / `deleteAllMessageReactions` (10.0); MTProto `messages.deleteParticipantReaction(s)`;
   - WhatsApp `health_status`: a messaging-health summary for the phone number, WABA and business.

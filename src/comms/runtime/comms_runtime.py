@@ -170,7 +170,13 @@ def build_comms_runtime(
         media=None
         if adapters.media is None
         else MediaService(conn, capability, executor, adapters.media),
-        account=AccountService(capability, webhooks=_InboxCounts(conn, adapters)),
+        account=AccountService(
+            capability,
+            webhooks=_InboxCounts(conn, adapters),
+            profiles=adapters.profiles,
+            phone=adapters.phone,
+            health=adapters.health,
+        ),
         identity=IdentityService(conn),
         actors=tuple(a for a in _ACTORS if a in adapters.admin or a in adapters.context),
         account_target=adapters.account,

@@ -137,8 +137,12 @@ def _world(actor, tmp_path):
         admin={actor: admins[actor]},  # only this actor is configured
         context={actor: source},
     )
+    adapters.profiles[actor] = lambda: {"reachable": True, "untrusted": {"name": "N"}}  # G8
     if actor == "whatsapp_cloud":  # the account tools run through the real services too
         adapters.templates, adapters.media, adapters.account = Templates(), Media(), ACCOUNT
+        adapters.phone = lambda: {"quality_rating": "GREEN", "status": "CONNECTED"}
+        adapters.health = lambda: {"can_send_message": "AVAILABLE", "entities": [],
+                                   "untrusted": {"notes": []}}  # fmt: skip
     # the one composition root the daemon uses (G2 found hand-built services hid its gaps)
     built = build_comms_runtime(
         conn, w["writer"], w["store"], adapters, clock=lambda: NOW, monotonic=Clock(),

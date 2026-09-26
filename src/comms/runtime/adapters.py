@@ -25,6 +25,7 @@ from comms.core.credentials import (
 from comms.core.delivery.transport import DeliveryTransport
 from comms.core.keys.secrets import SecretStore
 from comms.core.providers.protocols import ProviderTarget
+from comms.transports.profiles import bot_profile, user_profile, whatsapp_profile
 from comms.transports.telegram.bot.admin import BotAdmin
 from comms.transports.telegram.bot.capability import BotCapability
 from comms.transports.telegram.bot.context import BotContext
@@ -36,7 +37,7 @@ from comms.transports.telegram.user.capability import UserCapability
 from comms.transports.telegram.user.context import UserContext
 from comms.transports.telegram.user.delivery import UserDelivery
 from comms.transports.telegram.user.updates import UserUpdateConsumer
-from comms.transports.whatsapp.cloud.account import WhatsAppCapability
+from comms.transports.whatsapp.cloud.account import WhatsAppCapability, health_of
 from comms.transports.whatsapp.cloud.context import WhatsAppContext
 from comms.transports.whatsapp.cloud.delivery import WhatsAppDelivery
 from comms.transports.whatsapp.cloud.groups import GroupDiscovery, WhatsAppAdmin
@@ -77,6 +78,9 @@ class Adapters:
     # G2 prerequisite: the WhatsApp account's template and media sources, and the WABA target
     # the account tools act on (templates need the business-account id; media only the number)
     graph: GraphApi | None = None  # G8: the Groups API's live reads
+    profiles: dict[str, Any] = field(default_factory=dict)  # G8: each account's own profile
+    phone: Any = None  # G8: the WhatsApp number's quality and status
+    health: Any = None  # A46: the WhatsApp number's messaging health
     templates: TemplateOps | None = None
     media: MediaOps | None = None
     account: ProviderTarget | None = None
@@ -154,6 +158,7 @@ def _telegram_bot(
     adapters.admin["telegram_bot"] = BotAdmin(api)
     adapters.context["telegram_bot"] = BotContext(api, conn, clock=clock)
     adapters.poller = BotPoller(api, conn, clock=clock)
+    adapters.profiles["telegram_bot"] = bot_profile(api)
     return BotDelivery(api)
 
 
@@ -166,6 +171,7 @@ def _telegram_user(
     session.claim_updates(UPDATE_OWNER)  # A24: the one consumer of the one session's stream
     adapters.capability["telegram_user"] = UserCapability(session, run=run, clock=clock)
     adapters.admin["telegram_user"] = UserAdmin(session, run=run, clock=clock)
+    adapters.profiles["telegram_user"] = user_profile(session, run)
     adapters.context["telegram_user"] = UserContext(session, run=run, clock=clock)
     adapters.updates = UserUpdateConsumer(conn, clock=clock)
     return UserDelivery(session, run=run)
@@ -189,11 +195,14 @@ def _whatsapp(
         waba_id=settings.meta_waba_id,
     )
     discovery = GroupDiscovery(api)
-    adapters.capability["whatsapp_cloud"] = WhatsAppCapability(api, discovery, clock=clock)
+    capability = WhatsAppCapability(api, discovery, clock=clock)
+    adapters.capability["whatsapp_cloud"] = capability
+    adapters.phone, adapters.health = capability.inspect_phone, health_of(api)
     adapters.admin["whatsapp_cloud"] = WhatsAppAdmin(api, discovery)
     adapters.delivery["whatsapp"] = WhatsAppDelivery(api, catalog=adapters.catalog)
     adapters.media = MediaOps(api)
     adapters.graph = api
+    adapters.profiles["whatsapp_cloud"] = whatsapp_profile(api)
     if settings.meta_waba_id is not None:
         adapters.templates = TemplateOps(api)
         adapters.account = ProviderTarget(

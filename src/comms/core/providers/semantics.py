@@ -61,6 +61,7 @@ READS = frozenset(
         C.WEBHOOK_RECEIVE_STATUS,
         C.ACCOUNT_INSPECT,
         C.PHONE_NUMBER_INSPECT,
+        C.PHONE_NUMBER_HEALTH,  # A46
         C.GROUP_LIST,
         C.GROUP_GET,
         C.GROUP_MEMBERS,

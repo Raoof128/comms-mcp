@@ -9,6 +9,7 @@ advisory; Meta's answer to a send is final (A25).
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable, Mapping
 from datetime import datetime
 from typing import Any
@@ -94,3 +95,37 @@ class WhatsAppCapability:
             else:
                 states[cap] = S.AVAILABLE
         return CapabilitySnapshot(ACTOR, destination.destination_ref, states, stamp)
+
+
+_HEALTH = frozenset({"AVAILABLE", "LIMITED", "BLOCKED"})
+
+
+def health_of(api: GraphApi) -> Callable[[], Mapping[str, Any] | None]:
+    """A46: ``GET /{phone}?fields=health_status``: the overall and each entity's
+    ``can_send_message``; every entity id is dropped (an id is an identity, A26); Meta's
+    explanations are untrusted text, bounded. None when it cannot be read."""
+
+    def read() -> Mapping[str, Any] | None:
+        try:
+            response = api.health_status()
+        except GraphTransportError:
+            return None
+        health = (
+            (response.envelope or {}).get("health_status") if response.http_status == 200 else None
+        )
+        if not isinstance(health, dict) or health.get("can_send_message") not in _HEALTH:
+            return None
+        entities, notes = [], []
+        for entity in health.get("entities") or ():
+            if not isinstance(entity, dict) or entity.get("can_send_message") not in _HEALTH:
+                continue
+            entities.append({"entity_type": str(entity.get("entity_type"))[:32],
+                             "can_send_message": entity["can_send_message"]})  # fmt: skip
+            for key in ("additional_info", "errors"):
+                for note in entity.get(key) or ():
+                    text = note if isinstance(note, str) else json.dumps(note, sort_keys=True)
+                    notes.append(text[:512])
+        return {"can_send_message": health["can_send_message"], "entities": entities[:16],
+                "untrusted": {"notes": notes[:16]}}  # fmt: skip
+
+    return read

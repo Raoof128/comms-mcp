@@ -18,6 +18,7 @@ from comms.mcp.schemas import (
     BOOL,
     READ_FAILURES,
     array,
+    enum,
     integer,
     nullable,
     obj,
@@ -234,6 +235,35 @@ A46_TOOLS: tuple[ToolSpec, ...] = (
         ["group", "message", "recipient"],
         _MEMBER,
         capability=C.REACTION_REMOVE,
+    ),
+    read(
+        "comms_whatsapp_health_status",
+        "WhatsApp messaging health",
+        "Whether the business number can send messages now: AVAILABLE, LIMITED or BLOCKED, "
+        "overall and for each entity involved (the number, the business account, the "
+        "business, the app), with Meta's notes untrusted — never an id.",
+        "whatsapp.health_status",
+        {},
+        [],
+        obj(
+            {
+                "can_send_message": enum(("AVAILABLE", "LIMITED", "BLOCKED")),
+                "entities": array(
+                    obj(
+                        {
+                            "entity_type": string(1, 32),
+                            "can_send_message": enum(("AVAILABLE", "LIMITED", "BLOCKED")),
+                        },
+                        ["entity_type", "can_send_message"],
+                    ),
+                    high=16,
+                ),
+                "untrusted": obj({"notes": array(string(0, 512), high=16)}, ["notes"]),
+            },
+            ["can_send_message", "entities", "untrusted"],
+        ),
+        failures=(*READ_FAILURES, "NOT_CONFIGURED", "PROVIDER_UNAVAILABLE"),
+        open_world=True,
     ),
     _member_write(
         "reactions_clear",

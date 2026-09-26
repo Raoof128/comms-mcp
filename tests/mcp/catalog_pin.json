@@ -1,5 +1,5 @@
 {
-  "count": 126,
+  "count": 127,
   "names": [
     "comms_capability_list",
     "comms_context_get",
@@ -126,6 +126,7 @@
     "comms_context_person",
     "comms_group_member_tag_set",
     "comms_message_reaction_remove",
+    "comms_whatsapp_health_status",
     "comms_group_member_reactions_clear"
   ],
   "tools": {
@@ -226,7 +227,7 @@
     "comms_media_download": "da26103a7a84b4a1cf3b8e62957d883bc12839d52e979568a90cb9b23b79fee6",
     "comms_media_delete": "22fd219d930bf12860ee5bd301713a30a85871cb986d6acecaf89ed6a10ed2af",
     "comms_account_status": "32bfce84b31905f4a166293adbc69d040fb61d2e77140f891bbefc6d54d9364c",
-    "comms_account_profile": "b19ef1fb567bed048761a5b4baf0b16501ca081efa168b09efb9955471fb77bf",
+    "comms_account_profile": "6ae0e944e19d85028df41d2294a1c324d521290f49566d59eccc1bb195c584a6",
     "comms_account_capabilities": "84d13912975018d09c35dfb695a08f0e4f1c25ec6fd3bc8764427b665b2e5ddf",
     "comms_telegram_bot_status": "b06d2cef752e7b5c21823aad8165e4583255b46f59ac5bdf3dd184681dc435e1",
     "comms_telegram_user_status": "05f69c79a88b4a507c5e853a5cec7d662f3e13e0f613da9aab92c5f248648a3d",
@@ -254,7 +255,8 @@
     "comms_context_person": "9d7b3f06d9a43e6d55c0588399c682bb59a03c91e30750f17c2fa7003885cb1d",
     "comms_group_member_tag_set": "fb5ba62a21071e5ab57b6522b43b323af0d8199e2cfdf855c52ca2a36b86e3e8",
     "comms_message_reaction_remove": "c23723c70cf4cb62e3919c5134b6b943f0549dcae58e70c4e4c8d6f7d59ece3e",
+    "comms_whatsapp_health_status": "a3ed8574ff396dbd43a67c250120c3cb7c609ef0b75e52b86df58799ab2557e4",
     "comms_group_member_reactions_clear": "0ce6cf04af121a2c52cefe6eca8af7997e185c729cb4f71c8095a0bfb5c026ed"
   },
-  "catalog": "2730be6c73a1103404a8479ebaf74eca1203ec903552fe5e4600c2b0f537236c"
+  "catalog": "bc4c9b49c35373647465ad487e8a63d5d1a645f3766f2931ec9bdeb42b79c2fa"
 }

@@ -676,3 +676,11 @@
 - **Files changed:** `src/comms/core/storage/migrations.py` (v7), `src/comms/core/campaigns/directory.py`, `src/comms/core/providers/semantics.py`, `src/comms/transports/whatsapp/cloud/{http,groups}.py`, `src/comms/transports/whatsapp/webhooks/archive.py`, `src/comms/services/{directory,groups}.py`, `src/comms/runtime/facades.py`, `src/comms/mcp/tools/admin.py`; tests; `tests/mcp/catalog_pin.json`; the matrix, the rulings, the ledger, `AGENT.md`, `CHANGELOG.md`.
 - **Verification:** 5 new tests; the full gate passed (GATE ok=1).
 - **Follow-ups:** Live acceptance must confirm Meta's synchronous create body (R-G8b). Next: G8 parts c and d.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Catalog amendment G8, part c: account profile, phone status and A46's health status (branch `comms-v0.3-catalog`).
+- **Summary:** Each account shows what it calls itself (untrusted), never an identity. WhatsApp phone status and messaging health are offered; health drops every entity id.
+- **Files changed:** `src/comms/transports/profiles.py` (new), `src/comms/transports/whatsapp/cloud/{account,http}.py`, `src/comms/transports/telegram/telegram/telethon_adapter.py`, `src/comms/runtime/{adapters,comms_runtime,facades}.py`, `src/comms/services/account.py`, `src/comms/core/providers/{capability,semantics}.py`, `src/comms/mcp/tools/{account,groups}.py`, `src/comms/mcp/egress.py`; tests; `tests/mcp/catalog_pin.json`; the matrix, the rulings, the ledger, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 6 new tests; the full gate passed (GATE ok=1).
+- **Follow-ups:** G8 part d: media upload and download, and group photos.

@@ -59,8 +59,6 @@ NOT_OFFERED = frozenset(
     {
         "media.upload",
         "media.download",
-        "account.profile",
-        "whatsapp.phone_status",
     }
 )
 
@@ -573,6 +571,9 @@ class _Facades:
             "directory.recipient_enable": lambda cl, a: s.directory.recipient_enable(c(cl), a["recipient"], a["request_id"]),
             "directory.recipient_disable": lambda cl, a: s.directory.recipient_disable(c(cl), a["recipient"], a["request_id"]),
             "context.person": self.context_person,
+            "account.profile": lambda cl, a: s.account.profile(s.actors),  # G8
+            "whatsapp.phone_status": lambda cl, a: s.account.phone_status(),
+            "whatsapp.health_status": lambda cl, a: s.account.health_status(),  # A46
             "message.forward": self.forward,
             "group.create": self.group_create,
             "group.members_get": lambda cl, a: self.reads.member(a["group"], self.targets(a["group"]), a["recipient"]),

@@ -68,7 +68,16 @@ def results(tmp_path_factory):
         "comms_media_download": {"media": med, "file": "stage_x"},  # never produced: not offered
         "comms_media_delete": media.delete(CTX, ACCOUNT, med, req()),
         "comms_account_status": status,
-        "comms_account_profile": {"actors": {"telegram_bot": {"configured": True, "kind": "bot"}}},
+        "comms_account_profile": {
+            "actors": {
+                "telegram_bot": {
+                    "configured": True,
+                    "kind": "bot",
+                    "reachable": True,
+                    "untrusted": {"name": "Comms"},
+                }
+            }
+        },
         "comms_account_capabilities": {"actors": capability.list()},
         "comms_telegram_bot_status": account.status({"telegram_bot": bot}),
         "comms_telegram_user_status": account.status({"telegram_user": user}),
