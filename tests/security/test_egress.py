@@ -17,9 +17,11 @@ NETWORK_MODULES = {
     "transports/telegram/bot/http.py",
     "transports/whatsapp/cloud/http.py",
     "transports/whatsapp/cloud/media.py",
+    "transports/whatsapp/relay_client.py",  # A48: the relay's one pinned origin
     "transports/telegram/telegram/telethon_adapter.py",
     "mcp/stdio_proxy.py",  # comms v0.3 D29: loopback to the daemon's /mcp only (it refuses others)
     "runtime/selftest.py",  # D39-PRE E11c: a scripted MockTransport only (pinned below)
+    "runtime/selftest_relay.py",  # A48 R5: the selftest's loopback route to `wrangler dev`
 }
 
 

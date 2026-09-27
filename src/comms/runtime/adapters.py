@@ -25,6 +25,7 @@ from comms.core.credentials import (
 from comms.core.delivery.transport import DeliveryTransport
 from comms.core.keys.secrets import SecretStore
 from comms.core.providers.protocols import ProviderTarget
+from comms.runtime.relay import Collector
 from comms.transports.profiles import bot_profile, user_profile, whatsapp_profile
 from comms.transports.telegram.bot.admin import BotAdmin
 from comms.transports.telegram.bot.capability import BotCapability
@@ -46,12 +47,13 @@ from comms.transports.whatsapp.cloud.groups import GroupDiscovery, WhatsAppAdmin
 from comms.transports.whatsapp.cloud.http import GraphApi
 from comms.transports.whatsapp.cloud.media import MediaOps
 from comms.transports.whatsapp.cloud.templates import TemplateCatalog, TemplateOps
+from comms.transports.whatsapp.relay_client import RelayClient
 from comms.transports.whatsapp.webhooks.archive import ArchiveContext
 from comms.transports.whatsapp.webhooks.inbox import Inbox
 from comms.transports.whatsapp.webhooks.ingress import WebhookIngress
 from comms.transports.whatsapp.webhooks.worker import Archive, WebhookWorker
 
-__all__ = ["UPDATE_OWNER", "AdapterSettings", "Adapters", "build_adapters"]
+__all__ = ["UPDATE_OWNER", "AdapterSettings", "Adapters", "RelayKeys", "build_adapters"]
 
 UPDATE_OWNER = "update-consumer"
 Runner = Callable[[Coroutine[Any, Any, Any]], Any]
@@ -62,6 +64,17 @@ class AdapterSettings:
     telegram_delivery_actor: Literal["telegram_bot", "telegram_user"] = "telegram_bot"
     meta_phone_number_id: str | None = None
     meta_waba_id: str | None = None
+    relay_url: str | None = None  # A48: WhatsApp webhooks arrive through the relay
+
+
+@dataclass(frozen=True)
+class RelayKeys:
+    """A48: the relay's pull key and the age identities that open its rows (loaded from the key
+    slots by the composition root). ``transport`` is the injected network seam."""
+
+    pull_key: bytes = field(repr=False)
+    identities: tuple[str, ...] = field(repr=False)
+    transport: Any = field(default=None, repr=False)
 
 
 @dataclass
@@ -88,6 +101,7 @@ class Adapters:
     account: ProviderTarget | None = None
     # A47 (H3): each Telegram actor's download of its own ``med_`` (WhatsApp's is ``media``)
     downloads: dict[str, Any] = field(default_factory=dict)
+    relay: Collector | None = None  # A48: the relay collector, when a relay is configured
 
     def __repr__(self) -> str:
         return (
@@ -129,6 +143,7 @@ def build_adapters(
     archive: Archive | None,
     telegram_session: Any = None,
     run: Runner | None = None,
+    relay_keys: RelayKeys | None = None,
 ) -> Adapters:
     adapters = Adapters()
     telegram = {
@@ -142,7 +157,10 @@ def build_adapters(
     if chosen is not None:
         adapters.delivery["telegram"] = chosen
     _whatsapp(adapters, conn, secrets, settings, clock)
-    _webhooks(adapters, conn, secrets, clock, monotonic, archive)
+    if settings.relay_url is not None:
+        _relay(adapters, conn, secrets, clock, archive, settings.relay_url, relay_keys)
+    else:
+        _webhooks(adapters, conn, secrets, clock, monotonic, archive)
     if adapters.graph is not None:  # G8: group reads live, messages from the archive (if any)
         adapters.context["whatsapp_cloud"] = WhatsAppContext(
             adapters.context.get("whatsapp_cloud"), adapters.graph, clock=clock
@@ -217,6 +235,43 @@ def _whatsapp(
         )
 
 
+def _confirmer(conn: Any, versions: dict[str, int]) -> Callable[[str], None]:
+    def confirmed(purpose: str) -> None:  # R-E6: once per active version, metadata only
+        if not is_confirmed(conn, purpose, versions[purpose]):
+            record_confirmed(conn, purpose, versions[purpose])
+
+    return confirmed
+
+
+def _relay(
+    adapters: Adapters,
+    conn: Any,
+    secrets: SecretStore,
+    clock: Callable[[], datetime],
+    archive: Archive | None,
+    url: str,
+    keys: RelayKeys | None,
+) -> None:
+    """A48: webhooks come from the relay, so no local listener is served; the daemon is still
+    the only verifier of Meta's signature (D-R1). The verify token lives in the Worker."""
+    secret_version = _configured(conn, secrets, "meta-app-secret")
+    if secret_version is None or archive is None or keys is None:
+        return  # never collect an event the daemon could not verify and archive
+    inbox = Inbox(conn, clock=clock)
+    adapters.inbox = inbox
+    adapters.worker = WebhookWorker(conn, archive, clock=clock)
+    adapters.relay = Collector(
+        conn,
+        RelayClient(url, keys.pull_key, transport=keys.transport),
+        inbox,
+        identities=keys.identities,
+        app_secret=secrets.get("meta-app-secret", secret_version),
+        clock=clock,
+        on_verified=_confirmer(conn, {"meta-app-secret": secret_version}),
+    )
+    adapters.context["whatsapp_cloud"] = ArchiveContext(conn, clock=clock)
+
+
 def _webhooks(
     adapters: Adapters,
     conn: Any,
@@ -232,12 +287,9 @@ def _webhooks(
     inbox = Inbox(conn, clock=clock)
     adapters.inbox = inbox
     adapters.worker = WebhookWorker(conn, archive, clock=clock)
-    versions = {"meta-app-secret": secret_version, "meta-webhook-secret": token_version}
-
-    def confirmed(purpose: str) -> None:  # R-E6: once per active version, metadata only
-        if not is_confirmed(conn, purpose, versions[purpose]):
-            record_confirmed(conn, purpose, versions[purpose])
-
+    confirmed = _confirmer(
+        conn, {"meta-app-secret": secret_version, "meta-webhook-secret": token_version}
+    )
     adapters.webhook = WebhookIngress(
         app_secret=secrets.get("meta-app-secret", secret_version),
         verify_token=secrets.get("meta-webhook-secret", token_version).decode("utf-8"),

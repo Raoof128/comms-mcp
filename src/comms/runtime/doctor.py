@@ -24,7 +24,7 @@ from comms.core.storage.rekey import ITEM, KeyPointer
 from comms.runtime.paths import CommsPaths
 from comms.runtime.state import bootstrap_state
 
-__all__ = ["run_doctor"]
+__all__ = ["open_read_only", "run_doctor"]
 
 _ACCEPTABLE = frozenset({"CREDENTIAL_NOT_CONFIGURED"})
 
@@ -49,6 +49,12 @@ def _legacy(paths: CommsPaths) -> tuple[Any, Any] | None:
     return conn, legacy_verifier(load_key("audit-chain-key"), checkpoint_public_for(conn))
 
 
+def open_read_only(paths: CommsPaths) -> Any:
+    """comms.db under the pointer's key only: no repair, no migration, nothing created."""
+    key = FileSecretStore(paths.secrets_dir).get(ITEM, KeyPointer(paths.db_key_pointer).get())
+    return open_comms_db(paths.db, key)
+
+
 def run_doctor(paths: CommsPaths, *, now: datetime) -> dict[str, Any]:
     if not paths.db.exists() or not paths.db_key_pointer.exists():
         return _report(
@@ -60,8 +66,7 @@ def run_doctor(paths: CommsPaths, *, now: datetime) -> dict[str, Any]:
             ],
         )
     try:
-        key = FileSecretStore(paths.secrets_dir).get(ITEM, KeyPointer(paths.db_key_pointer).get())
-        conn = open_comms_db(paths.db, key)
+        conn = open_read_only(paths)
     except (CommsDbKeyError, SecretStoreError):
         return _report(
             "UNINITIALIZED",

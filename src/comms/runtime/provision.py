@@ -67,6 +67,8 @@ PROVISIONED_KEYS = (
     "backup-key",
     "cursor-key",
     "oauth-signing-key",
+    "relay-age-key",  # A48
+    "relay-pull-key",  # A48
 )
 _DAMAGED = "existing key material is damaged (run: comms doctor)"
 

@@ -609,6 +609,33 @@ CREATE TABLE media_facts (object_id INTEGER PRIMARY KEY REFERENCES provider_obje
 """
 SCHEMA_V8: tuple[str, ...] = _statements(_SCHEMA_V8_SQL)
 
+# Spec A48 (R3): the relay collector's durable state. One row of progress; the rows the daemon
+# refused (kept, since an ack is cumulative); and each gap the relay's numbering showed.
+_SCHEMA_V9_SQL = """
+CREATE TABLE relay_state (id INTEGER PRIMARY KEY CHECK (id = 1),
+  acked_through INTEGER NOT NULL DEFAULT 0 CHECK (acked_through >= 0),
+  purged_through INTEGER NOT NULL DEFAULT 0 CHECK (purged_through >= 0),
+  depth INTEGER CHECK (depth IS NULL OR depth >= 0),
+  oldest_received_at TEXT,
+  last_attempt_at TEXT,
+  last_success_at TEXT,
+  last_error TEXT CHECK (last_error IS NULL OR last_error IN ('unreachable', 'refused', 'clock', 'malformed')),
+  clock_skew_s INTEGER);
+CREATE TRIGGER relay_state_forward BEFORE UPDATE ON relay_state
+  WHEN NEW.acked_through < OLD.acked_through OR NEW.purged_through < OLD.purged_through
+  BEGIN SELECT RAISE(ABORT, 'relay progress only moves forward'); END;
+CREATE TABLE relay_quarantine (seq INTEGER PRIMARY KEY CHECK (seq >= 1),
+  reason TEXT NOT NULL CHECK (reason IN ('decrypt', 'envelope', 'signature', 'parts')),
+  ciphertext_sha256 TEXT NOT NULL CHECK (length(ciphertext_sha256) = 64),
+  ciphertext BLOB,
+  quarantined_at TEXT NOT NULL);
+CREATE TABLE relay_gaps (id INTEGER PRIMARY KEY,
+  from_seq INTEGER NOT NULL CHECK (from_seq >= 1),
+  to_seq INTEGER NOT NULL CHECK (to_seq >= from_seq),
+  found_at TEXT NOT NULL);
+"""
+SCHEMA_V9: tuple[str, ...] = _statements(_SCHEMA_V9_SQL)
+
 MIGRATIONS: tuple[Migration, ...] = (
     Migration(1, SCHEMA_V1),
     Migration(2, SCHEMA_V2),
@@ -618,6 +645,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(6, SCHEMA_V6, rebuild=True),
     Migration(7, SCHEMA_V7),
     Migration(8, SCHEMA_V8),
+    Migration(9, SCHEMA_V9),
 )
 
 

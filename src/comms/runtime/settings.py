@@ -47,6 +47,7 @@ _TOP = {
     "meta",
     "remote",
     "backup_recipient",
+    "relay",  # A48: {"url": "https://comms-relay.<subdomain>.workers.dev"}
 }
 _META = {"phone_number_id", "waba_id"}
 _REMOTE = {"issuer", "port", "client", "client_id", "redirect_uris", "owner"}
@@ -143,6 +144,17 @@ def _remote(value: Any) -> RemoteSettings:
     )
 
 
+def _relay(value: Any) -> str:
+    relay = _object(value, {"url"}, "relay")
+    url = relay.get("url")
+    if (
+        not isinstance(url, str)
+        or re.fullmatch(r"https://[A-Za-z0-9.-]+(:[0-9]{1,5})?/?", url) is None
+    ):
+        raise SettingsError("comms.json: relay.url is an https origin")
+    return url.rstrip("/")
+
+
 def load_settings(path: Path) -> DaemonSettings:
     path = Path(path)
     try:
@@ -172,6 +184,9 @@ def load_settings(path: Path) -> DaemonSettings:
         isinstance(api_id, bool) or not isinstance(api_id, int) or api_id < 1
     ):
         raise SettingsError("comms.json: telegram_api_id is a positive integer")
+    relay = None if top.get("relay") is None else _relay(top["relay"])
+    if relay is not None and top.get("webhook_port") is not None:
+        raise SettingsError("comms.json: with a relay, the local webhook listener is not served")
     retention = _object(top.get("retention", {}), set(RETENTION_DEFAULTS), "retention")
     for name, value in retention.items():
         if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 3650:
@@ -189,6 +204,7 @@ def load_settings(path: Path) -> DaemonSettings:
             meta_waba_id=None
             if "waba_id" not in meta
             else _text(meta["waba_id"], _DIGITS, "meta.waba_id"),
+            relay_url=relay,
         ),
         remote=None if top.get("remote") is None else _remote(top["remote"]),
         backup_recipient=None

@@ -5,7 +5,7 @@ which never delivers anything) and ``POST /webhooks/meta``. A POST is refused, i
 by a token-bucket rate bound (429), a content type other than JSON (415), a body over
 ``MAX_BODY_BYTES`` whether declared or streamed (413), a read slower than the deadline (408),
 and an ``X-Hub-Signature-256`` that is not the HMAC-SHA256 of the exact raw bytes under the app
-secret, compared in constant time (401). Only then are the raw bytes handed to ``accept`` (the
+secret, compared in constant time (401; the one rule is ``signature.meta_signed``). Only then are the raw bytes handed to ``accept`` (the
 durable inbox, C29), and 200 is sent only after ``accept`` returns; if it fails the answer is
 503 so Meta retries. The ingress never parses the body.
 """
@@ -13,16 +13,17 @@ durable inbox, C29), and 200 is sent only after ``accept`` returns; if it fails 
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import hmac
 from collections.abc import Awaitable, Callable
 from typing import Any
 from urllib.parse import parse_qs
 
+from comms.transports.whatsapp.webhooks.signature import meta_signed
+
 __all__ = ["MAX_BODY_BYTES", "WebhookIngress"]
 
 PATH = "/webhooks/meta"
-MAX_BODY_BYTES = 256 * 1024
+MAX_BODY_BYTES = 8 * 1024 * 1024  # A48: Meta sets no limit and batches up to 1000 updates
 READ_DEADLINE_S = 5.0
 
 Scope = dict[str, Any]
@@ -107,7 +108,7 @@ class WebhookIngress:
                 raw = await _read(receive)
         except TimeoutError:
             raise _Refused(408) from None
-        if not self._signed(raw, _header(scope, b"x-hub-signature-256")):
+        if not meta_signed(self._secret, raw, _header(scope, b"x-hub-signature-256")):
             raise _Refused(401)
         self._confirmed("meta-app-secret")  # its X-Hub-Signature-256 verified
         try:
@@ -118,12 +119,6 @@ class WebhookIngress:
     def _confirmed(self, purpose: str) -> None:
         if self._on_confirmed is not None:
             self._on_confirmed(purpose)
-
-    def _signed(self, raw: bytes, header: bytes | None) -> bool:
-        if header is None or not header.startswith(b"sha256="):
-            return False
-        expected = hmac.new(self._secret, raw, hashlib.sha256).hexdigest().encode()
-        return hmac.compare_digest(header[len(b"sha256=") :], expected)
 
     def _take_token(self) -> bool:
         now = self._clock()

@@ -91,7 +91,12 @@ prohibition); Telegram media is first class: `med_` refs from context items (sch
 `media_facts`), download on both APIs (a borrowed sender off the home DC), `comms_message_send_media`
 on all three actors, and the user account's upload. 130 tools. A file-carrying call fits one 64 KiB
 request or frame (32 KiB raw per chunk, slice or inline file). Exit: `tests/security/test_a47_exit.py`.
-Next: D39-B (owner-run, live).
+**WhatsApp relay, A48** (branch `comms-relay`; plan `docs/superpowers/plans/2026-09-27-comms-whatsapp-relay.md`):
+- **The relay.** A Cloudflare Worker (`relay/`, TypeScript, Vitest in workerd) holds Meta's webhooks `age`-encrypted to the Mac for 30 days, so the daemon can run on demand. It never holds the app secret (D-R1).
+- **The daemon side.** The daemon's `relay` loop pulls with signed requests, verifies, stores through the inbox, and acks. `comms relay setup` prints the owner's deploy steps. Runbook: `docs/runbooks/whatsapp-relay.md`.
+- **Evidence:** `docs/verification/comms-relay.md`.
+- **Exit test:** `tests/security/test_relay_exit.py`.
+Next: D39-B (owner-run, live), and deploying the relay (owner-run).
 Nothing here has ever touched Telegram; the Test DC harness is owner-run.
 
 ## Non-negotiables
@@ -119,14 +124,15 @@ Nothing here has ever touched Telegram; the Test DC harness is owner-run.
 ```bash
 uv sync --locked
 uv run python scripts/extract_contracts.py --check
-uv run pytest -q                                  # 5506 passed, 4 skipped
-uv run python scripts/e2e_smoke.py                # 106 checks, end to end (32 against a real daemon; every tool swept)
+uv run pytest -q                                  # 5596 passed, 4 skipped
+uv run python scripts/e2e_smoke.py                # 108 checks, end to end (34 against a real daemon; every tool swept; the relay under wrangler dev)
 uv run pytest tests/formal -q -s                  # 57 passed: 544 states/22 assertions; campaign 96,528/11; operations 4,728
 uv run ruff check src tests scripts
 uv run ruff format --check src tests scripts
 uv run mypy src/comms src/telegram_mcp
 uv build
 (cd transports/whatsapp && ../../.venv/bin/python -m pytest -p no:randomly -p no:cacheprovider)  # WhatsVault: 450 passed
+(cd relay && npm ci && npm run check)            # the relay Worker: wrangler types, tsc, 15 Vitest tests in workerd
 ```
 
 Host-touching tests are opt-in and never run by default:

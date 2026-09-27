@@ -29,6 +29,7 @@ __all__ = [
     "decrypt",
     "encrypt",
     "generate_identity",
+    "identity_from_raw",
     "recipient_of",
 ]
 
@@ -144,7 +145,14 @@ def _identity_key(identity: str) -> X25519PrivateKey:
 
 
 def generate_identity() -> str:
-    return _bech32_encode("age-secret-key-", secrets.token_bytes(32)).upper()
+    return identity_from_raw(secrets.token_bytes(32))
+
+
+def identity_from_raw(raw: bytes) -> str:
+    """The ``AGE-SECRET-KEY-1…`` encoding of a 32-byte X25519 scalar (A48's relay key)."""
+    if len(raw) != 32:
+        raise AgeError("identity refused")
+    return _bech32_encode("age-secret-key-", raw).upper()
 
 
 def recipient_of(identity: str) -> str:

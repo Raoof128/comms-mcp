@@ -156,7 +156,7 @@ def build_workers(
     maintenance: Callable[[], Any] | None = None,
 ) -> Workers:
     every = {"deliver": 5.0, "schedule": 15.0, "bot_updates": 5.0, "webhook_inbox": 2.0,
-             "retention": 86_400.0}  # fmt: skip
+             "retention": 86_400.0, "relay": 60.0}  # fmt: skip
     every.update(intervals or {})
     conn = state.conn
     engine = Engine(conn, adapters.delivery, clock=clock)
@@ -172,4 +172,6 @@ def build_workers(
         loops.append(Loop("retention", maintenance, every["retention"], True))
     if adapters.worker is not None:
         loops.append(Loop("webhook_inbox", adapters.worker.run_once, every["webhook_inbox"], False))
+    if adapters.relay is not None:  # A48: brings home what the relay held; no external effect
+        loops.append(Loop("relay", adapters.relay.run_once, every["relay"], False))
     return Workers(conn, tuple(loops), clock=clock)

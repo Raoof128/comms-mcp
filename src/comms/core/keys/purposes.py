@@ -1,4 +1,4 @@
-"""Every key purpose, its rotation and its destruction rules (comms v0.3 design §B.4; A9–A11, A38).
+"""Every key purpose, its rotation and its destruction rules (comms v0.3 design §B.4; A9–A11, A38, A48).
 
 Each purpose names how it rotates, whether its public half is registered in
 ``verification_keys`` (every signer is), and exactly when its private material is
@@ -15,7 +15,7 @@ from typing import Literal
 
 __all__ = ["PURPOSES", "KeyPurpose"]
 
-Kind = Literal["hmac", "ed25519", "p256", "raw256", "opaque"]
+Kind = Literal["hmac", "ed25519", "p256", "raw256", "opaque", "x25519"]
 Rotation = Literal["seal_epoch", "new_id", "invalidate", "rekey", "staged", "refused"]
 Destroy = Literal[
     "at_rotation",  # after the new version is active (and, for staged credentials, re-checked)
@@ -67,6 +67,8 @@ PURPOSES: Mapping[str, KeyPurpose] = MappingProxyType(
             _p("disclosure-key", "ed25519", "refused", True, "owner_runbook"),
             _p("consent-approval-key", "p256", "refused", True, "owner_runbook"),
             _p("consent-transport-key", "p256", "refused", True, "owner_runbook"),
+            _p("relay-age-key", "x25519", "new_id", False, "at_rotation"),  # A48
+            _p("relay-pull-key", "hmac", "new_id", False, "at_rotation"),  # A48
         )
     )
 )

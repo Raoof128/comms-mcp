@@ -31,6 +31,7 @@ EXPECTED = {
     "clients-claude-code",  # comms v0.3 D38
     "clients-codex",  # comms v0.3 D38
     "clients-chatgpt",  # comms v0.3 D38
+    "whatsapp-relay",  # comms v0.3 A48
 }
 
 
@@ -38,7 +39,7 @@ def _commands():
     for path in RUNBOOKS:
         for block in re.findall(r"```bash\n(.*?)```", path.read_text(encoding="utf-8"), re.DOTALL):
             for line in block.splitlines():
-                line = line.strip()
+                line = line.strip().split(" | ")[0]  # A48: the command that feeds a pipe
                 if line.startswith(("comms ", "telegram-mcp ")):
                     yield path.name, shlex.split(line)
 

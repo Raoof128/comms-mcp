@@ -31,3 +31,12 @@ build/
 
 # Subagent-driven execution worktrees (isolated tracks, never committed)
 .worktrees/
+
+# The WhatsApp relay Worker (spec A48): dependencies, local state, generated types, and the
+# local secrets file `wrangler dev` reads. Real secrets live only in `wrangler secret put`.
+relay/node_modules/
+relay/.wrangler/
+relay/.dev.vars
+relay/.dev.vars.*
+!relay/.dev.vars.example
+relay/worker-configuration.d.ts

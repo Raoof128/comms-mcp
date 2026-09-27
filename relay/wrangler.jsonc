@@ -1,0 +1,19 @@
+// The comms relay (spec A48). It holds no Meta app secret (D-R1): the daemon is the only
+// verifier. Every secret is set by the owner with `wrangler secret put`, typed or piped from
+// `comms relay ...`; none is ever written here.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "comms-relay",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "workers_dev": true,
+  "preview_urls": false,
+  "durable_objects": {
+    "bindings": [{ "name": "MAILBOX", "class_name": "Mailbox" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Mailbox"] }],
+  "secrets": {
+    "required": ["RELAY_PATH_TOKEN", "META_VERIFY_TOKEN", "RELAY_PULL_KEY", "RELAY_AGE_RECIPIENT"]
+  },
+  "observability": { "enabled": false }
+}

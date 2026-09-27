@@ -63,11 +63,20 @@ OPERATOR_COMMANDS: Mapping[tuple[str, ...], Sequence[Arg]] = {
     ("cutover", "status"): (),
     ("retention", "run"): (),
     ("oauth", "approve"): (),  # D34: a one-time, 5-minute owner code for the remote /authorize
+    # A48: the WhatsApp relay — local and read-only; a secret only ever into a pipe
+    ("relay", "setup"): (),
+    ("relay", "recipient"): (("--state-dir", "optional"),),
+    ("relay", "export-pull-key"): (("--state-dir", "optional"),),
+    ("relay", "new-path"): (),
+    ("relay", "status"): (("--state-dir", "optional"),),
 }
 OPERATOR_GROUPS = tuple(sorted({words[0] for words in OPERATOR_COMMANDS}))
-LOCAL_GROUPS = frozenset({"daemon", "doctor"})  # run by the local operator CLI
+LOCAL_GROUPS = frozenset({"daemon", "doctor", "relay"})  # run by the local operator CLI
 # D39-PRE E1 (R-E4): run in this process before any daemon exists, under the runtime lock.
-LOCAL_COMMANDS = frozenset({("keys", "provision")})
+# A48: the relay commands read the state like doctor does, daemon or not.
+LOCAL_COMMANDS = frozenset(
+    {("keys", "provision")} | {words for words in OPERATOR_COMMANDS if words[0] == "relay"}
+)
 # D39-PRE E8a: driven by the CLI as steps over the daemon's retained login admin commands.
 # D39-PRE E8b: the CLI moves the files in 32 KiB chunks over the admin socket.
 BACKUP_FLOWS = frozenset({("backup", "export"), ("backup", "import", "stage")})

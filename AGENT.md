@@ -921,3 +921,68 @@ Follow the user's engineering lifecycle: design/security analysis, implementatio
 - **Files changed:** `AGENT.md`, `CHANGELOG.md` (this entry); the ledger (gitignored).
 - **Verification:** the gate on `d899c6a` (GATE ok=1: 5506 passed, 4 skipped; smoke 106/106; formal 57; WhatsVault 450); `main^{tree}` equals `comms-v0.3-sweep^{tree}`; `origin/main` equals `main`. Zurvan updated with this day's decisions, claims and open questions (tags `telegram-mcp,comms`).
 - **Follow-ups:** D39-B, owner-run and live: a WhatsApp group photo and document, a Telegram download from another DC, WhatsApp group create's `request_id`, and the P §88 acceptance rows. Campaign media needs its own amendment.
+
+### 2026-09-27 (Australia/Sydney)
+**Raouf:**
+- **Scope:** WhatsApp relay R0 and R1: spec A48, the relay keys, the frozen pull signature, and one copy of Meta's signature rule (branch `comms-relay`).
+- **Summary:** Spec A48 makes the approved relay design normative, including D-R1: the relay never holds Meta's app secret. Two new key purposes are minted by `comms keys provision`:
+  - `relay-age-key`: a new `x25519` kind, with key id `x25519:sha256:<public>`; rotating it is refused in this version;
+  - `relay-pull-key`: `hmac`.
+
+  `comms.core.relay_sig` signs under the frozen domain `comms-relay-pull/v1`, with eight byte-equality vectors. Found while building: `slots._checked` held a second copy of the key-id rule, and it now calls `key_id_for`; the audit key-id validator accepts `x25519`. Meta's `X-Hub-Signature-256` check moved into `webhooks/signature.py` (one copy). The local listener accepts up to 8 MiB, since Meta sets no limit and batches up to 1000 updates.
+- **Files changed:** `docs/comms-spec-v0.3.md` (A48), the relay design (marked approved), the plan (new), the rulings (pin, R-R0), `src/comms/core/{domains,relay_sig,validators}.py`, `src/comms/core/keys/{purposes,ids,slots,rotate}.py`, `src/comms/core/backup/age.py` (`identity_from_raw`), `src/comms/runtime/provision.py`, `src/comms/transports/whatsapp/webhooks/{signature,ingress}.py`, tests (`tests/core/test_relay_sig.py`, `tests/transports/whatsapp_webhooks/test_signature.py` new; purposes, wire-frozen, provision), `tests/fixtures/relay/pull_signature_vectors.json`.
+- **Verification:** New tests written first and seen failing; full gate GATE ok=1 (5519 passed, 4 skipped; smoke 106; WhatsVault 450).
+- **Follow-ups:** R2 (the Worker and Mailbox), R3 (the collector), R4 (operator and doctor), R5 (end to end).
+
+### 2026-09-27 (Australia/Sydney)
+**Raouf:**
+- **Scope:** WhatsApp relay R2: the Cloudflare Worker and its Mailbox (`relay/`, branch `comms-relay`).
+- **Summary:** A TypeScript Worker on the secret webhook path.
+  - **Refusals:** the wrong token 404, a non-JSON body 415, a malformed signature header 401, a body over 8 MiB 413, and the Mailbox's rate bound 429. It answers 200 only once the batch is stored, and 503 otherwise.
+  - **Handshake:** the verify-token handshake is in constant time.
+  - **Pulls:** `/pull` and `/ack` are signed under `comms-relay-pull/v1`.
+  - **Mailbox:** one SQLite Durable Object. It `age`-encrypts the envelope `{batch, part, parts, raw_b64, received_at, signature}` to the daemon and stores bodies over 1 MiB as parts in one transaction. `seq` is `AUTOINCREMENT`, and a daily alarm purges rows after 30 days and raises `purged_through`.
+  - **D-R1:** no app secret anywhere.
+
+  Running it under `wrangler dev` found that workerd refuses a main module exporting a constant, which Vitest did not catch. The limits moved to `src/limits.ts`, and a test pins the exports. Dependencies are pinned exactly and every install script is denied. The gate now runs `(cd relay && npm ci && npm run check)`.
+- **Files changed:** `relay/` (new: `src/{index,mailbox,pull_sig,limits}.ts`, `test/`, `wrangler.jsonc`, `package.json`, `package-lock.json`, `tsconfig.json`, `vitest.config.ts`, `.dev.vars.example`), `.gitignore`, `tests/security/test_relay_static.py` (new), `tests/fixtures/relay/wrangler_dev_page.json` (a page from the real Worker), the relay design, the rulings (R-R2), `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 14 Vitest tests in workerd, including the shared pull-signature vectors and a 2.5 MiB batch reassembled exactly; the Worker run under `wrangler dev`, with its ciphertext decrypted by the daemon's `age`; full gate GATE ok=1 (the first run caught one lint finding, fixed and re-run).
+- **Follow-ups:** R3 (the collector).
+
+### 2026-09-27 (Australia/Sydney)
+**Raouf:**
+- **Scope:** WhatsApp relay R3: the daemon's collector (branch `comms-relay`).
+- **Summary:** `transports/whatsapp/relay_client.py` is the one new network module: one pinned https origin, signed pulls and acks, a bounded answer, strict shapes and fixed errors. The collector, `runtime/relay.py`, is a 60-second worker loop. It works in `seq` order: decrypt, check the envelope against its row, reassemble parts, verify Meta's signature (the only place it is checked, D-R1), store in the inbox, move progress forward, then ack. A refused row is quarantined in comms.db with its ciphertext, because an ack is cumulative. Gaps not covered by a purge are recorded, and a clock skew is told apart from a wrong key.
+  - Schema v9 holds `relay_state`, `relay_quarantine` and `relay_gaps`.
+  - `comms.json` takes `"relay": {"url": ...}`, and with a relay the local listener is not served; the verify token lives in the Worker.
+  - The composition loads the relay keys from the key slots.
+- **Files changed:** `src/comms/transports/whatsapp/relay_client.py`, `src/comms/runtime/relay.py` (new); `src/comms/runtime/{adapters,assemble,settings,workers}.py`, `src/comms/core/storage/migrations.py`; tests (`tests/runtime/test_relay_collector.py`, `test_relay_wiring.py`, `tests/transports/test_relay_client.py` new; egress pin, v8 pin); the egress matrix in `docs/verification/comms-v0.3.md`; the rulings (R-R3); `AGENT.md`; `CHANGELOG.md`.
+- **Verification:** 35 new tests, written first and seen failing, including a crash between the commit and the ack, junk, parts, gaps, clock skew, and the real Worker's captured ciphertext; full gate GATE ok=1.
+- **Follow-ups:** R4 (operator commands, doctor), R5 (end to end).
+
+### 2026-09-27 (Australia/Sydney)
+**Raouf:**
+- **Scope:** WhatsApp relay R4: the owner's relay commands and doctor (branch `comms-relay`).
+- **Summary:** `comms relay` runs locally and only reads.
+  - `recipient` prints the public key.
+  - `export-pull-key` and `new-path` refuse a terminal and write only to a pipe, with no trailing newline.
+  - `status` reports the collector's progress and counts.
+  - `setup` prints the ordered checklist.
+
+  Doctor adds `RELAY_UNREACHABLE`, `RELAY_REFUSED`, `RELAY_CLOCK`, `RELAY_STALE` (only while the daemon is trying), `RELAY_BACKLOG_OLD`, `RELAY_GAP` and `RELAY_QUARANTINE`, and none when no relay was ever used. `runtime/doctor.open_read_only` is the one read-only opener.
+- **Files changed:** `src/comms/runtime/operator/relay.py` (new), `src/comms/cli.py`, `src/comms/cli_commands/operator.py`, `src/comms/core/doctor.py`, `src/comms/runtime/doctor.py`; tests (`tests/core/test_doctor_relay.py`, `tests/runtime/test_relay_operator.py` new; the operator-group pin); the plan and design (`new-path`); the rulings (R-R4); `AGENT.md`; `CHANGELOG.md`.
+- **Verification:** 18 new tests, written first and seen failing; full gate GATE ok=1.
+- **Follow-ups:** R5 (the smoke against `wrangler dev`, the runbook, the evidence).
+
+### 2026-09-27 (Australia/Sydney)
+**Raouf:**
+- **Scope:** WhatsApp relay R5: end to end, the runbook, the evidence (branch `comms-relay`). The relay plan is complete.
+- **Summary:** Two new D39-A checks (now 34) run the real selftest daemon against the real Worker under `wrangler dev`:
+  - the Worker's secrets come from the daemon's own keys through `comms relay` pipes;
+  - a signed and a forged webhook are posted while the daemon is stopped;
+  - after start, the signed one is read back once over MCP, the forged one is quarantined, the mailbox drains, and the audit verifies.
+
+  `runtime/selftest_relay.LoopbackRelay` is the selftest's own route from https-loopback to plain HTTP, refusing any other host; only `selftest.py` imports it. The runbook `whatsapp-relay.md` covers deploy, day to day, doctor findings, rotation and a suspect account. The runbook parser checks the command before a pipe. The first full gate caught a flaky Worker boundary test (±301 s across two clocks); the exact boundary is now pinned deterministically. `tests/security/test_relay_exit.py` re-runs R0–R5 from the plan's headings.
+- **Files changed:** `src/comms/runtime/selftest_relay.py` (new), `src/comms/runtime/selftest.py`, `scripts/smoke_daemon.py`, `scripts/e2e_smoke.py`, `relay/test/relay.test.ts`, `docs/runbooks/whatsapp-relay.md` (new), `docs/verification/comms-relay.md` (new), the smoke map, the rulings (R-R5), tests (`tests/runtime/test_selftest_relay.py`, `tests/security/test_relay_exit.py` new; egress, runbooks, D39 check count), `CLAUDE.md`, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** full gate GATE ok=1: 5596 passed, 4 skipped; smoke 108/108 (34 against the real daemon); formal 57; WhatsVault 450; relay 15 Vitest tests in workerd.
+- **Follow-ups:** owner-run steps: `wrangler login`, the four Worker secrets (`comms relay setup`), `wrangler deploy`, Meta's callback URL, then the live check under D39-B. Merge and push await the owner.
