@@ -110,7 +110,7 @@ describe("the webhook path", () => {
     }
     expect(at).toBe(size);
     expect(joined).toEqual(raw);
-  });
+  }, 30_000); // 2.5 MiB encrypted and decrypted: heavy under load (R-R2); a Durable Object gets 30 s
 });
 
 describe("pull and ack", () => {
