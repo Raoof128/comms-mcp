@@ -9,6 +9,7 @@ proxy under a real MCP client, and HTTP ``/mcp`` with fresh ``cml1`` leases. The
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import os
 import signal
@@ -592,4 +593,125 @@ def _webhook_checks(d: Daemon, port: int) -> dict[str, Any]:
     out["webhook_kill9"] = d.json("audit", "verify", "--all")["ok"] is True and _until(
         lambda: bool(d.json("doctor", "--state-dir", str(d.state))["ok"])
     )
+    return out
+
+
+RELAY_DIR = Path(__file__).resolve().parents[1] / "relay"
+
+
+def _wrangler_dev(port: int, env_file: Path, persist: Path) -> subprocess.Popen[str]:
+    proc = subprocess.Popen(
+        ["npx", "wrangler", "dev", "--ip", "127.0.0.1", "--port", str(port), "--env-file",
+         str(env_file), "--persist-to", str(persist)],
+        cwd=RELAY_DIR, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, text=True,
+        start_new_session=True,
+    )  # fmt: skip
+    ready = _until(lambda: _open(port), seconds=90)
+    if not ready:
+        _kill_group(proc)
+        raise AssertionError("wrangler dev did not start")
+    return proc
+
+
+def _open(port: int) -> bool:
+    with socket.socket() as s:
+        return s.connect_ex(("127.0.0.1", port)) == 0
+
+
+def _kill_group(proc: subprocess.Popen[str]) -> None:
+    with contextlib.suppress(ProcessLookupError):
+        os.killpg(proc.pid, signal.SIGTERM)
+    with contextlib.suppress(subprocess.TimeoutExpired):
+        proc.wait(timeout=20)
+
+
+def drive_relay(root: Path) -> dict[str, Any]:
+    """A48 (R5): the WhatsApp relay under ``wrangler dev``, fed while the daemon is off.
+
+    The daemon's own keys go to the Worker through the installed CLI's pipes. A signed webhook
+    and an unsigned one are posted to the relay; then the daemon starts, collects, verifies,
+    archives the signed one (read back over MCP, once) and quarantines the other, and the
+    mailbox drains."""
+    import hashlib
+    import hmac
+
+    import httpx
+
+    from comms.core import refs, relay_sig
+    from comms.runtime.selftest import SELFTEST_APP_SECRET
+
+    out: dict[str, Any] = {}
+    if not (RELAY_DIR / "node_modules" / ".bin" / "wrangler").exists():
+        raise AssertionError("relay/node_modules is missing (run: cd relay && npm ci)")
+    d = Daemon(root / "relay")
+    d.json("keys", "provision", "--state-dir", str(d.state), "--runtime-dir", str(d.run))
+    values = {
+        "RELAY_PULL_KEY": d.comms("relay", "export-pull-key", "--state-dir", str(d.state)).stdout,
+        "RELAY_AGE_RECIPIENT": d.comms("relay", "recipient", "--state-dir", str(d.state)).stdout,
+        "RELAY_PATH_TOKEN": d.comms("relay", "new-path").stdout,
+        "META_VERIFY_TOKEN": "smoke-" + refs.mint("request"),
+    }
+    port = _free_port()
+    env_file = root / "relay.vars"
+    env_file.write_text("".join(f"{k}={v}\n" for k, v in values.items()), encoding="utf-8")
+    env_file.chmod(0o600)
+    wrangler = _wrangler_dev(port, env_file, root / "relay-state")
+    try:
+        hook = f"http://127.0.0.1:{port}/webhooks/meta/{values['RELAY_PATH_TOKEN']}"
+        body = _message("wamid.RELAY1", "while you were away")
+        signed = "sha256=" + hmac.new(SELFTEST_APP_SECRET, body, hashlib.sha256).hexdigest()
+        forged = "sha256=" + "0" * 64
+        posted = [
+            httpx.post(hook, content=body, headers={"content-type": "application/json",
+                                                    "x-hub-signature-256": sig}).status_code
+            for sig in (signed, forged)
+        ]  # fmt: skip
+        d.settings(relay={"url": f"https://127.0.0.1:{port}"})
+        d.start()
+        d.json("cutover", "run")
+        seed = root / "seed-relay"
+        d.json("client", "add", "--name", "smoke-relay", "--helper-path", str(seed))
+
+        def call(name: str, arguments: dict[str, Any], *, write: bool = True) -> dict[str, Any]:
+            extra = {"request_id": refs.mint("request")} if write else {}
+            answer = d.http(seed, name, {**arguments, **extra})
+            return {} if answer["isError"] else dict(answer["structuredContent"])
+
+        rcp = call("comms_directory_recipient_create", {"display_name": "Relay Person"}).get(
+            "recipient"
+        )
+        call("comms_directory_contact_add", {"recipient": rcp, "transport": "whatsapp",
+                                             "identity": f"+{SMOKE_PHONE}"})  # fmt: skip
+
+        def person_dm() -> list[str]:
+            got = call("comms_context_person", {"recipient": rcp, "transports": ["whatsapp"]},
+                       write=False)  # fmt: skip
+            sections = {s["section"]: s for s in got.get("sections", [])}
+            return [i.get("untrusted_text") for i in sections.get("whatsapp", {}).get("items", [])]
+
+        out["relay_offline_catchup"] = posted == [200, 200] and _until(
+            lambda: person_dm() == ["while you were away"], seconds=30
+        )
+
+        key = bytes.fromhex(values["RELAY_PULL_KEY"])
+
+        def mailbox_depth() -> int:
+            pull = json.dumps({"after": 0, "limit": 50}, separators=(",", ":")).encode()
+            now = int(time.time())
+            answer = httpx.post(f"http://127.0.0.1:{port}/pull", content=pull, headers={
+                "x-comms-timestamp": str(now),
+                "x-comms-signature": relay_sig.sign(key, "POST", "/pull", now, pull)})  # fmt: skip
+            return int(answer.json()["depth"])
+
+        status = d.json("relay", "status", "--state-dir", str(d.state))
+        doctor = {f["code"] for f in d.json("doctor", "--state-dir", str(d.state))["findings"]}
+        out["relay_quarantine"] = (
+            status["quarantined"] == 1 and status["gaps"] == 0 and status["last_error"] is None
+            and "RELAY_QUARANTINE" in doctor and _until(lambda: mailbox_depth() == 0)
+            and d.json("audit", "verify", "--all")["ok"] is True
+        )  # fmt: skip
+    finally:
+        if d.proc is not None and d.proc.poll() is None:
+            d.stop()
+        _kill_group(wrangler)
     return out

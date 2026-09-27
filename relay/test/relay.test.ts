@@ -7,7 +7,7 @@ import vectors from "../../tests/fixtures/relay/pull_signature_vectors.json";
 import * as main from "../src/index";
 import { MAX_BODY_BYTES, PART_BYTES, RETENTION_MS } from "../src/limits";
 import type { Mailbox } from "../src/mailbox";
-import { hexToBytes, sign } from "../src/pull_sig";
+import { hexToBytes, sign, verify } from "../src/pull_sig";
 import { BODY, HOOK, SIG, control, open, post } from "./fixtures";
 
 afterEach(async () => {
@@ -116,13 +116,26 @@ describe("the webhook path", () => {
 describe("pull and ack", () => {
   it("refuses a bad, stale or foreign signature", async () => {
     expect((await control("/pull", { after: 0, limit: 1 }, { tamper: true })).status).toBe(401);
-    expect((await control("/pull", { after: 0, limit: 1 }, { skew: 301 })).status).toBe(401);
-    expect((await control("/pull", { after: 0, limit: 1 }, { skew: -301 })).status).toBe(401);
-    expect((await control("/pull", { after: 0, limit: 1 }, { skew: 299 })).status).toBe(200);
+    // Clearly outside and inside the window: the two sides read the clock a moment apart, so
+    // the exact 300 s boundary is pinned against verify() with an explicit clock below.
+    expect((await control("/pull", { after: 0, limit: 1 }, { skew: 330 })).status).toBe(401);
+    expect((await control("/pull", { after: 0, limit: 1 }, { skew: -330 })).status).toBe(401);
+    expect((await control("/pull", { after: 0, limit: 1 }, { skew: 270 })).status).toBe(200);
     expect((await control("/ack", { through: 9 }, { key: "00".repeat(32) })).status).toBe(401);
     expect((await control("/pull", { after: -1, limit: 1 })).status).toBe(400);
     expect((await control("/pull", { after: 0, limit: 51 })).status).toBe(400);
     expect((await control("/ack", { through: "9" })).status).toBe(400);
+  });
+
+  it("accepts exactly 300 s of skew either way, and not 301", async () => {
+    const key = env.RELAY_PULL_KEY;
+    const body = new TextEncoder().encode("{}");
+    const signed = await sign(hexToBytes(key), "POST", "/ack", "1000", body);
+    for (const [now, ok] of [[1300, true], [700, true], [1301, false], [699, false]] as const) {
+      expect(await verify(key, "POST", "/ack", "1000", body, signed, now)).toBe(ok);
+    }
+    expect(await verify(key, "POST", "/ack", "01000", body, signed, 1000)).toBe(false);
+    expect(await verify(key, "POST", "/ack", "1000", body, signed.toUpperCase(), 1000)).toBe(false);
   });
 
   it("acks idempotently and keeps rows after the acked seq", async () => {

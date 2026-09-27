@@ -51,6 +51,8 @@ from comms.core.providers.protocols import (
     SemanticOperation,
 )
 from comms.runtime.adapters import Adapters
+from comms.runtime.relay import Collector
+from comms.runtime.selftest_relay import LoopbackRelay
 from comms.runtime.settings import DaemonSettings
 from comms.runtime.state import CommsState
 from comms.transports.telegram.bot.admin import BotAdmin
@@ -62,6 +64,7 @@ from comms.transports.telegram.peers import marked_chat_id
 from comms.transports.telegram.user.admin import UserAdmin
 from comms.transports.whatsapp.cloud.groups import WhatsAppAdmin
 from comms.transports.whatsapp.numbers import e164
+from comms.transports.whatsapp.relay_client import RelayClient
 from comms.transports.whatsapp.webhooks.archive import ArchiveContext, CommsArchive
 from comms.transports.whatsapp.webhooks.inbox import Inbox
 from comms.transports.whatsapp.webhooks.ingress import WebhookIngress
@@ -276,5 +279,23 @@ def selftest_adapters(state: CommsState, settings: DaemonSettings) -> Adapters:
             clock=time.monotonic,
         )
         adapters.listeners["webhook"] = adapters.webhook
+        adapters.context["whatsapp_cloud"] = ArchiveContext(state.conn, clock=clock)
+    elif settings.adapter.relay_url is not None:  # A48 (R5): a relay under `wrangler dev`
+        from comms.runtime.assemble import relay_keys
+
+        keys = relay_keys(state)
+        inbox = Inbox(state.conn, clock=clock)
+        adapters.inbox = inbox
+        adapters.worker = WebhookWorker(
+            state.conn, CommsArchive(state.conn, clock=clock), clock=clock
+        )
+        adapters.relay = Collector(
+            state.conn,
+            RelayClient(settings.adapter.relay_url, keys.pull_key, transport=LoopbackRelay()),
+            inbox,
+            identities=keys.identities,
+            app_secret=SELFTEST_APP_SECRET,
+            clock=clock,
+        )
         adapters.context["whatsapp_cloud"] = ArchiveContext(state.conn, clock=clock)
     return adapters

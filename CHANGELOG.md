@@ -848,3 +848,16 @@
 - **Files changed:** `src/comms/runtime/operator/relay.py` (new), `src/comms/cli.py`, `src/comms/cli_commands/operator.py`, `src/comms/core/doctor.py`, `src/comms/runtime/doctor.py`; tests (`tests/core/test_doctor_relay.py`, `tests/runtime/test_relay_operator.py` new; the operator-group pin); the plan and design (`new-path`); the rulings (R-R4); `AGENT.md`; `CHANGELOG.md`.
 - **Verification:** 18 new tests, written first and seen failing; full gate GATE ok=1.
 - **Follow-ups:** R5 (the smoke against `wrangler dev`, the runbook, the evidence).
+
+### 2026-09-27 (Australia/Sydney)
+**Raouf:**
+- **Scope:** WhatsApp relay R5: end to end, the runbook, the evidence (branch `comms-relay`). The relay plan is complete.
+- **Summary:** Two new D39-A checks (now 34) run the real selftest daemon against the real Worker under `wrangler dev`:
+  - the Worker's secrets come from the daemon's own keys through `comms relay` pipes;
+  - a signed and a forged webhook are posted while the daemon is stopped;
+  - after start, the signed one is read back once over MCP, the forged one is quarantined, the mailbox drains, and the audit verifies.
+
+  `runtime/selftest_relay.LoopbackRelay` is the selftest's own route from https-loopback to plain HTTP, refusing any other host; only `selftest.py` imports it. The runbook `whatsapp-relay.md` covers deploy, day to day, doctor findings, rotation and a suspect account. The runbook parser checks the command before a pipe. The first full gate caught a flaky Worker boundary test (±301 s across two clocks); the exact boundary is now pinned deterministically. `tests/security/test_relay_exit.py` re-runs R0–R5 from the plan's headings.
+- **Files changed:** `src/comms/runtime/selftest_relay.py` (new), `src/comms/runtime/selftest.py`, `scripts/smoke_daemon.py`, `scripts/e2e_smoke.py`, `relay/test/relay.test.ts`, `docs/runbooks/whatsapp-relay.md` (new), `docs/verification/comms-relay.md` (new), the smoke map, the rulings (R-R5), tests (`tests/runtime/test_selftest_relay.py`, `tests/security/test_relay_exit.py` new; egress, runbooks, D39 check count), `CLAUDE.md`, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** full gate GATE ok=1: 5596 passed, 4 skipped; smoke 108/108 (34 against the real daemon); formal 57; WhatsVault 450; relay 15 Vitest tests in workerd.
+- **Follow-ups:** owner-run steps: `wrangler login`, the four Worker secrets (`comms relay setup`), `wrangler deploy`, Meta's callback URL, then the live check under D39-B. Merge and push await the owner.

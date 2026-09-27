@@ -2008,6 +2008,12 @@ def phase_v03_daemon(ledger: Ledger) -> None:
                 results.update(smoke_daemon.drive_install_and_surfaces(Path(short)))
             with tempfile.TemporaryDirectory(dir="/tmp", prefix="sd") as short:
                 results.update(smoke_daemon.drive_directory_and_campaigns(Path(short)))
+            with tempfile.TemporaryDirectory(dir="/tmp", prefix="sd") as short:
+                try:  # A48 (R5): a failure here fails its two checks, never the others
+                    results.update(smoke_daemon.drive_relay(Path(short)))
+                except AssertionError as failed:
+                    reason = str(failed)[:200]
+                    results.update(relay_offline_catchup=reason, relay_quarantine=reason)
         return results
 
     def verdict(key: str) -> Any:
@@ -2144,6 +2150,16 @@ def phase_v03_daemon(ledger: Ledger) -> None:
         area,
         "kill -9 during webhook delivery, then restart, verifies clean",
         lambda: verdict("webhook_kill9"),
+    )
+    ledger.run(
+        area,
+        "a webhook the relay held while the daemon was off is read over MCP once it starts",
+        lambda: verdict("relay_offline_catchup"),
+    )
+    ledger.run(
+        area,
+        "an unsigned delivery through the relay is quarantined, never inboxed, and the mailbox drains",
+        lambda: verdict("relay_quarantine"),
     )
 
 
