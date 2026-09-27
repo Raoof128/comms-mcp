@@ -34,6 +34,7 @@ MAINTENANCE_EVERY = timedelta(days=7)
 RELAY_STALE_AFTER = timedelta(minutes=10)  # A48: no successful pull while the daemon tries
 RELAY_BACKLOG_OLD = timedelta(days=25)  # A48: the relay purges after 30 days
 _CREDENTIALS = tuple(sorted(n for n, p in PURPOSES.items() if p.rotation == "staged"))
+_TELEGRAM_SESSION = "telegram-session"
 
 
 @dataclass(frozen=True)
@@ -152,15 +153,19 @@ def _lineage(conn: Any) -> list[Finding]:
     return []
 
 
-def _credentials(conn: Any) -> list[Finding]:
+def _credentials(conn: Any, telegram_session: bool) -> list[Finding]:
     active = dict(
         conn.execute("SELECT purpose, version FROM key_slots WHERE state = 'ACTIVE'").fetchall()
     )
     missing = [
         Finding("CREDENTIAL_NOT_CONFIGURED", purpose, "no active credential")
         for purpose in _CREDENTIALS
-        if purpose not in active
+        if purpose != _TELEGRAM_SESSION and purpose not in active
     ]
+    if not telegram_session:  # it comes from `comms transport telegram login`, not the store
+        missing.append(
+            Finding("CREDENTIAL_NOT_CONFIGURED", _TELEGRAM_SESSION, "no logged-in Telegram session")
+        )
     unconfirmed = [
         Finding("CREDENTIAL_UNCONFIRMED", purpose, "not yet confirmed by Meta in operation")
         for purpose in CONFIRMED_IN_OPERATION
@@ -215,11 +220,14 @@ def doctor(
     now: datetime,
     legacy_conn: Any = None,
     legacy: LegacyVerify | None = None,
+    telegram_session: bool = False,
 ) -> list[Finding]:
+    """``telegram_session``: whether a logged-in session file exists (the caller knows where the
+    state lives); without that knowledge the session is reported as not configured."""
     findings = [*_keys(conn, store), *_coverage(conn), *_maintenance(conn, now)]
     findings += _chains(conn, store, legacy_conn, legacy)
     findings += _lineage(conn)
-    findings += _credentials(conn)
+    findings += _credentials(conn, telegram_session)
     findings += relay_findings(conn, now)
     if is_degraded(conn):
         findings.append(

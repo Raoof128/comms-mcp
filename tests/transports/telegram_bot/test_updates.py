@@ -10,7 +10,7 @@ from comms.transports.telegram.bot.http import BotApi
 from comms.transports.telegram.bot.updates import BotPoller, PollingRefused, set_update_mode, state
 from tests.core import fakes
 from tests.core import schema_fixtures as fx
-from tests.transports.telegram_bot.helpers import Secrets, routed
+from tests.transports.telegram_bot.helpers import FIXTURES, Secrets, routed
 
 NOW = datetime(2026, 9, 25, tzinfo=UTC)
 
@@ -133,3 +133,55 @@ def test_switching_mode_is_explicit(conn):
     assert state(conn) == ("polling", 0)
     with pytest.raises(ValueError):
         set_update_mode(conn, "both", now=NOW)
+
+
+# -- found live (2026-09-28): the long poll outlived the client, and blocked the daemon ----------
+
+
+def test_the_long_poll_gets_a_read_timeout_longer_than_the_poll(conn):
+    """Telegram holds getUpdates open for up to LONG_POLL_SECONDS; a 10 s client timeout cut
+    every empty poll short, so the bot never received anything."""
+    from comms.transports.telegram.bot.updates import LONG_POLL_SECONDS
+
+    seen = []
+    _poller(conn, "getUpdates_two", seen).poll_once()
+    timeout = seen[0].extensions["timeout"]
+    assert timeout["read"] > LONG_POLL_SECONDS
+    assert json.loads(seen[0].content)["timeout"] == LONG_POLL_SECONDS
+
+
+async def test_the_async_poll_waits_off_the_event_loop_and_writes_on_it(conn):
+    """The daemon runs every worker on one event loop with one SQLite connection: the network
+    wait moves to a thread, the ingest stays on the loop's thread."""
+    import asyncio
+    import threading
+    import time
+
+    loop_thread = threading.get_ident()
+    fetched_on = []
+
+    def slow_handler(request):
+        fetched_on.append(threading.get_ident())
+        time.sleep(0.4)  # Telegram holding the long poll
+        recorded = json.loads((FIXTURES / "getUpdates_two.json").read_text())
+        return httpx.Response(recorded["http_status"], json=recorded["body"])
+
+    written_on = []
+    api = BotApi(Secrets(), version=1, transport=httpx.MockTransport(slow_handler))
+    poller = BotPoller(api, conn, clock=lambda: NOW,
+                       on_update=lambda c, u: written_on.append(threading.get_ident()))  # fmt: skip
+    ticks = 0
+
+    async def ticker():
+        nonlocal ticks
+        while True:
+            ticks += 1
+            await asyncio.sleep(0.02)
+
+    beat = asyncio.create_task(ticker())
+    report = await poller.poll_once_async()
+    beat.cancel()
+    assert (report.outcome, report.ingested) == ("ok", 2)
+    assert fetched_on and fetched_on[0] != loop_thread  # the wait left the loop
+    assert written_on and set(written_on) == {loop_thread}  # the database stayed on it
+    assert ticks >= 10  # the loop kept running while Telegram held the poll

@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import inspect
 import logging
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -105,7 +106,9 @@ class Workers:
                     await asyncio.wait_for(stop.wait(), timeout=min(loop.every, PAUSE_CHECK_S))
                 continue
             try:
-                loop.step()
+                result = loop.step()
+                if inspect.isawaitable(result):  # e.g. the bot's long poll, waiting off the loop
+                    await result
             except RECOVERABLE:
                 _logger.warning("worker_failed name=%s class=recoverable", loop.name)
                 period = min(period * 2, MAX_BACKOFF_S)
@@ -167,7 +170,9 @@ def build_workers(
         ),
     ]
     if adapters.poller is not None:
-        loops.append(Loop("bot_updates", adapters.poller.poll_once, every["bot_updates"], False))
+        loops.append(
+            Loop("bot_updates", adapters.poller.poll_once_async, every["bot_updates"], False)
+        )
     if maintenance is not None:  # the maintenance runner (A37): retention, daily; doctor wants 7
         loops.append(Loop("retention", maintenance, every["retention"], True))
     if adapters.worker is not None:

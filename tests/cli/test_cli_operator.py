@@ -160,3 +160,30 @@ def test_revoke_session_is_one_admin_request(monkeypatch, capsys):
                         lambda d, r: sent.append(r) or {"ok": True, "data": {"revoked": True}})  # fmt: skip
     cli.main(["transport", "telegram", "revoke-session"])
     assert sent == [{"cmd": "auth revoke-this-session", "args": {}}]
+
+
+def test_a_refused_login_step_prints_the_code_and_its_reason(monkeypatch, capsys):
+    """Found live (2026-09-28): only the code was printed, which hid why a step was refused.
+    Reasons are fixed, non-secret strings by design."""
+    from comms import cli
+
+    monkeypatch.setattr(cli, "_admin_request", lambda d, r: {
+        "ok": False, "code": "MALFORMED_REQUEST",
+        "reason": "telegram refused the step: TELEGRAM_UNAVAILABLE"})  # fmt: skip
+    monkeypatch.setattr("sys.stdin", _Tty())
+    monkeypatch.setattr("builtins.input", lambda prompt="": "+61400000001")
+    with pytest.raises(SystemExit):
+        cli.main(["transport", "telegram", "login"])
+    err = capsys.readouterr().err
+    assert "MALFORMED_REQUEST" in err and "telegram refused the step: TELEGRAM_UNAVAILABLE" in err
+
+
+def test_a_refused_operator_command_prints_the_code_and_its_reason(monkeypatch, capsys):
+    from comms import cli
+
+    monkeypatch.setattr(cli, "_admin_request", lambda d, r: {
+        "ok": False, "code": "MALFORMED_REQUEST", "reason": "unknown argument"})  # fmt: skip
+    with pytest.raises(SystemExit):
+        cli.main(["cutover", "status"])
+    err = capsys.readouterr().err
+    assert "MALFORMED_REQUEST" in err and "unknown argument" in err

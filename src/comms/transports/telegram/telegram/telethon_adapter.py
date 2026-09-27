@@ -53,6 +53,7 @@ __all__ = [
     "OPERATIONS",
     "READ_RPCS",
     "REVIEWED_REQUESTS",
+    "SESSION_FILE",
     "SESSION_RPCS",
     "UPDATE_RPCS",
     "WRITE_RPCS",
@@ -277,6 +278,24 @@ def _operation(name: str, budget: WorkBudget) -> Iterator[_Operation]:
         _CURRENT.reset(token)
 
 
+def _admitted(name: str) -> _Operation | None:
+    """The reviewed operation a request runs under, or None for Telethon's own requests.
+
+    Inside an operation, only that operation's requests go. Outside every operation, only
+    UPDATE_RPCS go: what Telethon sends by itself (``connect`` on a logged-in session, the
+    update loop), reviewed as reads of the account's own state. Found live on 2026-09-28: without
+    this, every connect of a logged-in session was refused. Anything else is refused.
+    """
+    current = _CURRENT.get()
+    if current is None:
+        if name in UPDATE_RPCS:
+            return None
+        raise PermissionError(f"unreviewed request: {name}")
+    if name not in current.allowed:
+        raise PermissionError(f"unreviewed request: {name}")
+    return current
+
+
 class _GatewayClient(TelegramClient):  # type: ignore[misc]
     """Telethon's client with the gateway's own ``_call``: one send, reviewed, charged."""
 
@@ -285,11 +304,10 @@ class _GatewayClient(TelegramClient):  # type: ignore[misc]
     ):
         if isinstance(request, list):
             raise PermissionError("batched requests are not reviewed")
-        current = _CURRENT.get()
-        name = qualified(request)
-        if current is None or name not in current.allowed:
-            raise PermissionError(f"unreviewed request: {name}")
-        if id(request) in current.precharged:
+        current = _admitted(qualified(request))
+        if current is None:
+            pass  # Telethon's own request (UPDATE_RPCS): reviewed, and Telethon paces it
+        elif id(request) in current.precharged:
             current.precharged.discard(id(request))
         else:
             current.budget.spend()
@@ -326,6 +344,7 @@ _UNAVAILABLE = (
     EOFError,  # asyncio.IncompleteReadError: the link dropped mid-read
 )
 _SESSION_NAME = "primary"
+SESSION_FILE = f"{_SESSION_NAME}.session"  # the logged-in session, as comms doctor finds it
 # Documented refusals of messages.sendMessage: nothing was posted, and a resend cannot help.
 _SEND_REFUSED = (
     errors.ChatWriteForbiddenError,

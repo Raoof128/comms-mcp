@@ -167,3 +167,16 @@ def test_doctor_output_holds_no_secret_identity_or_body(w):
     ]
     assert "+61400000077" not in text and "canary" not in text
     assert all(m.hex() not in text for m in material)
+
+
+def test_the_telegram_session_is_judged_by_the_session_not_the_store(w):
+    """Found live (2026-09-28): the session comes from `comms transport telegram login`, never
+    the credential store, so the store check always reported it missing."""
+    present = doctor(w["conn"], w["store"], now=NOW, telegram_session=True)
+    absent = doctor(w["conn"], w["store"], now=NOW, telegram_session=False)
+
+    def subjects(findings):
+        return {f.subject for f in findings if f.code == "CREDENTIAL_NOT_CONFIGURED"}
+
+    assert "telegram-session" not in subjects(present)
+    assert "telegram-session" in subjects(absent)
