@@ -1062,3 +1062,28 @@ Follow the user's engineering lifecycle: design/security analysis, implementatio
 - **Files changed:** `AGENT.md`, `CHANGELOG.md`.
 - **Verification:** Meta's pricing, non-template pricing, Groups API, Official Business Account and registration pages, read 2026-09-28.
 - **Follow-ups (owner):** a spare number for production; the Telegram bot token or session for announcements; the Meta contact email and Terms of Service URL.
+
+### 2026-09-28 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Telegram set up on the live install: the bot and the owner's user account (owner-authorised; the owner logged into Telegram Web in the controlled browser).
+- **Summary:**
+  - **Bot:** @raouf_comms_bot ("Raouf Comms") was created through the verified @BotFather (id 93372553; an impostor "BotFather", 7836447530, was avoided). Its token went browser → 0600 file → a pty at `comms credential set telegram-bot-token` (version 1, proved live, reloaded) → deleted. The token never entered the transcript.
+  - **User account:**
+    - A my.telegram.org app, "Raouf Comms", api_id 35628079 (not secret), was created.
+    - Its `api_hash` went browser → file → `security -i` on stdin (never in argv) into the login Keychain as `telegram-mcp`/`api_hash`, and `read_api_hash()` reads it back.
+    - `telegram_api_id` was set in `comms.json` and the daemon restarted.
+    - `comms transport telegram login` ran with the phone and the code read from Telegram's service chat (777000). Two-step verification is off on the account. The result is `authorized: true`, account ref `tga_…`, and the session is `state/telegram/primary.session` (0600).
+  - **The first login attempt** got `MALFORMED_REQUEST` because it hit the daemon before its background Telegram reconnect had finished ("Telegram unreachable at start"). A bare Telethon connect took 4.8 s. A retry worked.
+  - **MCP client:** `claude-code` was added (`cli_algtfvgpaq53qhy4ntohhapzfv`, seed at `~/.config/comms/claude-code.seed`, 0600).
+  - **Account profile over HTTP `/mcp`:** `telegram_bot` and `telegram_user` are configured and reachable; `whatsapp_cloud` is not configured (no access token).
+- **Defects found:**
+  1. `comms doctor` always reports `CREDENTIAL_NOT_CONFIGURED telegram-session`: the session is created by `transport telegram login`, not the credential store, but doctor checks the store (false finding; `ok` is still true).
+  2. The login CLI prints only the error code and drops the message ("telegram refused the step: …"), which hid the real cause.
+  3. The first login step right after a daemon start fails while Telegram is still connecting, instead of waiting or answering with a clear code.
+- **Files changed:** `AGENT.md`, `CHANGELOG.md`. No code.
+- **Verification:** `auth status` shows authorized; `comms doctor` is ok; `comms_account_profile` shows both Telegram actors reachable.
+- **Follow-ups:**
+  - fix the three defects above (gated);
+  - log Telegram Web and my.telegram.org out of the controlled browser if they are not wanted there;
+  - add the bot to society groups for announcements;
+  - set up WhatsApp's `meta-access-token` when production WhatsApp sending is wanted.
