@@ -19,8 +19,8 @@ def test_core_prefixes_are_disjoint_from_telegram_and_whatsvault():
 def test_core_prefixes_are_unique():
     values = list(refs.CORE_PREFIXES.values())
     assert (
-        len(values) == len(set(values)) == 26
-    )  # 10 from 5b-4 + 12 (Task A1b) + aev_/ack_ (Task A4, R-002)
+        len(values) == len(set(values)) == 27
+    )  # 10 from 5b-4 + 12 (Task A1b) + aev_/ack_ (Task A4, R-002) + cin_/cbi_ + upl_ (G8)
 
 
 def test_mint_check_and_kind_of_round_trip_and_refuse_wrong_kind():

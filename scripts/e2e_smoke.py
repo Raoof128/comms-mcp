@@ -2102,6 +2102,26 @@ def phase_v03_daemon(ledger: Ledger) -> None:
     )
     ledger.run(
         area,
+        "the directory over MCP: a person, a WhatsApp contact, a location with them, a Telegram and a WhatsApp group",
+        lambda: verdict("catalog_directory"),
+    )
+    ledger.run(
+        area,
+        "a location campaign reaches the person added over MCP",
+        lambda: verdict("catalog_location_campaign"),
+    )
+    ledger.run(
+        area,
+        "a signed webhook for a WhatsApp group is read by its grp_",
+        lambda: verdict("catalog_whatsapp_group_context"),
+    )
+    ledger.run(
+        area,
+        "comms_context_person serves the person's WhatsApp direct message",
+        lambda: verdict("catalog_context_person"),
+    )
+    ledger.run(
+        area,
         "the webhook listener verifies the challenge, accepts signed, refuses unsigned",
         lambda: verdict("webhook_served"),
     )

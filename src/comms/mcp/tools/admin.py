@@ -60,14 +60,6 @@ _TOPIC_FIELDS = {
     "icon_color": integer(0),
     "icon_custom_emoji_id": string(1, 64),
 }
-_LISTED = obj(
-    {
-        "group": _GROUP,
-        "items": array({"type": "object"}, high=100),
-        "next_cursor": nullable(string(1, 64)),
-    },
-    ["group", "items", "next_cursor"],
-)
 
 
 def _admin(
@@ -116,8 +108,61 @@ def _member(
     )
 
 
+def _listed(item: Mapping[str, Any]) -> dict[str, Any]:
+    return obj(
+        {"group": _GROUP, "items": array(item, high=100), "next_cursor": nullable(string(1, 64))},
+        ["group", "items", "next_cursor"],
+    )
+
+
+# G6: a pending join request, its requester by ref (null when not in the directory)
+_JOIN_REQUEST = obj(
+    {
+        "source": enum(("telegram_live", "telegram_local", "whatsapp_live")),
+        "recipient": nullable(ref("recipient")),
+        "requested_at": nullable(string(1, 64)),
+        "untrusted": obj({"name": nullable(string(0, 256))}, []),
+    },
+    ["source", "recipient", "requested_at", "untrusted"],
+)
+
+
+_TOPIC_NAME = obj({"name": nullable(string(0, 128))}, [])
+# G6: an invite link by ref; its name is untrusted text
+_INVITE_ITEM = obj(
+    {
+        "invite": ref("invite"),
+        "primary": BOOL,
+        "revoked": BOOL,
+        "usage": nullable(integer(0)),  # WhatsApp reports no usage
+        "usage_limit": nullable(integer(0)),
+        "expires_at": nullable(string(1, 64)),
+        "request_needed": BOOL,
+        "requested": nullable(integer(0)),
+        "untrusted": obj({"title": nullable(string(0, 256))}, []),
+    },
+    ["invite", "primary", "revoked", "usage", "usage_limit", "expires_at", "request_needed",
+     "requested", "untrusted"],
+)  # fmt: skip
+_TOPIC_ITEM = obj(
+    {"topic": ref("topic"), "closed": BOOL, "pinned": BOOL, "hidden": BOOL,
+     "untrusted": _TOPIC_NAME},
+    ["topic", "closed", "pinned", "hidden", "untrusted"],
+)  # fmt: skip
+# G6: one admin-log event: when, which kind, and who by ref (null when not in the directory)
+_LOG_EVENT = obj(
+    {"at": nullable(string(1, 64)), "action": string(1, 128), "actor": nullable(ref("recipient"))},
+    ["at", "action", "actor"],
+)
+
+
 def _list(
-    name: str, title: str, description: str, inputs: Mapping[str, Any] | None = None
+    name: str,
+    title: str,
+    description: str,
+    inputs: Mapping[str, Any] | None = None,
+    *,
+    item: Mapping[str, Any],
 ) -> ToolSpec:
     return read(
         f"comms_{name}",
@@ -126,7 +171,7 @@ def _list(
         name.replace("_", ".", 1),
         {"group": _GROUP, "cursor": string(1, 64), **(inputs or {})},
         ["group"],
-        _LISTED,
+        _listed(item),
         failures=CONTEXT_FAILURES,
         open_world=True,
     )
@@ -162,7 +207,7 @@ ADMIN_TOOLS: tuple[ToolSpec, ...] = (
     read(
         "comms_group_permissions_get",
         "Default permissions",
-        "The group's default member permissions. Not offered yet: answers PROVIDER_UNSUPPORTED.",
+        "The group's default member permissions, by their Bot API names.",
         "group.permissions_get",
         {"group": _GROUP},
         ["group"],
@@ -201,15 +246,22 @@ ADMIN_TOOLS: tuple[ToolSpec, ...] = (
     _admin(
         "group_info_set_photo",
         "Set the photo",
-        "Replace the group's photo with a media object. Not offered yet: answers "
-        "PROVIDER_UNSUPPORTED.",
+        "Replace the group's photo with a staged image (upload, from comms_media_stage_begin and "
+        "_chunk) or an inline one of at most 512 KiB (data_b64 with mime): JPEG or PNG on "
+        "Telegram (at most 10 MiB), JPEG on WhatsApp (at most 5 MB).",
         C.CHAT_SET_PHOTO,
-        {"media": ref("media")},
-        ["media"],
+        {"upload": ref("upload"), "data_b64": string(1, 699052), "mime": string(1, 128)},
+        [],
         destructive=True,
     ),
     # -- invites and join requests (P §27) ---------------------------------------------------
-    _list("group_invite_list", "List invites", "The group's invite links, by ref."),
+    _list(
+        "group_invite_list",
+        "List invites",
+        "The account's active invite links for the group, by inv_ ref: usage, limit, expiry, "
+        "whether it is the primary link or needs approval; the link's name is untrusted.",
+        item=_INVITE_ITEM,
+    ),
     _admin(
         "group_invite_create",
         "Create an invite",
@@ -235,7 +287,13 @@ ADMIN_TOOLS: tuple[ToolSpec, ...] = (
         {"invite": _INVITE},
         destructive=True,
     ),
-    _list("group_join_requests_list", "List join requests", "Pending requests to join the group."),
+    _list(
+        "group_join_requests_list",
+        "List join requests",
+        "Pending requests to join the group, newest first: each requester by ref when they are "
+        "in the directory, their name untrusted. The bot lists the requests it has received.",
+        item=_JOIN_REQUEST,
+    ),
     _member(
         "group_join_requests_approve",
         "Approve a join request",
@@ -250,17 +308,22 @@ ADMIN_TOOLS: tuple[ToolSpec, ...] = (
         destructive=True,
     ),
     # -- topics (P §28) -----------------------------------------------------------------------
-    _list("group_topic_list", "List topics", "The forum's topics, by ref."),
+    _list(
+        "group_topic_list",
+        "List topics",
+        "The forum's topics, by top_ ref: closed, pinned or hidden; the name is untrusted.",
+        item=_TOPIC_ITEM,
+    ),
     read(
         "comms_group_topic_get",
         "Get a topic",
-        "One forum topic, by its ref. Not offered yet: answers PROVIDER_UNSUPPORTED.",
+        "One forum topic, by its ref: whether it is closed; its name is untrusted.",
         "group.topic_get",
         {"group": _GROUP, "topic": _TOPIC},
         ["group", "topic"],
         obj(
-            {"group": _GROUP, "topic": _TOPIC, "name": string(0, 128), "closed": BOOL},
-            ["group", "topic", "name", "closed"],
+            {"group": _GROUP, "topic": _TOPIC, "closed": BOOL, "untrusted": _TOPIC_NAME},
+            ["group", "topic", "closed", "untrusted"],
         ),
         failures=CONTEXT_FAILURES,
         open_world=True,
@@ -301,8 +364,10 @@ ADMIN_TOOLS: tuple[ToolSpec, ...] = (
     write(
         "comms_group_create",
         "Create a group",
-        "Create a supergroup or channel as the owner's account and register it at a location. "
-        "A CREATE: an ambiguous outcome is resolved, never retried.",
+        "Create a group at a location: a Telegram supergroup or channel from the owner's account "
+        "(its grp_ at once), or a WhatsApp group (Meta creates it asynchronously: group is null "
+        "until Meta's webhook names it). Say actor when both platforms are configured. A CREATE: "
+        "an ambiguous outcome is resolved, never retried.",
         "group.create",
         {
             "location": ref("location"),
@@ -350,7 +415,7 @@ ADMIN_TOOLS: tuple[ToolSpec, ...] = (
         "group.admin_log",
         {"group": _GROUP, "limit": integer(1, 100), "cursor": string(1, 64)},
         ["group"],
-        _LISTED,
+        _listed(_LOG_EVENT),
         failures=(*READ_FAILURES, "NOT_AUTHORIZED", "PROVIDER_UNSUPPORTED"),
         open_world=True,
     ),

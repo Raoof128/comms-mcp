@@ -56,7 +56,7 @@ def _ops(graph_routes=None, cdn=None, graph_seen=None, cdn_seen=None):
             "id": MEDIA_ID,
         },
     )
-    routes = {("GET", f"/v21.0/{MEDIA_ID}"): info, **(graph_routes or {})}
+    routes = {("GET", f"/v26.0/{MEDIA_ID}"): info, **(graph_routes or {})}
     api = GraphApi(
         Secrets(), version=1, phone_number_id=PHONE_ID, transport=_graph(routes, graph_seen)
     )
@@ -101,7 +101,7 @@ def test_host_matching_is_exact_suffix_not_substring(url):
     cdn_seen = []
     ops = _ops(
         graph_routes={
-            ("GET", f"/v21.0/{MEDIA_ID}"): (
+            ("GET", f"/v26.0/{MEDIA_ID}"): (
                 200,
                 {"url": url, "mime_type": "image/png", "id": MEDIA_ID},
             )
@@ -175,8 +175,8 @@ def test_upload_and_delete_by_media_id():
     graph_seen = []
     ops = _ops(
         graph_routes={
-            ("POST", f"/v21.0/{PHONE_ID}/media"): (200, {"id": MEDIA_ID}),
-            ("DELETE", f"/v21.0/{MEDIA_ID}"): (200, {"success": True}),
+            ("POST", f"/v26.0/{PHONE_ID}/media"): (200, {"id": MEDIA_ID}),
+            ("DELETE", f"/v26.0/{MEDIA_ID}"): (200, {"success": True}),
         },
         graph_seen=graph_seen,
     )

@@ -34,6 +34,7 @@ _BODY = frozenset(
         "comms_message_search",
         "comms_message_context",
         "comms_group_context",
+        "comms_context_person",  # G5
     }
 )
 _NAMES = frozenset(
@@ -42,6 +43,16 @@ _NAMES = frozenset(
         "comms_group_admins_list",
         "comms_context_get",
         "comms_group_context",
+        # catalog amendment G2: people's labels, owner-typed but model-visible
+        "comms_directory_recipient_list",
+        "comms_directory_recipient_get",
+        "comms_context_person",  # G5: senders' names, under untrusted
+        "comms_group_join_requests_list",  # G6: requesters' names, under untrusted
+        "comms_group_invite_list",  # G6: invite links' names
+        "comms_group_topic_list",  # G6: topic names
+        "comms_group_topic_get",
+        "comms_account_profile",  # G8: what each account calls itself
+        "comms_whatsapp_health_status",  # A46: Meta's notes
     }
 )
 _IDENTITY = frozenset({"comms_admin_identity_inspect"})

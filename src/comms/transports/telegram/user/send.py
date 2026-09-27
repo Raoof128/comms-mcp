@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import time
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import datetime
 from typing import Any, Protocol
 
@@ -24,10 +24,22 @@ from comms.core.delivery.reducer import bind_provider_ref
 from comms.core.delivery.transport import DeliveryResult, ResultKind
 from comms.transports.telegram.telegram.send_attempt import SendAttempt
 
-__all__ = ["RECONCILE_WINDOW_S", "correlate_message_id", "random_id_for", "send"]
+__all__ = [
+    "RECONCILE_WINDOW_S",
+    "correlate_message_id",
+    "forward",
+    "random_id_for",
+    "send",
+]
 
 RECONCILE_WINDOW_S = 10.0
 ACTOR = "telegram_user"
+
+
+class Forwarder(Protocol):
+    async def forward_once(
+        self, from_peer: Any, message_id: int, to_peer: Any, random_id: int, *, timeout: float
+    ) -> SendAttempt: ...
 
 
 class TextSender(Protocol):
@@ -57,13 +69,42 @@ async def send(
     clock: Callable[[], float] = time.monotonic,
     reply_to: int | None = None,
 ) -> DeliveryResult:
-    started = clock()
-
-    async def attempt() -> SendAttempt:
-        remaining = RECONCILE_WINDOW_S - (clock() - started)
+    async def once(remaining: float) -> SendAttempt:
         return await session.send_text_once(
             peer, text, random_id, timeout=remaining, reply_to=reply_to
         )
+
+    return await _reconciled(once, chat, clock)
+
+
+async def forward(
+    session: Forwarder,
+    from_peer: Any,
+    message_id: int,
+    to_peer: Any,
+    chat: str,
+    random_id: int,
+    *,
+    clock: Callable[[], float] = time.monotonic,
+) -> DeliveryResult:
+    """A forward is a new message (G7): deduplicated by ``random_id`` exactly as a send."""
+
+    async def once(remaining: float) -> SendAttempt:
+        return await session.forward_once(
+            from_peer, message_id, to_peer, random_id, timeout=remaining
+        )
+
+    return await _reconciled(once, chat, clock)
+
+
+async def _reconciled(
+    once: Callable[[float], Awaitable[SendAttempt]], chat: str, clock: Callable[[], float]
+) -> DeliveryResult:
+    """One attempt; on ambiguity the identical request once more inside the window."""
+    started = clock()
+
+    async def attempt() -> SendAttempt:
+        return await once(RECONCILE_WINDOW_S - (clock() - started))
 
     first = await attempt()
     if first.outcome in ("sent", "duplicate"):

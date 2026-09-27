@@ -15,11 +15,9 @@ from collections.abc import Callable, Coroutine, Mapping
 from datetime import datetime
 from typing import Any, Protocol
 
-from comms.core import timeutil
 from comms.core.delivery.transport import DeliveryResult, ResultKind
 from comms.core.providers.capability import Capability
 from comms.core.providers.protocols import (
-    ContextPage,
     ProviderResult,
     ProviderTarget,
     SemanticOperation,
@@ -30,13 +28,18 @@ from comms.transports.telegram.telegram.errors import GatewayError
 from comms.transports.telegram.user.admin_chat import CHAT_SPECS, group_create
 from comms.transports.telegram.user.admin_members import MEMBER_SPECS
 from comms.transports.telegram.user.admin_messages import MESSAGE_SPECS
-from comms.transports.telegram.user.send import TextSender, random_id_for, send
+from comms.transports.telegram.user.send import (
+    Forwarder,
+    TextSender,
+    forward,
+    random_id_for,
+    send,
+)
 
 __all__ = ["UserAdmin"]
 
 ACTOR = "telegram_user"
 ADMIN_TIMEOUT_S = 15.0
-MAX_LOG_PAGE = 100
 _SPECS: Mapping[Capability, Callable[[Mapping[str, Any]], dict[str, Any]]] = {
     **MEMBER_SPECS,
     **CHAT_SPECS,
@@ -45,7 +48,7 @@ _SPECS: Mapping[Capability, Callable[[Mapping[str, Any]], dict[str, Any]]] = {
 assert all(not SEMANTICS[(c, ACTOR)].steps for c in _SPECS)  # no saga is ever one call
 
 
-class AdminSession(TextSender, Protocol):
+class AdminSession(TextSender, Forwarder, Protocol):
     def input_peer(self, peer_type: str, peer_id: int) -> Any: ...
 
     async def admin_request(
@@ -58,9 +61,9 @@ class AdminSession(TextSender, Protocol):
         timeout: float,
     ) -> ProviderResult: ...
 
-    async def admin_log(
-        self, peer_id: int, *, max_id: int, limit: int, timeout: float
-    ) -> list[tuple[int, datetime, int, str]]: ...
+    async def set_chat_photo(
+        self, peer_type: str, peer_id: int, data: bytes, *, timeout: float
+    ) -> ProviderResult: ...
 
 
 Runner = Callable[[Coroutine[Any, Any, Any]], Any]
@@ -83,6 +86,10 @@ class UserAdmin:
     def _request(self, op: SemanticOperation, target: ProviderTarget) -> tuple[Any, str, int]:
         if target.actor != ACTOR:
             raise ValueError("not a telegram_user destination")
+        if op.capability is Capability.GROUP_CREATE:  # G7: made from the account, no group
+            if target.identity != "account":
+                raise ValueError("a group is created from the account")
+            return group_create(op.args), "none", 0
         build = _SPECS.get(op.capability)
         if build is None:
             raise NotImplementedError("the user actor does not perform this operation as one call")
@@ -96,6 +103,16 @@ class UserAdmin:
         spec, peer_type, peer_id = self._request(op, target)
         if op.capability is Capability.MESSAGE_SEND:
             return self._send(spec, peer_type, peer_id, target.identity, op_key)
+        if op.capability is Capability.MESSAGE_FORWARD:
+            return self._forward(spec, peer_type, peer_id, target.identity, op_key)
+        if op.capability is Capability.GROUP_CREATE:
+            return self.create_group(op.args)
+        if op.capability is Capability.CHAT_SET_PHOTO:  # G8: uploaded in parts, then set
+            return self._run(  # type: ignore[no-any-return]
+                self._session.set_chat_photo(
+                    peer_type, peer_id, spec["photo"], timeout=ADMIN_TIMEOUT_S
+                )
+            )
         return self._run(  # type: ignore[no-any-return]
             self._session.admin_request(
                 op.capability, peer_type, peer_id, spec, timeout=ADMIN_TIMEOUT_S
@@ -121,6 +138,22 @@ class UserAdmin:
         )
         return _sent(delivered)
 
+    def _forward(
+        self, spec: Mapping[str, Any], peer_type: str, peer_id: int, chat: str, op_key: str
+    ) -> ProviderResult:
+        """One keyed forward into this group (G7); both peers resolved before anything is sent."""
+        try:
+            to_peer = self._session.input_peer(peer_type, peer_id)
+            from_peer = self._session.input_peer(*unmark_chat_id(spec["from_chat"]))
+        except GatewayError:
+            return ProviderResult("FAILED", "PROVIDER_UNAVAILABLE")  # provably unsent
+        delivered: DeliveryResult = self._run(
+            forward(
+                self._session, from_peer, spec["message_id"], to_peer, chat, random_id_for(op_key)
+            )
+        )
+        return _sent(delivered)
+
     def create_group(self, args: Mapping[str, Any]) -> ProviderResult:
         """``group.create`` (CREATE, resolve-only): no destination; the ref is the new chat's
         marked id."""
@@ -130,39 +163,6 @@ class UserAdmin:
                 Capability.GROUP_CREATE, "none", 0, spec, timeout=ADMIN_TIMEOUT_S
             )
         )
-
-    def read_admin_log(
-        self, target: ProviderTarget, *, limit: int = 50, cursor: str | None = None
-    ) -> ContextPage:
-        """One bounded page of the admin log (``admin.log.read``), newest first, event kinds only
-        (no content); a basic group has none. ``cursor`` is the last page's lowest event id."""
-        if target.actor != ACTOR:
-            raise ValueError("not a telegram_user destination")
-        if type(limit) is not int or not 1 <= limit <= MAX_LOG_PAGE:
-            raise ValueError("admin log page size is 1..100")
-        if cursor is not None and not (cursor.isascii() and cursor.isdigit() and int(cursor) > 0):
-            raise ValueError("admin log cursor is malformed")
-        peer_type, peer_id = unmark_chat_id(target.identity)
-        if peer_type != "channel":
-            return ContextPage((), "telegram_live")
-        max_id = int(cursor) if cursor is not None else 0
-        events = self._run(
-            self._session.admin_log(peer_id, max_id=max_id, limit=limit, timeout=ADMIN_TIMEOUT_S)
-        )
-        observed = timeutil.iso(self._clock())
-        items = tuple(
-            {
-                "source": "telegram_live",
-                "observed_at": observed,
-                "event_id": event_id,
-                "date": timeutil.iso(date),
-                "user_id": user_id,
-                "action": action,
-            }
-            for event_id, date, user_id, action in events
-        )
-        next_cursor = str(min(e[0] for e in events)) if len(events) == limit else None
-        return ContextPage(items, "telegram_live", next_cursor)
 
 
 def _sent(delivered: DeliveryResult) -> ProviderResult:

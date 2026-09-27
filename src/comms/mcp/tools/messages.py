@@ -128,7 +128,7 @@ MESSAGE_TOOLS: tuple[ToolSpec, ...] = (
     write(
         "comms_message_forward",
         "Forward a message",
-        "Forward a message to another group. Not offered yet: answers PROVIDER_UNSUPPORTED.",
+        "Forward a message into another group, as a new message; an actor in both groups sends it.",
         "message.forward",
         {"group": _GROUP, "message": _MESSAGE, "to_group": _GROUP},
         ["group", "message", "to_group"],
@@ -138,9 +138,10 @@ MESSAGE_TOOLS: tuple[ToolSpec, ...] = (
     write(
         "comms_message_pin",
         "Pin a message",
-        "Pin a message in its group.",
+        "Pin a message in its group. On WhatsApp a pin lasts expire_days (1-30, default 30) and "
+        "at most three are pinned; Telegram pins have no expiry.",
         "message.pin",
-        {"group": _GROUP, "message": _MESSAGE, "actor": ACTOR},
+        {"group": _GROUP, "message": _MESSAGE, "actor": ACTOR, "expire_days": integer(1, 30)},
         ["group", "message"],
         _DONE,
         capability=C.MESSAGE_PIN,

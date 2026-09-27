@@ -75,8 +75,8 @@ def _api(routes, seen):
 def _world(groups_answer, extra=None):
     seen = []
     routes = {
-        ("GET", f"/v21.0/{PHONE_ID}/groups"): groups_answer,
-        ("GET", f"/v21.0/{PHONE_ID}"): PHONE_OK,
+        ("GET", f"/v26.0/{PHONE_ID}/groups"): groups_answer,
+        ("GET", f"/v26.0/{PHONE_ID}"): PHONE_OK,
         **(extra or {}),
     }
     api = _api(routes, seen)
@@ -95,6 +95,13 @@ def test_the_group_capabilities_are_p16s():
         C.GROUP_INVITE_RESET,
         C.GROUP_SETTINGS_UPDATE,
         C.GROUP_MESSAGE_SEND,
+        # G8: the Groups API's pins and join requests are gated by the same discovery
+        C.MESSAGE_PIN,
+        C.JOIN_REQUEST_LIST,
+        C.JOIN_REQUEST_APPROVE,
+        C.JOIN_REQUEST_REJECT,
+        C.GROUP_CREATE,
+        C.GROUP_DELETE,
     }
 
 
@@ -129,12 +136,12 @@ def test_discovery_that_cannot_decide_is_unknown_never_available():
 
 def test_groups_available_ops_classified():
     extra = {
-        ("DELETE", f"/v21.0/{GROUP_ID}/participants"): (200, {"success": True}),
-        ("POST", f"/v21.0/{GROUP_ID}/invite_link"): (
+        ("DELETE", f"/v26.0/{GROUP_ID}/participants"): (200, {"success": True}),
+        ("POST", f"/v26.0/{GROUP_ID}/invite_link"): (
             200,
             {"invite_link": "https://chat.whatsapp.com/AbC"},
         ),
-        ("POST", f"/v21.0/{GROUP_ID}"): (
+        ("POST", f"/v26.0/{GROUP_ID}"): (
             400,
             {"error": {"message": "Invalid parameter", "code": 100}},
         ),
@@ -174,7 +181,7 @@ def test_account_status_feeds_the_baseline_states():
     assert set(states) == {c for c, a in SUPPORT.items() if "whatsapp_cloud" in a}
     assert states[C.MESSAGE_SEND_TEXT] is S.AVAILABLE and states[C.TEMPLATE_LIST] is S.AVAILABLE
     flagged = {
-        ("GET", f"/v21.0/{PHONE_ID}"): (
+        ("GET", f"/v26.0/{PHONE_ID}"): (
             200,
             {"status": "FLAGGED", "quality_rating": "RED", "id": PHONE_ID},
         )

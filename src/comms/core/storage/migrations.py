@@ -532,12 +532,78 @@ CREATE INDEX whatsapp_messages_by_chat ON whatsapp_messages (chat, sent_at, id);
 """
 SCHEMA_V5: tuple[str, ...] = _statements(_SCHEMA_V5_SQL)
 
+# Catalog amendment G1 (A45): WhatsApp groups are destinations. The destinations CHECK allowed
+# Telegram only, so the table is rebuilt (the 5b-3 method, foreign keys off) to allow a
+# ``whatsapp`` destination whose identity is a group (``group:<id>``, or ``redacted:<id>`` once
+# A15 redacts it); a WhatsApp contact stays a person's contact point. Every index and trigger
+# that names the table (measured from a v5 database) is recreated verbatim.
+_SCHEMA_V6_SQL = """
+CREATE TABLE destinations_v6 (id INTEGER PRIMARY KEY, ref TEXT NOT NULL UNIQUE,
+  location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE RESTRICT,
+  transport TEXT NOT NULL CHECK (transport = 'telegram' OR (transport = 'whatsapp'
+    AND (platform_identity GLOB 'group:?*' OR platform_identity GLOB 'redacted:?*'))),
+  platform_identity TEXT NOT NULL,
+  identity_id INTEGER NOT NULL REFERENCES delivery_identities(id) ON DELETE RESTRICT,
+  display_name TEXT NOT NULL, capabilities TEXT NOT NULL DEFAULT '{}',
+  enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0,1)), created_at TEXT NOT NULL, disabled_at TEXT);
+INSERT INTO destinations_v6 (id, ref, location_id, transport, platform_identity, identity_id,
+  display_name, capabilities, enabled, created_at, disabled_at)
+  SELECT id, ref, location_id, transport, platform_identity, identity_id, display_name, capabilities,
+    enabled, created_at, disabled_at FROM destinations;
+DROP TRIGGER groups_are_group_destinations;
+DROP TRIGGER job_origins_endpoint_matches_job;
+DROP TABLE destinations;
+ALTER TABLE destinations_v6 RENAME TO destinations;
+CREATE INDEX destinations_location ON destinations (location_id);
+CREATE UNIQUE INDEX destinations_one_enabled_per_identity ON destinations (identity_id) WHERE enabled = 1;
+CREATE TRIGGER destinations_identity_immutable BEFORE UPDATE OF transport, platform_identity, identity_id, location_id, ref
+  ON destinations WHEN NOT (NEW.transport IS OLD.transport AND NEW.identity_id IS OLD.identity_id
+    AND NEW.location_id IS OLD.location_id AND NEW.ref IS OLD.ref
+    AND NEW.platform_identity = 'redacted:' || OLD.identity_id)
+  BEGIN SELECT RAISE(ABORT, 'destination identity is immutable'); END;
+CREATE TRIGGER destinations_never_deleted BEFORE DELETE ON destinations
+  BEGIN SELECT RAISE(ABORT, 'endpoints are disabled, never deleted'); END;
+CREATE TRIGGER destinations_transport_matches_identity BEFORE INSERT ON destinations
+  WHEN (SELECT transport FROM delivery_identities WHERE id = NEW.identity_id) IS NOT NEW.transport
+  BEGIN SELECT RAISE(ABORT, 'endpoint transport mismatch'); END;
+CREATE TRIGGER groups_are_group_destinations BEFORE INSERT ON groups
+  WHEN (SELECT platform_identity FROM destinations WHERE id = NEW.destination_id) NOT GLOB 'group:*'
+    AND (SELECT platform_identity FROM destinations WHERE id = NEW.destination_id) NOT GLOB 'channel:*'
+  BEGIN SELECT RAISE(ABORT, 'not a group destination'); END;
+CREATE TRIGGER job_origins_endpoint_matches_job BEFORE INSERT ON job_origins
+  WHEN NOT EXISTS (SELECT 1 FROM delivery_jobs j WHERE j.id = NEW.job_id AND (
+    EXISTS (SELECT 1 FROM destinations d WHERE d.ref = NEW.endpoint_ref AND d.identity_id = j.identity_id AND d.transport = j.transport)
+    OR EXISTS (SELECT 1 FROM contact_points c WHERE c.ref = NEW.endpoint_ref AND c.identity_id = j.identity_id AND c.transport = j.transport)))
+  BEGIN SELECT RAISE(ABORT, 'origin endpoint does not match its job'); END;
+"""
+SCHEMA_V6: tuple[str, ...] = _statements(_SCHEMA_V6_SQL)
+
+# Catalog amendment G8: a WhatsApp group is created asynchronously (Meta answers a request id; the
+# group id arrives in a group_lifecycle_update webhook carrying it). The pending creation keeps
+# where the group belongs until the webhook files it as a destination; nothing is ever deleted.
+_SCHEMA_V7_SQL = """
+CREATE TABLE pending_group_creations (id INTEGER PRIMARY KEY, request_id TEXT NOT NULL UNIQUE,
+  location_id INTEGER NOT NULL REFERENCES locations(id) ON DELETE RESTRICT,
+  name TEXT NOT NULL, created_at TEXT NOT NULL,
+  destination_id INTEGER REFERENCES destinations(id) ON DELETE RESTRICT,
+  failed_at TEXT, CHECK (destination_id IS NULL OR failed_at IS NULL));
+CREATE TRIGGER pending_group_creations_settle_once BEFORE UPDATE ON pending_group_creations
+  WHEN OLD.destination_id IS NOT NULL OR OLD.failed_at IS NOT NULL
+    OR NEW.request_id IS NOT OLD.request_id OR NEW.location_id IS NOT OLD.location_id
+  BEGIN SELECT RAISE(ABORT, 'a pending group creation settles once'); END;
+CREATE TRIGGER pending_group_creations_kept BEFORE DELETE ON pending_group_creations
+  BEGIN SELECT RAISE(ABORT, 'pending group creations are kept'); END;
+"""
+SCHEMA_V7: tuple[str, ...] = _statements(_SCHEMA_V7_SQL)
+
 MIGRATIONS: tuple[Migration, ...] = (
     Migration(1, SCHEMA_V1),
     Migration(2, SCHEMA_V2),
     Migration(3, SCHEMA_V3, rebuild=True),
     Migration(4, SCHEMA_V4),
     Migration(5, SCHEMA_V5),
+    Migration(6, SCHEMA_V6, rebuild=True),
+    Migration(7, SCHEMA_V7),
 )
 
 

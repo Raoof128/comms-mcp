@@ -36,24 +36,28 @@ __all__ = [
     "add_location_member_in_tx",
     "add_recipient",
     "add_recipient_in_tx",
+    "contact_targets",
     "destination_id",
     "has_recipient",
     "member_identity",
     "opt_out",
     "opt_out_in_tx",
+    "recipient_of_identity",
     "remove_audience_member",
     "remove_audience_member_in_tx",
     "remove_location_member",
     "remove_location_member_in_tx",
     "rename",
     "rename_in_tx",
+    "set_display_name_in_tx",
     "set_enabled",
     "set_enabled_in_tx",
+    "settle_group_creation_in_tx",
 ]
 
 Normalizer = Callable[[str], str]
 
-DESTINATION_TRANSPORTS = frozenset({"telegram"})
+DESTINATION_TRANSPORTS = frozenset({"telegram", "whatsapp"})
 CONTACT_TRANSPORTS = frozenset({"telegram", "whatsapp"})
 _TABLE = {
     "location": "locations",
@@ -151,6 +155,8 @@ def add_destination_in_tx(
     require_tx(conn)
     if transport not in DESTINATION_TRANSPORTS:
         raise DirectoryError("unsupported transport")
+    if transport == "whatsapp" and not is_group_identity(platform_identity):
+        raise DirectoryError("invalid platform identity")  # a WhatsApp contact is a person (G1)
     _kind(location_ref, {"location"})
     ref, stamp = refs.mint("destination"), timeutil.iso(now)
     location_id = _id(conn, "location", location_ref)
@@ -188,18 +194,33 @@ def add_destination(
         )
 
 
+def _display_name(display_name: object) -> str:
+    """A person's label (D7): 1–200 characters after trimming; the one rule."""
+    if not isinstance(display_name, str) or not 0 < len(display_name.strip()) <= 200:
+        raise DirectoryError("display name refused")
+    return display_name.strip()
+
+
 def add_recipient_in_tx(conn: Any, *, now: datetime, display_name: str | None = None) -> str:
     require_tx(conn)
-    if display_name is not None and (
-        not isinstance(display_name, str) or not 0 < len(display_name.strip()) <= 200
-    ):
-        raise DirectoryError("display name refused")
+    label = None if display_name is None else _display_name(display_name)
     ref, stamp = refs.mint("recipient"), timeutil.iso(now)
     conn.execute(
         "INSERT INTO recipients (ref, display_name, created_at) VALUES (?, ?, ?)",
-        (ref, display_name.strip() if display_name else None, stamp),
+        (ref, label, stamp),
     )
     return ref
+
+
+def set_display_name_in_tx(conn: Any, recipient_ref: str, display_name: str) -> None:
+    """A person's new label (G2); the ref never changes."""
+    require_tx(conn)
+    _kind(recipient_ref, {"recipient"})
+    label = _display_name(display_name)
+    conn.execute(
+        "UPDATE recipients SET display_name = ? WHERE id = ?",
+        (label, _id(conn, "recipient", recipient_ref)),
+    )
 
 
 def add_recipient(conn: Any, *, now: datetime, display_name: str | None = None) -> str:
@@ -248,6 +269,12 @@ def add_contact_point_in_tx(
         raise DirectoryError("recipient already has an enabled contact point on this transport")
     identity_id = _identity_id(conn, transport, platform_identity, normalize)
     _refuse_second_enabled(conn, "contact_points", identity_id)
+    opted_out = conn.execute(
+        "SELECT 1 FROM contact_points WHERE identity_id = ? AND opted_out_at IS NOT NULL",
+        (identity_id,),
+    ).fetchone()
+    if opted_out is not None:  # an opt-out outlives disabling (G3): never re-added silently
+        raise DirectoryError("delivery identity has opted out")
     conn.execute(
         "INSERT INTO contact_points (ref, recipient_id, transport, platform_identity,"
         " identity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -482,3 +509,89 @@ def has_recipient(conn: Any, recipient_ref: str) -> bool:
     """Whether the recipient ref names a recipient (read-only)."""
     row = conn.execute("SELECT 1 FROM recipients WHERE ref = ?", (recipient_ref,)).fetchone()
     return row is not None
+
+
+def contact_targets(conn: Any, recipient_ref: str) -> list[tuple[str, str, str]]:
+    """A person's enabled contact points as ``(transport, contact ref, delivery identity)``, for
+    building read targets only; never returned to a caller (G5). ``DirectoryNotFound`` for an
+    unknown person."""
+    _kind(recipient_ref, {"recipient"})
+    recipient_id = _id(conn, "recipient", recipient_ref)
+    rows = conn.execute(
+        "SELECT c.transport, c.ref, i.identity FROM contact_points c"
+        " JOIN delivery_identities i ON i.id = c.identity_id"
+        " WHERE c.recipient_id = ? AND c.enabled = 1 ORDER BY c.transport",
+        (recipient_id,),
+    ).fetchall()
+    return [(str(r[0]), str(r[1]), str(r[2])) for r in rows]
+
+
+def recipient_of_identity(conn: Any, transport: str, identity: str) -> str | None:
+    """The person whose contact point on ``transport`` is this delivery identity, or None: how
+    a provider id in a read becomes a ``rcp_`` ref before it leaves (G6)."""
+    row = conn.execute(
+        "SELECT r.ref FROM contact_points c JOIN recipients r ON r.id = c.recipient_id"
+        " JOIN delivery_identities i ON i.id = c.identity_id"
+        " WHERE i.transport = ? AND i.identity = ? ORDER BY c.enabled DESC, c.id LIMIT 1",
+        (transport, identity),
+    ).fetchone()
+    return None if row is None else str(row[0])
+
+
+def pend_group_creation_in_tx(
+    conn: Any, request_id: str, location_ref: str, name: str, *, now: datetime
+) -> None:
+    """A WhatsApp group Meta is creating (G8): where it belongs, until its webhook arrives."""
+    require_tx(conn)
+    _kind(location_ref, {"location"})
+    if not isinstance(request_id, str) or not request_id or len(request_id) > 256:
+        raise DirectoryError("request id refused")
+    conn.execute(
+        "INSERT INTO pending_group_creations (request_id, location_id, name, created_at)"
+        " VALUES (?, ?, ?, ?)",
+        (request_id, _id(conn, "location", location_ref), _display_name(name), timeutil.iso(now)),
+    )
+
+
+def settle_group_creation_in_tx(
+    conn: Any,
+    request_id: str,
+    platform_identity: str | None,
+    *,
+    normalize: Normalizer,
+    now: datetime,
+) -> str | None:
+    """Meta's webhook for a pending creation (G8): the created group becomes a WhatsApp
+    destination with its ``grp_`` (``platform_identity`` given), or the creation is marked
+    failed (``None``). An unknown or already settled request changes nothing; returns the new
+    destination ref or None."""
+    require_tx(conn)
+    row = conn.execute(
+        "SELECT p.id, l.ref, p.name FROM pending_group_creations p"
+        " JOIN locations l ON l.id = p.location_id"
+        " WHERE p.request_id = ? AND p.destination_id IS NULL AND p.failed_at IS NULL",
+        (request_id,),
+    ).fetchone()
+    if row is None:
+        return None
+    if platform_identity is None:
+        conn.execute(
+            "UPDATE pending_group_creations SET failed_at = ? WHERE id = ?",
+            (timeutil.iso(now), row[0]),
+        )
+        return None
+    destination = add_destination_in_tx(
+        conn, row[1], "whatsapp", platform_identity, row[2], normalize=normalize, now=now
+    )
+    conn.execute(
+        "UPDATE pending_group_creations SET destination_id = ? WHERE id = ?",
+        (_id(conn, "destination", destination), row[0]),
+    )
+    return destination
+
+
+def pend_group_creation(
+    conn: Any, request_id: str, location_ref: str, name: str, *, now: datetime
+) -> None:
+    with write_tx(conn):
+        pend_group_creation_in_tx(conn, request_id, location_ref, name, now=now)

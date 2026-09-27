@@ -19,16 +19,16 @@ import httpx
 
 from comms.core.keys.secrets import SecretStore
 from comms.transports.net import pinned_client
+from comms.transports.whatsapp.numbers import WA_GROUP_ID
 
 __all__ = ["GRAPH_ORIGIN", "GraphApi", "GraphRefused", "GraphResponse", "GraphTransportError"]
 
 GRAPH_ORIGIN = "https://graph.facebook.com"
-API_VERSION = "v21.0"
+API_VERSION = "v26.0"  # G9: v21.0 expires 2027-01-21; Meta's current (2026-07-29)
 TOKEN_ITEM = "meta-access-token"
 _TOKEN = re.compile(r"\A[A-Za-z0-9_.\-]{20,512}\Z")
 _NUMBER_ID = re.compile(r"\A[0-9]{5,20}\Z")
 _OBJECT_ID = re.compile(r"\A[0-9]{1,20}\Z")  # a Graph object id (a template)
-_GROUP_ID = re.compile(r"\A[0-9]{5,30}\Z")
 
 
 class GraphRefused(Exception):
@@ -146,9 +146,59 @@ class GraphApi:
             f"/{API_VERSION}/{self._group(group_id)}", {"messaging_product": "whatsapp", **body}
         )
 
+    # -- catalog amendment G8: the rest of the Groups API, the profile and health ---------------
+
+    def group_info(self, group_id: str) -> GraphResponse:
+        """``GET /{group-id}?fields=participants,total_participant_count,subject``."""
+        params = {"fields": "participants,total_participant_count,subject"}
+        return self._call("GET", f"/{API_VERSION}/{self._group(group_id)}", params=params)
+
+    def group_invite(self, group_id: str) -> GraphResponse:
+        return self._call("GET", f"/{API_VERSION}/{self._group(group_id)}/invite_link")
+
+    def join_requests(self, group_id: str, *, limit: int, after: str | None) -> GraphResponse:
+        params = {"limit": str(limit), **({"after": after} if after else {})}
+        path = f"/{API_VERSION}/{self._group(group_id)}/join_requests"
+        return self._call("GET", path, params=params)
+
+    def answer_join_requests(
+        self, group_id: str, request_ids: list[str], *, approve: bool
+    ) -> GraphResponse:
+        """``POST`` (approve) or ``DELETE`` (reject) ``/{group-id}/join_requests``."""
+        body = {"messaging_product": "whatsapp", "join_requests": request_ids}
+        path = f"/{API_VERSION}/{self._group(group_id)}/join_requests"
+        return self._call("POST" if approve else "DELETE", path, body=body)
+
+    def update_group_photo(self, group_id: str, data: bytes) -> GraphResponse:
+        """``POST /{group-id}`` multipart: the group's profile picture (JPEG, G8). Meta reads the
+        part named ``profile_picture_file``, not the media upload's ``file`` (R-G9b)."""
+        return self._call(
+            "POST",
+            f"/{API_VERSION}/{self._group(group_id)}",
+            form={"messaging_product": "whatsapp"},
+            files={"profile_picture_file": ("photo.jpg", data, "image/jpeg")},
+        )
+
+    def create_group(self, body: Mapping[str, Any]) -> GraphResponse:
+        """``POST /{phone-number-id}/groups``: Meta creates the group asynchronously."""
+        return self._post(f"/{API_VERSION}/{self._phone}/groups", body)
+
+    def delete_group(self, group_id: str) -> GraphResponse:
+        return self._call("DELETE", f"/{API_VERSION}/{self._group(group_id)}")
+
+    def business_profile(self) -> GraphResponse:
+        params = {"fields": "about,address,description,email,websites,vertical"}
+        path = f"/{API_VERSION}/{self._phone}/whatsapp_business_profile"
+        return self._call("GET", path, params=params)
+
+    def health_status(self) -> GraphResponse:
+        return self._call(
+            "GET", f"/{API_VERSION}/{self._phone}", params={"fields": "health_status"}
+        )
+
     @staticmethod
     def _group(group_id: str) -> str:
-        if not isinstance(group_id, str) or not _GROUP_ID.match(group_id):
+        if not isinstance(group_id, str) or not WA_GROUP_ID.match(group_id):
             raise ValueError("group id refused")
         return group_id
 

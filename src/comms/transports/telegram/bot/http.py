@@ -50,9 +50,14 @@ BOT_METHODS = frozenset(
         "setChatTitle",
         "setChatDescription",
         "setChatPermissions",
+        "setChatPhoto",  # G8: multipart
         "createChatInviteLink",
         "editChatInviteLink",
         "revokeChatInviteLink",
+        "exportChatInviteLink",  # G6: a new primary link revokes the old
+        "setChatMemberTag",  # A46 (Bot API 9.5)
+        "deleteMessageReaction",  # A46 (Bot API 10.0)
+        "deleteAllMessageReactions",
         "approveChatJoinRequest",
         "declineChatJoinRequest",
         "createForumTopic",
@@ -129,6 +134,31 @@ class BotApi:
             stage = "ambiguous"
         if stage is not None:
             raise BotTransportError(stage)  # outside the handler: no chained, URL-bearing error
+        try:
+            envelope = json.loads(response.content)
+        except ValueError:
+            envelope = None
+        return BotResponse(response.status_code, envelope if isinstance(envelope, dict) else None)
+
+    def call_multipart(
+        self, method: str, params: Mapping[str, Any], files: Mapping[str, Any]
+    ) -> BotResponse:
+        """One multipart call (G8: ``setChatPhoto``); classified as ``call`` is."""
+        if method not in BOT_METHODS:
+            raise BotRefused("the bot api method is not allowed")
+        stage: Literal["not_sent", "ambiguous"] | None = None
+        try:
+            response = self._client.post(
+                f"{BOT_ORIGIN}/bot{self._token}/{method}",
+                data={k: str(v) for k, v in params.items()},
+                files=dict(files),
+            )
+        except (httpx.ConnectError, httpx.ConnectTimeout):
+            stage = "not_sent"
+        except httpx.HTTPError:
+            stage = "ambiguous"
+        if stage is not None:
+            raise BotTransportError(stage)
         try:
             envelope = json.loads(response.content)
         except ValueError:

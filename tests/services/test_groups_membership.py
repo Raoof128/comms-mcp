@@ -179,6 +179,10 @@ def test_membership_table_names_the_p25_p27_member_operations():
         "group.admin.update_rights",
         "group.join_requests.approve",
         "group.join_requests.reject",
+        # spec A46 (G7): member tags and reaction moderation name a member too
+        "group.member.tag_set",
+        "group.member.reactions_clear",
+        "message.reaction_remove",
     }
 
 

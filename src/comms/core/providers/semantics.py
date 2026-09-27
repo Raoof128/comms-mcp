@@ -61,6 +61,7 @@ READS = frozenset(
         C.WEBHOOK_RECEIVE_STATUS,
         C.ACCOUNT_INSPECT,
         C.PHONE_NUMBER_INSPECT,
+        C.PHONE_NUMBER_HEALTH,  # A46
         C.GROUP_LIST,
         C.GROUP_GET,
         C.GROUP_MEMBERS,
@@ -94,6 +95,7 @@ _TELEGRAM_CAPS = (
     *(C.MESSAGE_SEND, C.MESSAGE_EDIT, C.MESSAGE_DELETE, C.MESSAGE_FORWARD, C.MESSAGE_PIN),
     *(C.MEMBER_LIST, C.MEMBER_GET, C.MEMBER_ADD, C.MEMBER_REMOVE),
     *(C.MEMBER_BAN, C.MEMBER_UNBAN, C.MEMBER_RESTRICT),
+    *(C.MEMBER_TAG, C.REACTION_REMOVE, C.REACTION_CLEAR),  # A46
     *(C.ADMIN_LIST, C.ADMIN_PROMOTE, C.ADMIN_DEMOTE, C.ADMIN_LOG_READ),
     *(C.INVITE_CREATE, C.INVITE_EDIT, C.INVITE_REVOKE, C.INVITE_LIST),
     *(C.JOIN_REQUEST_LIST, C.JOIN_REQUEST_APPROVE, C.JOIN_REQUEST_REJECT),
@@ -108,6 +110,16 @@ SUPPORT: Mapping[C, tuple[str, ...]] = MappingProxyType(
         **{c: (USER,) if c in _USER_ONLY else _TELEGRAM for c in _TELEGRAM_CAPS},
         **{c: (CLOUD,) for c in C if c not in _TELEGRAM_CAPS and c not in _HOOK_CAPS},
         **dict.fromkeys(_HOOK_CAPS, (HOOKS,)),
+        # G6: every actor resets a group's primary invite link (Telegram: a new primary link
+        # revokes the old; WhatsApp: the one link is reset)
+        C.GROUP_INVITE_RESET: (*_TELEGRAM, CLOUD),
+        # G8: the Groups API pins messages and lists, approves and rejects join requests
+        C.MESSAGE_PIN: (*_TELEGRAM, CLOUD),
+        C.JOIN_REQUEST_LIST: (USER, CLOUD),
+        C.JOIN_REQUEST_APPROVE: (*_TELEGRAM, CLOUD),
+        C.JOIN_REQUEST_REJECT: (*_TELEGRAM, CLOUD),
+        C.GROUP_CREATE: (USER, CLOUD),  # G8: WhatsApp creates asynchronously
+        C.GROUP_DELETE: (USER, CLOUD),
     }
 )
 

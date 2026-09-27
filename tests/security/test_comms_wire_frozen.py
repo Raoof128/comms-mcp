@@ -46,6 +46,7 @@ ADDED_IN_V03 = Counter(  # comms/core/domains.py, comms v0.3 Part A
         "b'comms-cursor/v1\\x00'": 1,  # Part D, A30
         "b'comms-local-lease/v1\\x00'": 1,  # Part D, A33
         "'comms-loopback'": 1,  # Part D, A33: the cml1 audience
+        "b'comms-directory-identity/v1\\x00'": 1,  # catalog amendment G3: keyed contact binding
     }
 )
 

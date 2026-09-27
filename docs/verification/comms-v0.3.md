@@ -582,3 +582,69 @@ R-A20 (decided), R-E1 to R-E3 (the owner's), and R-E4 to R-E17 are in `docs/veri
 `comms-v0.3-d39-pre` is an annotated tag, pushed with the owner's approval on 2026-09-25 together with the merge that lands this branch on `main`: tag object `4503cc6daca4b533232d615f120c689ffd17a90a` → commit `d258670ebe46e4dcacd6e66ecf9f6575d265fd7b`.
 
 No production claim.
+
+## Catalog amendment (tasks G0–G9, with G6a)
+
+Plan `docs/superpowers/plans/2026-09-25-comms-v0.3-catalog-amendment.md`, approved by the owner with "full admin on both APIs" (G6a). Spec amendments A45 (the catalog amendment) and A46 (the 2026-docs admin surface). Branch `comms-v0.3-catalog` off `main` (`bdcefba`).
+
+### What exists now
+
+- **The directory is managed over MCP.**
+  - `comms_directory_recipient_*` handles people.
+  - `comms_directory_contact_*` handles contact points. Identities are input only (A26), bound by a keyed HMAC (`comms-directory-identity/v1`), and an opted-out identity is never re-added.
+  - `comms_directory_destination_*` handles destinations, and `comms_location_member_*` handles location membership.
+  - Backups keep `grp_` refs.
+- **WhatsApp groups are destinations with `grp_` refs** (schema v6). They reach sends, pins, participants, join requests, the invite link, create (settled by Meta's lifecycle webhook, schema v7) and delete.
+- **`comms_context_person`** serves one person's communication by source: their WhatsApp messages, their Telegram messages, their campaigns and their groups.
+- **Full admin on both Telegram APIs**, pinned by the actor matrix (`comms-v0.3-actor-matrix.md`). The matrix has no open cell and no A46 section left. The matrix's tests drive all three actors through the one composition root.
+- **Account profile, WhatsApp phone status and messaging health.** Account names and descriptions are marked untrusted and carry no identities.
+- **Staged media (D3):** `upl_` staging, in memory only, checked by SHA-256 and used once. It serves WhatsApp media upload and download, and group photos on all three actors.
+- **`NOT_OFFERED` is deleted.** Every catalog tool is offered. The catalog holds 129 tools; its pin is regenerated per task (R-G2).
+- **The Graph API is pinned at v26.0.** v21.0 expires on 2027-01-21 (R-G6a-docs).
+
+### D39-A additions against a real daemon
+
+`phase_v03_daemon` now has 29 checks. Four `catalog_*` checks drive the daemon through HTTP `/mcp`:
+
+- the directory over MCP: a person, a WhatsApp contact, a location with them, a Telegram group and a WhatsApp group;
+- a location campaign reaches the person added over MCP;
+- a signed webhook for a WhatsApp group is read by its `grp_`;
+- `comms_context_person` serves the person's WhatsApp direct message.
+
+### The exit gate
+
+`tests/security/test_catalog_amendment_exit.py` maps each plan task, read from the plan's own headings, to its owning tests and re-runs them in a fresh process with nothing skipped. It also checks the following:
+
+- no tool is constantly refused;
+- the matrix has no open cell;
+- the daemon checks are pinned in the smoke map;
+- the A45 and A46 tools are all in the catalog;
+- one end-to-end path runs over MCP: a person, a location, an audience, a campaign delivered by a fake provider, and that delivery in `comms_context_person`.
+
+### Counts (gate at the catalog-amendment head)
+
+| Check | Result |
+|---|---|
+| `uv run pytest -q` | **5420 passed**, 4 skipped (opt-in host and live tests) |
+| `scripts/e2e_smoke.py` | **103/103** (29 in `phase_v03_daemon`) |
+| `pytest tests/formal` | 57 passed |
+| ruff (no cache), ruff format, mypy, `uv build` | clean |
+| WhatsVault suite | **450 passed** |
+
+### Rulings
+
+R-G6a-docs, R-A46, R-G1 to R-G8d and R-G9 are in `docs/verification/comms-v0.3-rulings.md`.
+
+### Waiting on the owner
+
+- **Telegram mark-read and Telegram media:** the owner ruled on both on 2026-09-26. They are spec A47 (R-G9b), planned in `docs/superpowers/plans/2026-09-26-comms-v0.3-a47.md`, and the plan awaits approval.
+- **WhatsApp group create's synchronous response:** a second source (pywa 4.5.0, which follows Meta's Groups reference) documents `{"request_id": ...}`, matching the oracle. D39-B still observes it live.
+- **Found by that search and fixed (R-G9b):** the group-photo upload used the multipart part `file`, but Meta reads `profile_picture_file`.
+- **Merge and push** of `comms-v0.3-catalog`, and the tag.
+- **D39-B:** live acceptance of the P §88 rows.
+
+### Tag
+
+`comms-v0.3-catalog-amendment` is a local annotated tag (the branch has the other name). It is not pushed.
+
+No production claim.

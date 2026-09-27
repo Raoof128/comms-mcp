@@ -45,7 +45,12 @@ WRITES = {
         {"description": "Sal-e no"},
         False,
     ),
-    "comms_group_info_set_photo": (C.CHAT_SET_PHOTO, None, {"media": "med_" + "a" * 26}, False),
+    "comms_group_info_set_photo": (
+        C.CHAT_SET_PHOTO,
+        None,
+        {"data_b64": "/9j/4A==", "mime": "image/jpeg"},
+        False,
+    ),
     "comms_group_invite_create": (
         C.INVITE_CREATE,
         "group.invite.create",
@@ -133,7 +138,8 @@ def results(tmp_path_factory):
         "permissions": {"can_send_messages": True},
     }
     examples["comms_group_permissions_get"] = {"group": grp}
-    produced["comms_group_topic_get"] = {"group": grp, "topic": topic, "name": "T", "closed": False}
+    produced["comms_group_topic_get"] = {"group": grp, "topic": topic, "closed": False,
+                                         "untrusted": {"name": "T"}}  # fmt: skip
     examples["comms_group_topic_get"] = {"group": grp, "topic": topic}
     return {"results": produced, "examples": examples}
 

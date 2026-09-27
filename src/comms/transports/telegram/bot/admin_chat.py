@@ -61,6 +61,11 @@ def _pin(chat_id: int, args: Mapping[str, Any]) -> tuple[str, dict[str, Any]]:
     return "unpinChatMessage", {"chat_id": chat_id, "message_id": fields["message_id"]}
 
 
+def _photo(chat_id: int, args: Mapping[str, Any]) -> tuple[str, dict[str, Any]]:
+    specs.chat_photo(args)  # the bytes go as a file part, not in the params (G8)
+    return "setChatPhoto", {"chat_id": chat_id}
+
+
 CHAT_REQUESTS = {
     C.ADMIN_PROMOTE: _promote,
     C.ADMIN_DEMOTE: _demote,
@@ -68,4 +73,5 @@ CHAT_REQUESTS = {
     C.CHAT_SET_DESCRIPTION: _description,
     C.CHAT_SET_PERMISSIONS: _permissions,
     C.MESSAGE_PIN: _pin,
+    C.CHAT_SET_PHOTO: _photo,  # G8: multipart
 }

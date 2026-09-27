@@ -57,6 +57,9 @@ REVIEWED_RPCS: frozenset[str] = frozenset(
         "messages.DeleteMessagesRequest",
         "messages.EditChatAboutRequest",
         "messages.EditChatAdminRequest",
+        "messages.EditChatParticipantRankRequest",  # spec A46
+        "messages.DeleteParticipantReactionRequest",  # spec A46
+        "messages.DeleteParticipantReactionsRequest",  # spec A46
         "messages.EditChatDefaultBannedRightsRequest",
         "messages.EditChatPhotoRequest",
         "messages.EditChatTitleRequest",
@@ -68,11 +71,13 @@ REVIEWED_RPCS: frozenset[str] = frozenset(
         "messages.GetChatInviteImportersRequest",
         "messages.GetExportedChatInvitesRequest",
         "messages.GetForumTopicsRequest",
+        "messages.GetForumTopicsByIDRequest",  # catalog amendment G6: comms_group_topic_get
         "messages.GetFullChatRequest",
         "messages.HideChatJoinRequestRequest",
         "messages.MigrateChatRequest",
         "messages.SendMessageRequest",
         "messages.UpdatePinnedMessageRequest",
+        "upload.SaveFilePartRequest",  # catalog amendment G8: a group photo, in parts
     }
 )
 

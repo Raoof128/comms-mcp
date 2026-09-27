@@ -7,6 +7,7 @@ method; the adapter builds the MTProto request from the same spec.
 
 from __future__ import annotations
 
+import unicodedata
 from collections.abc import Callable, Mapping
 from typing import Any
 
@@ -63,6 +64,58 @@ def invite_edit(args: Mapping[str, Any]) -> Spec:
     if len(fields) < 2:
         raise ValueError("an invite edit changes something")
     return fields
+
+
+def _group_chat(value: object) -> bool:
+    """A group's marked chat id, as the directory stores it: ``-N`` or ``-100…`` (G7)."""
+    return (
+        isinstance(value, str)
+        and value.startswith("-")
+        and value[1:].isascii()
+        and value[1:].isdigit()
+        and int(value[1:]) > 0
+    )
+
+
+def forward(args: Mapping[str, Any]) -> Spec:
+    """One message of another group, by its marked chat id and message id (G7)."""
+    return take(args, {"from_chat": _group_chat, "message_id": positive_int}, {})
+
+
+def _tag(value: object) -> bool:
+    """A member tag (A46): 0–16 characters, no emoji or other symbols; empty clears it."""
+    return (
+        isinstance(value, str)
+        and len(value) <= 16
+        and all(unicodedata.category(ch)[0] not in "SC" for ch in value)
+    )
+
+
+def member_tag(args: Mapping[str, Any]) -> Spec:
+    return take(args, {"user_id": positive_int, "tag": _tag}, {})
+
+
+def member_reaction(args: Mapping[str, Any]) -> Spec:
+    return take(args, {"user_id": positive_int, "message_id": positive_int}, {})
+
+
+PHOTO_TYPES = frozenset({"image/jpeg", "image/png"})
+PHOTO_MAX = 10 * 1024 * 1024  # Telegram's photo limit
+
+
+def chat_photo(args: Mapping[str, Any]) -> Spec:
+    """A group photo (G8): JPEG or PNG bytes, at most 10 MiB."""
+    photo, mime = args.get("photo"), args.get("mime")
+    if set(args) != {"photo", "mime"} or mime not in PHOTO_TYPES:
+        raise ValueError("operation arguments are malformed")
+    if not isinstance(photo, bytes) or not 0 < len(photo) <= PHOTO_MAX:
+        raise ValueError("operation arguments are malformed")
+    return {"photo": photo, "mime": mime}
+
+
+def no_args(args: Mapping[str, Any]) -> Spec:
+    """An operation that takes nothing (G6: resetting the primary invite link)."""
+    return take(args, {}, {})
 
 
 def invite_revoke(args: Mapping[str, Any]) -> Spec:

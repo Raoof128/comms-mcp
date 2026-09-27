@@ -57,6 +57,10 @@ CAPABILITY_TOOLS = {
     C.MEDIA_UPLOAD: "comms_media_upload",
     C.MEMBER_ADD: "comms_group_member_add",
     C.MEMBER_BAN: "comms_group_member_ban",
+    C.MEMBER_TAG: "comms_group_member_tag_set",  # spec A46
+    C.REACTION_REMOVE: "comms_message_reaction_remove",
+    C.REACTION_CLEAR: "comms_group_member_reactions_clear",
+    C.PHONE_NUMBER_HEALTH: "comms_whatsapp_health_status",
     C.MEMBER_GET: "comms_group_members_get",
     C.MEMBER_LIST: "comms_group_members_list",
     C.MEMBER_REMOVE: "comms_group_member_remove",

@@ -12,6 +12,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from comms.core.providers.capability import Capability as C
+from comms.transports.telegram import chat_specs as specs
 from comms.transports.telegram.args import boolean, positive_int, take, text
 
 __all__ = ["DELETE_SCOPE", "MESSAGE_REQUESTS"]
@@ -40,4 +41,15 @@ def _delete(chat_id: int, args: Mapping[str, Any]) -> tuple[str, dict[str, Any]]
     return "deleteMessage", {"chat_id": chat_id, "message_id": fields["message_id"]}
 
 
-MESSAGE_REQUESTS = {C.MESSAGE_SEND: _send, C.MESSAGE_EDIT: _edit, C.MESSAGE_DELETE: _delete}
+def _forward(chat_id: int, args: Mapping[str, Any]) -> tuple[str, dict[str, Any]]:
+    fields = specs.forward(args)
+    return "forwardMessage", {"chat_id": chat_id, "from_chat_id": int(fields["from_chat"]),
+                              "message_id": fields["message_id"]}  # fmt: skip
+
+
+MESSAGE_REQUESTS = {
+    C.MESSAGE_SEND: _send,
+    C.MESSAGE_EDIT: _edit,
+    C.MESSAGE_DELETE: _delete,
+    C.MESSAGE_FORWARD: _forward,  # G7: the new message's id is its provider ref
+}

@@ -47,6 +47,7 @@ from comms.core.providers.semantics import SEMANTICS
 __all__ = [
     "CRASH_POINTS",
     "CallContext",
+    "Created",
     "MutationCrash",
     "MutationExecutor",
     "MutationOutcome",
@@ -75,9 +76,22 @@ class MutationOutcome:
     replayed: bool = False
 
 
+# What a successful creation adds to the directory, from its provider ref (G7).
+Created = Callable[[Any, str], Mapping[str, Any]]
+
+
 def request_digest(tool: str, args: Mapping[str, Any], targets: Mapping[str, Any]) -> str:
     body = jcs_dumps({"args": dict(args), "targets": dict(targets), "tool": tool})
     return hashlib.sha256(domains.REQUEST_DIGEST + body).hexdigest()
+
+
+def _digestible(args: Mapping[str, Any]) -> dict[str, Any]:
+    """File bytes (G8: a media upload, a group photo) enter the request digest as their SHA-256
+    and size only; they never reach a digest, a record or the audit chain themselves."""
+    return {
+        k: {"sha256": hashlib.sha256(v).hexdigest(), "size": len(v)} if isinstance(v, bytes) else v
+        for k, v in args.items()
+    }
 
 
 def op_key(client_ref: str, request_id: str) -> str:
@@ -189,10 +203,13 @@ class MutationExecutor:
         request_id: str,
         *,
         object_kind: str | None = None,
+        on_created: Created | None = None,
     ) -> MutationOutcome:
         """``object_kind`` names what the call makes: its provider ref becomes a durable object
         ref in the result. A CREATE's success without one is ``OUTCOME_UNKNOWN`` (A19); a send
-        without one (a proven duplicate) succeeds with no ref."""
+        without one (a proven duplicate) succeeds with no ref. ``on_created`` records what a
+        success made in the directory, through a core API with its own transaction, from the provider ref (G7: a
+        created group becomes a destination with its ``grp_``); without a ref it is unknown."""
         _check_request(request_id)
         if object_kind is not None and object_kind not in KIND_PREFIX:
             raise CommsError("INVALID_ARGUMENT")
@@ -213,7 +230,7 @@ class MutationExecutor:
             "capability": op.capability.value,
             "destination": target.destination_ref,
         }
-        digest = request_digest(tool, op.args, targets)
+        digest = request_digest(tool, _digestible(op.args), targets)
         mutation_id, op_ref = 0, ""
         try:
             with self._writer.transaction() as tx:
@@ -269,6 +286,7 @@ class MutationExecutor:
                 adapter,
                 replayed=True,
                 object_kind=object_kind,
+                on_created=on_created,
             )
         return self._run(
             mutation_id,
@@ -281,6 +299,7 @@ class MutationExecutor:
             adapter,
             replayed=False,
             object_kind=object_kind,
+            on_created=on_created,
         )
 
     def _run(
@@ -296,6 +315,7 @@ class MutationExecutor:
         *,
         replayed: bool,
         object_kind: str | None = None,
+        on_created: Created | None = None,
     ) -> MutationOutcome:
         key = op_key(ctx.client_ref, request_id)
         conn = self._writer.conn
@@ -359,6 +379,11 @@ class MutationExecutor:
                         now=self._writer.now(),
                     )
                 elif SEMANTICS[(op.capability, target.actor)].retry_class == "CREATE":
+                    state = "OUTCOME_UNKNOWN"  # created, but nothing to name it by
+            if on_created is not None and last and state == "SUCCEEDED":
+                if result.provider_ref:  # the hook runs its own core transaction
+                    created.update(on_created(conn, result.provider_ref))
+                else:
                     state = "OUTCOME_UNKNOWN"  # created, but nothing to name it by
             try:
                 self._record_step(

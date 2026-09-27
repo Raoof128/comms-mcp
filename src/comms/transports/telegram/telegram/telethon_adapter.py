@@ -16,6 +16,7 @@ import contextlib
 import fcntl
 import inspect
 import os
+import secrets
 import stat
 from collections.abc import Callable, Iterator, Mapping
 from contextvars import ContextVar
@@ -120,7 +121,9 @@ READ_RPCS: Mapping[Capability, frozenset[str]] = MappingProxyType(
         Capability.ADMIN_LOG_READ: frozenset({"channels.GetAdminLogRequest"}),
         Capability.INVITE_LIST: frozenset({"messages.GetExportedChatInvitesRequest"}),
         Capability.JOIN_REQUEST_LIST: frozenset({"messages.GetChatInviteImportersRequest"}),
-        Capability.TOPIC_LIST: frozenset({"messages.GetForumTopicsRequest"}),
+        Capability.TOPIC_LIST: frozenset(
+            {"messages.GetForumTopicsRequest", "messages.GetForumTopicsByIDRequest"}  # G6
+        ),
     }
 )
 WRITE_RPCS: Mapping[Capability, frozenset[str]] = MappingProxyType(
@@ -153,6 +156,10 @@ ADMIN_RPCS: Mapping[Capability, frozenset[str]] = MappingProxyType(
         Capability.INVITE_CREATE: frozenset({"messages.ExportChatInviteRequest"}),
         Capability.INVITE_EDIT: _EDIT_INVITE,
         Capability.INVITE_REVOKE: _EDIT_INVITE,
+        Capability.GROUP_INVITE_RESET: frozenset({"messages.ExportChatInviteRequest"}),  # G6
+        Capability.MEMBER_TAG: frozenset({"messages.EditChatParticipantRankRequest"}),  # A46
+        Capability.REACTION_REMOVE: frozenset({"messages.DeleteParticipantReactionRequest"}),
+        Capability.REACTION_CLEAR: frozenset({"messages.DeleteParticipantReactionsRequest"}),
         Capability.JOIN_REQUEST_APPROVE: _JOIN_REQUEST,
         Capability.JOIN_REQUEST_REJECT: _JOIN_REQUEST,
         Capability.CHAT_SET_TITLE: frozenset(
@@ -160,7 +167,12 @@ ADMIN_RPCS: Mapping[Capability, frozenset[str]] = MappingProxyType(
         ),
         Capability.CHAT_SET_DESCRIPTION: frozenset({"messages.EditChatAboutRequest"}),
         Capability.CHAT_SET_PHOTO: frozenset(
-            {"messages.EditChatPhotoRequest", "channels.EditPhotoRequest"}
+            # G8: the photo goes up in upload.saveFilePart parts first, then is set
+            {
+                "messages.EditChatPhotoRequest",
+                "channels.EditPhotoRequest",
+                "upload.SaveFilePartRequest",
+            }
         ),
         Capability.CHAT_SET_PERMISSIONS: frozenset({"messages.EditChatDefaultBannedRightsRequest"}),
         Capability.TOPIC_CREATE: frozenset({"messages.CreateForumTopicRequest"}),
@@ -562,6 +574,60 @@ def _invite_create(
     return functions.messages.ExportChatInviteRequest(peer, **_invite_args(spec))
 
 
+def _invite_reset(
+    session: TelethonSession, peer_type: str, peer_id: int, spec: Mapping[str, Any]
+) -> Any:
+    """A new primary link that revokes the old (G6), as the Bot API's exportChatInviteLink."""
+    peer = session._admin_peer(peer_type, peer_id)
+    return functions.messages.ExportChatInviteRequest(peer, legacy_revoke_permanent=True)
+
+
+def _member_peer(session: TelethonSession, user_id: int) -> Any:
+    try:
+        return session.input_peer("user", user_id)
+    except GatewayError:
+        raise _PeerMissing("TARGET_NOT_FOUND") from None
+
+
+def _member_tag(
+    session: TelethonSession, peer_type: str, peer_id: int, spec: Mapping[str, Any]
+) -> Any:
+    """A regular member's tag (A46); an empty tag clears it."""
+    return functions.messages.EditChatParticipantRankRequest(
+        peer=session._admin_peer(peer_type, peer_id),
+        participant=_member_peer(session, spec["user_id"]),
+        rank=spec["tag"],
+    )
+
+
+def _reaction_remove(
+    session: TelethonSession, peer_type: str, peer_id: int, spec: Mapping[str, Any]
+) -> Any:
+    return functions.messages.DeleteParticipantReactionRequest(
+        peer=session._admin_peer(peer_type, peer_id),
+        msg_id=spec["message_id"],
+        participant=_member_peer(session, spec["user_id"]),
+    )
+
+
+def _reactions_clear(
+    session: TelethonSession, peer_type: str, peer_id: int, spec: Mapping[str, Any]
+) -> Any:
+    return functions.messages.DeleteParticipantReactionsRequest(
+        peer=session._admin_peer(peer_type, peer_id),
+        participant=_member_peer(session, spec["user_id"]),
+    )
+
+
+def _chat_photo(
+    session: TelethonSession, peer_type: str, peer_id: int, spec: Mapping[str, Any]
+) -> Any:
+    photo = types.InputChatUploadedPhoto(file=spec["uploaded"])
+    if peer_type == "channel":
+        return functions.channels.EditPhotoRequest(session._admin_channel(peer_id), photo)
+    return functions.messages.EditChatPhotoRequest(peer_id, photo)
+
+
 def _invite_edit(
     session: TelethonSession, peer_type: str, peer_id: int, spec: Mapping[str, Any]
 ) -> Any:
@@ -702,6 +768,7 @@ def _new_channel(result: Any) -> str | None:
 _CREATED_REF: Mapping[Capability, Callable[[Any], str | None]] = MappingProxyType(
     {
         Capability.INVITE_CREATE: _invite_link,
+        Capability.GROUP_INVITE_RESET: _invite_link,
         Capability.TOPIC_CREATE: _topic_id,
         Capability.GROUP_CREATE: _new_channel,
         Capability.GROUP_MIGRATE: _new_channel,
@@ -713,9 +780,14 @@ _ADMIN_BUILDERS: Mapping[Capability, Callable[..., Any]] = MappingProxyType(
         Capability.CHAT_SET_TITLE: _title,
         Capability.CHAT_SET_DESCRIPTION: _about,
         Capability.CHAT_SET_PERMISSIONS: _default_rights,
+        Capability.CHAT_SET_PHOTO: _chat_photo,  # G8
         Capability.INVITE_CREATE: _invite_create,
         Capability.INVITE_EDIT: _invite_edit,
         Capability.INVITE_REVOKE: _invite_revoke,
+        Capability.GROUP_INVITE_RESET: _invite_reset,
+        Capability.MEMBER_TAG: _member_tag,  # A46
+        Capability.REACTION_REMOVE: _reaction_remove,
+        Capability.REACTION_CLEAR: _reactions_clear,
         Capability.JOIN_REQUEST_APPROVE: _join(True),
         Capability.JOIN_REQUEST_REJECT: _join(False),
         Capability.TOPIC_CREATE: _topic_create,
@@ -747,6 +819,22 @@ _ROLE: Mapping[type, str] = MappingProxyType(
         types.ChatParticipantAdmin: "admin",
     }
 )
+
+
+PHOTO_PART = 512 * 1024  # upload.saveFilePart's part size (G8)
+MAX_ADMINS = 200  # a channel's administrators (Telegram caps them at 50; one page holds all)
+
+
+def _standing(part: Any) -> tuple[str | None, str]:
+    """A participant's ``(role, status)`` (G6)."""
+    if isinstance(part, types.ChannelParticipantLeft):
+        return None, "left"
+    if isinstance(part, types.ChannelParticipantBanned):
+        rights = getattr(part, "banned_rights", None)
+        if rights is not None and rights.view_messages:
+            return None, "banned"
+        return "member", "restricted"
+    return _ROLE.get(type(part), "member"), "member"
 
 
 def _sent_message_id(result: Any, random_id: int) -> int | None:
@@ -1034,9 +1122,47 @@ class TelethonSession:
         request = functions.messages.SendMessageRequest(
             peer, text, random_id=random_id, reply_to=replied
         )
+        return await self._keyed_send(Capability.MESSAGE_SEND, request, random_id, timeout)
+
+    async def set_chat_photo(
+        self, peer_type: str, peer_id: int, data: bytes, *, timeout: float
+    ) -> ProviderResult:
+        """A group's photo (G8): the bytes in ``upload.saveFilePart`` parts of 512 KiB, then
+        ``channels.editPhoto`` / ``messages.editChatPhoto``, classified as every admin call.
+        A part that fails means nothing was set: the photo is provably unchanged."""
+        file_id = secrets.randbits(63)
+        parts = [data[i : i + PHOTO_PART] for i in range(0, len(data), PHOTO_PART)]
+        for index, part in enumerate(parts):
+            try:
+                await self.call_capability(
+                    Capability.CHAT_SET_PHOTO,
+                    functions.upload.SaveFilePartRequest(file_id, index, part),
+                    timeout=timeout,
+                )
+            except GatewayError:
+                return ProviderResult("FAILED", "PROVIDER_UNAVAILABLE")
+        uploaded = types.InputFile(file_id, len(parts), "photo.jpg", md5_checksum="")
+        return await self.admin_request(
+            Capability.CHAT_SET_PHOTO, peer_type, peer_id, {"uploaded": uploaded}, timeout=timeout
+        )
+
+    async def forward_once(
+        self, from_peer: Any, message_id: int, to_peer: Any, random_id: int, *, timeout: float
+    ) -> SendAttempt:
+        """One ``messages.forwardMessages`` of one message carrying ``random_id`` (G7; A20),
+        classified as a send; never retried here."""
+        request = functions.messages.ForwardMessagesRequest(
+            from_peer=from_peer, id=[message_id], to_peer=to_peer, random_id=[random_id]
+        )
+        return await self._keyed_send(Capability.MESSAGE_FORWARD, request, random_id, timeout)
+
+    async def _keyed_send(
+        self, capability: Capability, request: Any, random_id: int, timeout: float
+    ) -> SendAttempt:
+        """One keyed send-shaped call, classified (A20): the one copy for send and forward."""
         try:
             result = await self.call_capability(
-                Capability.MESSAGE_SEND,
+                capability,
                 request,
                 timeout=timeout,
                 passthrough=(errors.RandomIdDuplicateError, *_SEND_REFUSED),
@@ -1176,6 +1302,192 @@ class TelethonSession:
             rows.append((user_id, _ROLE.get(type(part), "member"), name or None))
         return rows, (offset + len(parts) if more else None)
 
+    async def fetch_participant(
+        self, peer_type: str, peer_id: int, user_id: int, *, timeout: float
+    ) -> tuple[str | None, str]:
+        """One member's ``(role, status)`` (G6): ``channels.getParticipant`` for a channel or
+        supergroup, ``messages.getFullChat`` for a basic group. Not a member is ``(None,
+        "left")``; a banned member is ``(None, "banned")``, a restricted one ``("member",
+        "restricted")``."""
+        if peer_type == "channel":
+            request = functions.channels.GetParticipantRequest(
+                self.input_peer("channel", peer_id), self._admin_user(user_id)
+            )
+            try:
+                result = await self.call_capability(
+                    Capability.MEMBER_GET,
+                    request,
+                    timeout=timeout,
+                    passthrough=(errors.UserNotParticipantError,),
+                )
+            except errors.UserNotParticipantError:
+                return None, "left"
+            return _standing(result.participant)
+        if peer_type == "chat":
+            result = await self.call_capability(
+                Capability.MEMBER_GET,
+                functions.messages.GetFullChatRequest(peer_id),
+                timeout=timeout,
+            )
+            every = getattr(result.full_chat.participants, "participants", None) or ()
+            part = next((p for p in every if getattr(p, "user_id", None) == user_id), None)
+            return (None, "left") if part is None else _standing(part)
+        raise GatewayError("NOT_ACCESSIBLE")
+
+    async def fetch_admins(
+        self, peer_type: str, peer_id: int, *, timeout: float
+    ) -> list[tuple[int, str, str | None]]:
+        """Every administrator, ``(user id, role, display name)`` (G6): ``channels.
+        getParticipants(admins)`` for a channel or supergroup, the full chat's for a basic one."""
+        if peer_type == "channel":
+            request = functions.channels.GetParticipantsRequest(
+                utils.get_input_channel(self.input_peer("channel", peer_id)),
+                types.ChannelParticipantsAdmins(),
+                0,
+                MAX_ADMINS,
+                hash=0,
+            )
+            result = await self.call_capability(Capability.ADMIN_LIST, request, timeout=timeout)
+            parts = list(getattr(result, "participants", None) or ())
+        elif peer_type == "chat":
+            result = await self.call_capability(
+                Capability.ADMIN_LIST,
+                functions.messages.GetFullChatRequest(peer_id),
+                timeout=timeout,
+            )
+            parts = list(getattr(result.full_chat.participants, "participants", None) or ())
+        else:
+            raise GatewayError("NOT_ACCESSIBLE")
+        names = {u.id: u for u in getattr(result, "users", None) or ()}
+        rows = []
+        for part in parts:
+            role = _ROLE.get(type(part))
+            user_id = getattr(part, "user_id", None)
+            if role not in ("creator", "admin") or type(user_id) is not int:
+                continue
+            user = names.get(user_id)
+            name = " ".join(
+                filter(None, (getattr(user, "first_name", None), getattr(user, "last_name", None)))
+            )
+            rows.append((user_id, role, name or None))
+        return rows
+
+    async def default_permissions(
+        self, peer_type: str, peer_id: int, *, timeout: float
+    ) -> dict[str, bool]:
+        """The chat's default member permissions, as the Bot API names them (G6): a permission
+        holds unless one of the ``ChatBannedRights`` flags it lifts is in force. The chat object
+        comes with ``channels.getParticipant(self)`` or ``messages.getFullChat``; the frozen
+        spec keeps ``channels.getChannels`` absent in every phase."""
+        if peer_type == "channel":  # the account's own participant read carries the channel
+            request = functions.channels.GetParticipantRequest(
+                self.input_peer("channel", peer_id), types.InputUserSelf()
+            )
+            result = await self.call_capability(Capability.MEMBER_GET, request, timeout=timeout)
+        elif peer_type == "chat":
+            result = await self.call_capability(
+                Capability.MEMBER_GET,
+                functions.messages.GetFullChatRequest(peer_id),
+                timeout=timeout,
+            )
+        else:
+            raise GatewayError("NOT_ACCESSIBLE")
+        chat = next((c for c in result.chats if getattr(c, "id", None) == peer_id), None)
+        if chat is None:
+            raise GatewayError("NOT_ACCESSIBLE")
+        banned = _flags(getattr(chat, "default_banned_rights", None))
+        return {
+            permission: not (set(flags) & banned)
+            for permission, flags in _BANNED_FOR_PERMISSION.items()
+        }
+
+    async def exported_invites(
+        self,
+        peer_type: str,
+        peer_id: int,
+        *,
+        offset: tuple[datetime, str] | None,
+        limit: int,
+        timeout: float,
+    ) -> tuple[list[Any], tuple[datetime, str] | None]:
+        """One page of the account's own active invite links (G6), and the next offset (the
+        last link's date and link, as ``messages.getExportedChatInvites`` pages)."""
+        request = functions.messages.GetExportedChatInvitesRequest(
+            peer=self._admin_peer(peer_type, peer_id),
+            admin_id=types.InputUserSelf(),
+            limit=limit,
+            revoked=False,
+            offset_date=offset[0] if offset else None,
+            offset_link=offset[1] if offset else None,
+        )
+        result = await self.call_capability(Capability.INVITE_LIST, request, timeout=timeout)
+        invites = [i for i in result.invites if isinstance(i, types.ChatInviteExported)]
+        more = len(result.invites) == limit and invites
+        return invites, ((invites[-1].date, invites[-1].link) if more else None)
+
+    async def join_requests(
+        self,
+        peer_type: str,
+        peer_id: int,
+        *,
+        offset: tuple[datetime, int] | None,
+        limit: int,
+        timeout: float,
+    ) -> tuple[list[tuple[int, datetime | None, str | None]], tuple[datetime, int] | None]:
+        """One page of pending join requests (G6): ``(user id, date, display name)``, and the
+        next offset (the last requester's date and id)."""
+        offset_user: Any = types.InputUserEmpty()
+        if offset is not None:
+            offset_user = self._admin_user(offset[1])
+        request = functions.messages.GetChatInviteImportersRequest(
+            peer=self._admin_peer(peer_type, peer_id),
+            offset_date=offset[0] if offset else None,
+            offset_user=offset_user,
+            limit=limit,
+            requested=True,
+        )
+        result = await self.call_capability(Capability.JOIN_REQUEST_LIST, request, timeout=timeout)
+        names = {u.id: u for u in getattr(result, "users", None) or ()}
+        rows = []
+        for importer in result.importers:
+            user = names.get(importer.user_id)
+            name = " ".join(
+                filter(None, (getattr(user, "first_name", None), getattr(user, "last_name", None)))
+            )
+            rows.append((importer.user_id, importer.date, name or None))
+        last = result.importers[-1] if result.importers else None
+        if last is None or len(result.importers) < limit:
+            return rows, None
+        return rows, (last.date, last.user_id)
+
+    async def forum_topics(
+        self,
+        peer_id: int,
+        *,
+        offset: tuple[datetime, int, int] | None,
+        ids: list[int] | None = None,
+        limit: int,
+        timeout: float,
+    ) -> tuple[list[Any], tuple[datetime, int, int] | None]:
+        """A page of a forum's topics, or the topics with these ids (G6); the next offset is the
+        last topic's date, top message and id, as ``messages.getForumTopics`` pages."""
+        peer = self.input_peer("channel", peer_id)
+        if ids is not None:
+            request: Any = functions.messages.GetForumTopicsByIDRequest(peer=peer, topics=ids)
+        else:
+            request = functions.messages.GetForumTopicsRequest(
+                peer=peer,
+                offset_date=offset[0] if offset else None,
+                offset_id=offset[1] if offset else 0,
+                offset_topic=offset[2] if offset else 0,
+                limit=limit,
+            )
+        result = await self.call_capability(Capability.TOPIC_LIST, request, timeout=timeout)
+        topics = [x for x in result.topics if isinstance(x, types.ForumTopic)]
+        more = ids is None and len(result.topics) == limit and topics
+        last = topics[-1] if more else None
+        return topics, ((last.date, last.top_message, last.id) if last is not None else None)
+
     async def admin_log(
         self, peer_id: int, *, max_id: int, limit: int, timeout: float
     ) -> list[tuple[int, datetime, int, str]]:
@@ -1297,6 +1609,21 @@ class TelethonSession:
             budget=WorkBudget(max_rpcs=1),
         )
         return int(users[0].id)
+
+    async def own_name(self, deadline: Deadline) -> str | None:
+        """The account's own display name (G8: ``comms_account_profile``); never its id."""
+        users = await self._call_reviewed(
+            functions.users.GetUsersRequest([types.InputUserSelf()]),
+            operation="admin.status",
+            client_ref="operator",
+            deadline=deadline,
+            budget=WorkBudget(max_rpcs=1),
+        )
+        user = users[0] if users else None
+        name = " ".join(
+            filter(None, (getattr(user, "first_name", None), getattr(user, "last_name", None)))
+        )
+        return name or None
 
     async def admin_log_out(self, deadline: Deadline) -> None:
         """Exactly one ``auth.LogOutRequest`` (comms v0.3 B14); only ``admin_rpc`` calls this."""
@@ -1565,12 +1892,15 @@ class TelethonSession:
         client_ref: str,
         deadline: Deadline,
         budget: WorkBudget,
+        from_user: int | None = None,
     ) -> SearchPage:
         """One messages.Search page in one peer (never SearchGlobal).
 
-        ``None`` bounds are sent as 0, which Telegram reads as unbounded.
+        ``None`` bounds are sent as 0, which Telegram reads as unbounded. ``from_user`` narrows
+        it to one sender (G6, a person's group activity); left out, the request is unchanged.
         """
         peer = self.input_peer(peer_type, peer_id)
+        sender = None if from_user is None else self.input_peer("user", from_user)
         result = await self._call_reviewed(
             functions.messages.SearchRequest(
                 peer=peer,
@@ -1584,6 +1914,7 @@ class TelethonSession:
                 max_id=0,
                 min_id=0,
                 hash=0,
+                from_id=sender,
             ),
             operation="mcp.retrieval",
             client_ref=client_ref,

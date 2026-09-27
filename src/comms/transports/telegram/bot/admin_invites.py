@@ -19,7 +19,11 @@ from comms.transports.telegram import chat_specs as specs
 __all__ = ["INVITE_REQUESTS", "REF_FIELDS"]
 
 REF_FIELDS: Mapping[C, str] = MappingProxyType(
-    {C.INVITE_CREATE: "invite_link", C.TOPIC_CREATE: "message_thread_id"}
+    {
+        C.INVITE_CREATE: "invite_link",
+        C.TOPIC_CREATE: "message_thread_id",
+        C.GROUP_INVITE_RESET: "result",  # exportChatInviteLink answers the link itself
+    }
 )
 Request = Callable[[int, Mapping[str, Any]], tuple[str, dict[str, Any]]]
 
@@ -35,6 +39,7 @@ INVITE_REQUESTS = {
     C.INVITE_CREATE: _bot("createChatInviteLink", specs.invite_create),
     C.INVITE_EDIT: _bot("editChatInviteLink", specs.invite_edit),
     C.INVITE_REVOKE: _bot("revokeChatInviteLink", specs.invite_revoke),
+    C.GROUP_INVITE_RESET: _bot("exportChatInviteLink", specs.no_args),
     C.JOIN_REQUEST_APPROVE: _bot("approveChatJoinRequest", specs.member),
     C.JOIN_REQUEST_REJECT: _bot("declineChatJoinRequest", specs.member),
     C.TOPIC_CREATE: _bot("createForumTopic", specs.topic_create),

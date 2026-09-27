@@ -103,6 +103,10 @@
     "phase_v03_daemon::scripted Bot API updates are retained and served as telegram_local",
     "phase_v03_daemon::a restart polls from the stored offset and ingests nothing twice",
     "phase_v03_daemon::the webhook listener verifies the challenge, accepts signed, refuses unsigned",
-    "phase_v03_daemon::kill -9 during webhook delivery, then restart, verifies clean"
+    "phase_v03_daemon::kill -9 during webhook delivery, then restart, verifies clean",
+    "phase_v03_daemon::the directory over MCP: a person, a WhatsApp contact, a location with them, a Telegram and a WhatsApp group",
+    "phase_v03_daemon::a location campaign reaches the person added over MCP",
+    "phase_v03_daemon::a signed webhook for a WhatsApp group is read by its grp_",
+    "phase_v03_daemon::comms_context_person serves the person's WhatsApp direct message"
   ]
 }

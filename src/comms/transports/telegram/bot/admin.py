@@ -34,7 +34,11 @@ _REQUESTS: Mapping[Capability, Request] = {
     **INVITE_REQUESTS,
     **MESSAGE_REQUESTS,
 }
-_REF_FIELDS: Mapping[Capability, str] = {**REF_FIELDS, Capability.MESSAGE_SEND: "message_id"}
+_REF_FIELDS: Mapping[Capability, str] = {
+    **REF_FIELDS,
+    Capability.MESSAGE_SEND: "message_id",
+    Capability.MESSAGE_FORWARD: "message_id",
+}
 assert all(not SEMANTICS[(c, ACTOR)].steps for c in _REQUESTS)  # no saga is ever one call
 
 
@@ -61,7 +65,12 @@ class BotAdmin:
     def invoke(self, op: SemanticOperation, target: ProviderTarget, op_key: str) -> ProviderResult:
         method, params = self._request(op, target)
         try:
-            outcome: BotResponse | BotTransportError = self._api.call(method, params)
+            outcome: BotResponse | BotTransportError
+            if op.capability is Capability.CHAT_SET_PHOTO:  # G8: the photo as a file part
+                photo = ("photo", op.args["photo"], op.args["mime"])
+                outcome = self._api.call_multipart(method, params, {"photo": photo})
+            else:
+                outcome = self._api.call(method, params)
         except BotTransportError as exc:
             outcome = exc
         result = classify_admin(outcome)
@@ -71,6 +80,8 @@ class BotAdmin:
         if field is None or result.outcome != "SUCCEEDED":
             return result
         ref = result.detail.get(field)
+        if op.capability is Capability.GROUP_INVITE_RESET and isinstance(outcome, BotResponse):
+            ref = (outcome.envelope or {}).get("result")  # the new link is the bare result
         if type(ref) not in (int, str) or ref in ("", 0):
             return ProviderResult("OUTCOME_UNKNOWN", None)  # created, but no ref to name it by
         return ProviderResult("SUCCEEDED", None, provider_ref=str(ref), detail=result.detail)

@@ -57,7 +57,7 @@ BAD = {
 }
 UNPERFORMED = {
     "telegram_bot": SemanticOperation(C.GROUP_DELETE, {}),
-    "telegram_user": SemanticOperation(C.CHAT_SET_PHOTO, {}),
+    "telegram_user": SemanticOperation(C.MEMBER_REMOVE, {}),  # a saga: never one call
     "whatsapp_cloud": SemanticOperation(C.MEMBER_BAN, {"user_id": 42}),
 }
 

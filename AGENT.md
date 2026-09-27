@@ -670,3 +670,182 @@ Follow the user's engineering lifecycle: design/security analysis, implementatio
   - `grp_` refs are not in backups.
   - The local tag `comms-v0.3-d39-pre` is not pushed; merge and push need the owner's approval.
   - No production claim.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Catalog amendment G6a. The last gauntlet re-checked the actor matrix against the live 2026 developer docs (branch `comms-v0.3-catalog`).
+- **Summary:** No cell flips between A and B. All 30 cited Bot API methods (10.3, 2026-08-24) and all 47 cited MTProto methods exist; the forum-topic requests are `messages.*`, matching Telethon 1.45.0 (layer 229). Meta confirms the WhatsApp gaps (edit and delete are non-supported in groups; the Message History Events API is status-only). Recorded for the builders:
+  - `getChatAdministrators(return_bots=True)`;
+  - a WhatsApp pin requires `expiration_days`;
+  - a group holds at most 8 participants.
+
+  **Found:** the Graph API pin (v21.0) expires on 2027-01-21. G9 now moves it.
+- **Files changed:** `docs/verification/comms-v0.3-actor-matrix.md`, `docs/verification/comms-v0.3-rulings.md` (R-G6a-docs), `docs/superpowers/plans/2026-09-25-comms-v0.3-catalog-amendment.md` (G9), `tests/core/providers/test_actor_matrix.py` (+1 test), the ledger, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** The raw doc pages were fetched and grepped; the full gate passed (GATE ok=1).
+- **Follow-ups:** The owner rules whether member tags, reaction moderation and WhatsApp `health_status` join the catalog (they are outside A45). G9 bumps the Graph version.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Spec amendment A46. The owner added the 2026-docs admin surface to the catalog (branch `comms-v0.3-catalog`).
+- **Summary:** Four tools:
+  - `comms_group_member_tag_set`: Bot `setChatMemberTag`, MTProto `messages.editChatParticipantRank`;
+  - `comms_message_reaction_remove`: `deleteMessageReaction` / `messages.deleteParticipantReaction`;
+  - `comms_group_member_reactions_clear`: `deleteAllMessageReactions` / `messages.deleteParticipantReactions`;
+  - `comms_whatsapp_health_status`: Graph `health_status`, with entity ids dropped.
+
+  WhatsApp is B for the three Telegram tools. G7 builds the Telegram tools and G8 the health tool; G9 requires them all in the catalog.
+- **Files changed:** `docs/comms-spec-v0.3.md` (A46), `docs/verification/comms-v0.3-rulings.md` (a pin and R-A46), the plan (G7, G8, G9), `docs/verification/comms-v0.3-actor-matrix.md`, the ledger, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** The preflight pin and the actor-matrix tests pass; the full gate passed (GATE ok=1).
+- **Follow-ups:** Build them in G7 and G8.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Catalog amendment G1: WhatsApp groups as destinations with `grp_` refs (branch `comms-v0.3-catalog`).
+- **Summary:** A WhatsApp group (`group:<id>`, one rule `wa_group_id`) is a directory destination with a `grp_`. Group tools target it through `whatsapp_cloud`, and its context is the comms webhook archive over MCP (`recent`, pages, `get`, `message_get`, `around`).
+- **Found and fixed:**
+  - Meta's group ids are opaque, but the Graph client accepted digits only;
+  - the schema admitted Telegram destinations only (v6 rebuild);
+  - the archive answered every read kind as `recent`;
+  - two actor-matrix cells were false: `member_invite` on WhatsApp is not wired (now G8), and `member_add` answers INVITE_REQUIRED by design.
+- **Files changed:** `src/comms/transports/whatsapp/numbers.py`, `cloud/http.py`, `cloud/groups.py`, `webhooks/archive.py`, `src/comms/core/storage/migrations.py` (v6), `src/comms/core/campaigns/directory.py`, `src/comms/core/groups.py`, `src/comms/runtime/facades.py`, `src/comms/services/context.py`; tests `tests/runtime/test_whatsapp_group_destinations.py`, `tests/core/test_schema_v6.py`, `tests/integration/test_actor_matrix_behaviour.py`, `tests/runtime/test_facades.py`; the matrix, the rulings (R-G1), the plan, the ledger, `AGENT.md` and `CHANGELOG.md`.
+- **Verification:** 29 new tests; the behaviour test covers all three actors (mutation-checked); the full gate passed (GATE ok=1).
+- **Follow-ups:**
+  - G4 proves a backup round trip of a WhatsApp group's `grp_` (D5);
+  - G8 adds the invite GET, participants and `group_context` for WhatsApp;
+  - G6 adds the bot's `around` from retained updates.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Catalog amendment G2a. The daemon wires the WhatsApp actor (branch `comms-v0.3-catalog`).
+- **Summary:** `build_comms_runtime` never listed `whatsapp_cloud` as an actor, nor passed WhatsApp template or media services or an account target. In production, WhatsApp groups and the WhatsApp account tools therefore answered `NOT_CONFIGURED`, while tests that built their own services passed. They are now wired from `Adapters`, and the actor-matrix behaviour test goes through the real composition root.
+- **Files changed:** `src/comms/runtime/adapters.py`, `src/comms/runtime/comms_runtime.py`, `tests/runtime/test_comms_runtime_whatsapp.py`, `tests/integration/test_actor_matrix_behaviour.py`, the rulings (R-G2a), the ledger, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 4 new composition tests; the behaviour test was mutation-checked on the actor list; the full gate passed (GATE ok=1).
+- **Follow-ups:** None.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Catalog amendment G2: the `comms_directory_recipient_*` tools (branch `comms-v0.3-catalog`).
+- **Summary:** Six tools (list, get, create, update, enable, disable) over the core directory. Labels appear under `untrusted`; contact points appear by ref and transport, never by identity; every write is audited and replays by `req_`. The catalog pin is regenerated per task, on purpose (R-G2; 109 to 115 tools). The egress rule now counts an `untrusted` object as text.
+- **Files changed:** `src/comms/mcp/tools/directory_people.py` (new), `src/comms/mcp/tools/__init__.py`, `src/comms/services/directory.py`, `src/comms/core/campaigns/directory.py`, `src/comms/core/campaigns/directory_views.py`, `src/comms/runtime/facades.py`, `src/comms/mcp/egress.py`, `tests/mcp/test_catalog_directory_people.py` (new), `tests/security/test_v03_egress.py`, `tests/mcp/catalog_pin.json`, the rulings, the plan, the ledger, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 48 new tests; the egress sweep runs the new tools; the full gate passed (GATE ok=1).
+- **Follow-ups:** G3 adds contact points.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Catalog amendment G3: `comms_directory_contact_*` (branch `comms-v0.3-catalog`).
+- **Summary:** Add, disable and opt out a person's WhatsApp number or Telegram user id. The identity is input only: it is bound to the request by a keyed HMAC (an unkeyed digest of a phone number in the audit chain could be brute-forced) and never echoed. An opt-out now survives disabling and blocks re-adding. `contact_add` is host-confirmed.
+- **Files changed:** `src/comms/core/domains.py`, `src/comms/core/campaigns/binding.py` (new), `src/comms/core/campaigns/directory.py`, `src/comms/services/directory.py`, `src/comms/runtime/comms_runtime.py`, `src/comms/runtime/facades.py`, `src/comms/mcp/tools/directory_people.py`, `.claude/settings.json`; tests `tests/mcp/test_catalog_directory_contacts.py` (new), `tests/mcp/test_catalog_directory_people.py`, `tests/security/test_v03_egress.py`, `tests/security/test_comms_wire_frozen.py`, `tests/mcp/catalog_pin.json`; the rulings, the ledger, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 26 new tests (the opt-out guard mutation-checked); the full gate passed (GATE ok=1).
+- **Follow-ups:** G4 adds destinations and location membership.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Catalog amendment G4: destinations, location membership and D5 (branch `comms-v0.3-catalog`).
+- **Summary:** Create and disable chats by the provider's own id (Telegram marked chat ids, Meta group ids), input only; a group gets its `grp_` at once. Add and remove location members. Backups now keep every `grp_`: a compatible restore reuses them, a conflicting binding is a staged incompatibility, and a missing provider's groups are restored disabled with refs kept.
+- **Files changed:** `src/comms/core/backup/payload.py`, `src/comms/core/backup/export_import.py`, `src/comms/services/directory.py`, `src/comms/runtime/comms_runtime.py`, `src/comms/runtime/facades.py`, `src/comms/mcp/tools/directory_people.py`, `.claude/settings.json`; tests `tests/mcp/test_catalog_directory_places.py` and `tests/core/backup/test_backup_groups.py` (both new), `tests/mcp/catalog_pin.json`; the rulings, the ledger, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 32 new tests; the full gate passed (GATE ok=1).
+- **Follow-ups:** G5 adds per-person context.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Catalog amendment G5: `comms_context_person` (branch `comms-v0.3-catalog`).
+- **Summary:** One person's direct communication, by source: WhatsApp archive DMs, the Telegram private chat (live, else the bot's retained updates) and campaign history. Their messages in up to ten groups appear only when asked, read by a new sender-filtered `from` kind in the archive and the bot's context. Every section is a normal context page that pages through `comms_context_page`. No number or id appears.
+- **Files changed:** `src/comms/runtime/facades.py`, `src/comms/services/context.py`, `src/comms/core/campaigns/directory.py`, `src/comms/core/groups.py`, `src/comms/transports/whatsapp/webhooks/archive.py`, `src/comms/transports/telegram/bot/context.py`, `src/comms/mcp/tools/context.py`, `src/comms/mcp/tools/__init__.py`, `src/comms/mcp/egress.py`; tests `tests/runtime/test_context_person.py` (new), `tests/mcp/catalog_pin.json`; the matrix, the rulings, the ledger, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 6 new tests; the actor matrix covers the tool on all three actors; the full gate passed (GATE ok=1).
+- **Follow-ups:** G6 adds the user account's sender search.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Catalog amendment G6, part 1: Telegram group reads (branch `comms-v0.3-catalog`).
+- **Summary:** Admins are read as admins, which fixes the bot's admin list and group context. One member's standing, default permissions and join requests are served on both actors where the API allows, with every user id mapped to a `rcp_` ref or `null`. The bot serves `around`, `message_get` and join requests from its retained updates. A prohibited RPC (`channels.getChannels`) was caught by the independent guard and replaced with a reviewed one. User mark-read waits on the owner, because the frozen spec prohibits `messages.readHistory`.
+- **Files changed:** `src/comms/services/group_reads.py` (new), `src/comms/services/context.py`, `src/comms/runtime/facades.py`, `src/comms/transports/telegram/bot/context.py`, `src/comms/transports/telegram/user/context.py`, `src/comms/transports/telegram/telegram/telethon_adapter.py`, `src/comms/core/campaigns/directory.py`, `src/comms/mcp/tools/admin.py`, `src/comms/mcp/tools/groups.py`, `src/comms/mcp/egress.py`; tests (three new modules, plus updates), `tests/mcp/catalog_pin.json`; the matrix, the rulings, the ledger, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 22 new tests; the behaviour matrix passes on all three actors; the full gate passed (GATE ok=1).
+- **Follow-ups:** G6 part 2: the user account's invite list, join requests, topics, admin log and sender search.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Catalog amendment G6, part 2: the user account's lists and the primary-link reset (branch `comms-v0.3-catalog`).
+- **Summary:** The user account lists invites, join requests, topics (and one topic) and the admin log. Its sender search serves a person's group activity. Invite revoke with no invite resets the primary link on both Telegram APIs and returns the new ref. Every provider id is mapped to a ref. The admin-log read now has one copy.
+- **Files changed:** `src/comms/transports/telegram/telegram/telethon_adapter.py`, `src/comms/transports/telegram/user/context.py`, `src/comms/transports/telegram/user/admin.py`, `src/comms/transports/telegram/user/admin_chat.py`, `src/comms/transports/telegram/user/capability.py`, `src/comms/transports/telegram/bot/*.py`, `src/comms/transports/telegram/chat_specs.py`, `src/comms/services/group_reads.py`, `src/comms/services/groups.py`, `src/comms/core/providers/semantics.py`, `src/comms/runtime/facades.py`, `src/comms/mcp/tools/admin.py`, `src/comms/mcp/egress.py`, `docs/verification/telegram-rpc-review.md`; tests (three new modules, plus updates), `tests/mcp/catalog_pin.json`; the matrix, the rulings, the ledger, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 16 new tests; no G6 cell is left in the matrix; the full gate passed (GATE ok=1).
+- **Follow-ups:** G7 (Telegram writes and A46's three tools).
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Catalog amendment G7, part 1: forward and group create (branch `comms-v0.3-catalog`).
+- **Summary:** Forward works on both Telegram APIs; the user account's forward is deduplicated by `random_id` like a send, through one shared reconcile path. The user account creates a group or channel, which is filed in the directory with its `grp_` in the same step. A WhatsApp forward crash was found and turned into a refusal.
+- **Files changed:** `src/comms/transports/telegram/user/send.py`, `src/comms/transports/telegram/user/admin.py`, `src/comms/transports/telegram/user/admin_messages.py`, `src/comms/transports/telegram/user/capability.py`, `src/comms/transports/telegram/bot/admin.py`, `src/comms/transports/telegram/bot/admin_messages.py`, `src/comms/transports/telegram/chat_specs.py`, `src/comms/transports/telegram/telegram/telethon_adapter.py`, `src/comms/services/mutations.py`, `src/comms/services/writes.py`, `src/comms/services/messages.py`, `src/comms/services/groups.py`, `src/comms/services/directory.py`, `src/comms/runtime/facades.py`, `src/comms/mcp/tools/messages.py`; tests; `tests/mcp/catalog_pin.json`; the matrix, the rulings, the ledger, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 13 new tests; the full gate passed (GATE ok=1).
+- **Follow-ups:** G7 part 2 adds A46's three tools.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Catalog amendment G7, part 2: spec A46's Telegram tools (branch `comms-v0.3-catalog`).
+- **Summary:** `comms_group_member_tag_set`, `comms_message_reaction_remove` and `comms_group_member_reactions_clear` on both Telegram APIs, with three new capabilities, three reviewed MTProto requests and three Bot API methods, all host-confirmed. WhatsApp is B.
+- **Files changed:** `src/comms/core/providers/capability.py`, `src/comms/core/providers/semantics.py`, `src/comms/transports/telegram/chat_specs.py`, `src/comms/transports/telegram/bot/{admin_members,capability,http}.py`, `src/comms/transports/telegram/user/{admin_members,capability}.py`, `src/comms/transports/telegram/telegram/telethon_adapter.py`, `src/comms/services/groups.py`, `src/comms/runtime/facades.py`, `src/comms/mcp/tools/{groups,__init__}.py`, `.claude/settings.json`, `docs/verification/telegram-rpc-review.md`; tests; `tests/mcp/catalog_pin.json`; the matrix, the rulings, the ledger, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 16 new tests; the full gate passed (GATE ok=1).
+- **Follow-ups:** G8: WhatsApp group writes, account and media, and A46's health status.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Catalog amendment G8, part a: WhatsApp group writes and live group reads (branch `comms-v0.3-catalog`).
+- **Summary:** Group send and pin; join requests listed, approved and rejected; participants and the invite link. Group facts are read live under `whatsapp_live`, which is never allowed for messages. People appear as `rcp_` refs; no number or id leaves.
+- **Files changed:** `src/comms/transports/whatsapp/cloud/{http,groups,context}.py` (`context.py` is new), `src/comms/runtime/adapters.py`, `src/comms/runtime/facades.py`, `src/comms/services/{context,messages,groups}.py`, `src/comms/core/providers/semantics.py`, `src/comms/mcp/tools/{context,admin,messages}.py`; tests; `tests/mcp/catalog_pin.json`; the matrix, the rulings, the ledger, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 11 new tests; the Meta oracle covers every Graph call; the full gate passed (GATE ok=1).
+- **Follow-ups:** G8 parts b to d: WhatsApp group create and delete, account and health, and media.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Catalog amendment G8, part b: WhatsApp group create and delete (branch `comms-v0.3-catalog`).
+- **Summary:** Meta creates a group asynchronously. The request is kept pending (schema v7) until the `group_lifecycle_update` webhook names it; the group is then filed with its `grp_`, or the creation is marked failed. Delete asks Meta. A create naming no actor when both platforms are configured is refused as ambiguous.
+- **Files changed:** `src/comms/core/storage/migrations.py` (v7), `src/comms/core/campaigns/directory.py`, `src/comms/core/providers/semantics.py`, `src/comms/transports/whatsapp/cloud/{http,groups}.py`, `src/comms/transports/whatsapp/webhooks/archive.py`, `src/comms/services/{directory,groups}.py`, `src/comms/runtime/facades.py`, `src/comms/mcp/tools/admin.py`; tests; `tests/mcp/catalog_pin.json`; the matrix, the rulings, the ledger, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 5 new tests; the full gate passed (GATE ok=1).
+- **Follow-ups:** Live acceptance must confirm Meta's synchronous create body (R-G8b). Next: G8 parts c and d.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Catalog amendment G8, part c: account profile, phone status and A46's health status (branch `comms-v0.3-catalog`).
+- **Summary:** Each account shows what it calls itself (untrusted), never an identity. WhatsApp phone status and messaging health are offered; health drops every entity id.
+- **Files changed:** `src/comms/transports/profiles.py` (new), `src/comms/transports/whatsapp/cloud/{account,http}.py`, `src/comms/transports/telegram/telegram/telethon_adapter.py`, `src/comms/runtime/{adapters,comms_runtime,facades}.py`, `src/comms/services/account.py`, `src/comms/core/providers/{capability,semantics}.py`, `src/comms/mcp/tools/{account,groups}.py`, `src/comms/mcp/egress.py`; tests; `tests/mcp/catalog_pin.json`; the matrix, the rulings, the ledger, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 6 new tests; the full gate passed (GATE ok=1).
+- **Follow-ups:** G8 part d: media upload and download, and group photos.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Catalog amendment G8, part d: staged media (D3), media upload and download, and group photos (branch `comms-v0.3-catalog`).
+- **Summary:** Files are staged in memory for one client (`upl_`), checked by SHA-256 and used once; bytes never reach a request digest. WhatsApp media upload and paged download; group photos on the bot, the user account and WhatsApp. `NOT_OFFERED` is gone, and no open cell is left in the actor matrix. Telegram media objects are marked "not addressed" (nothing consumes them): the owner is asked to confirm.
+- **Files changed:** `src/comms/services/uploads.py` (new), `src/comms/services/{media,mutations,groups}.py`, `src/comms/core/refs.py`, `src/comms/runtime/facades.py`, `src/comms/transports/telegram/{chat_specs,bot/http,bot/admin,bot/admin_chat,user/admin,user/admin_chat,telegram/telethon_adapter}.py`, `src/comms/transports/whatsapp/cloud/{http,groups,media}.py`, `src/comms/mcp/tools/{account,admin,__init__}.py`, `docs/verification/telegram-rpc-review.md`; tests; `tests/mcp/catalog_pin.json`; the matrix, the rulings, the ledger, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 15 new tests; the full gate passed (GATE ok=1).
+- **Follow-ups:** G9 (the pin, the guards, D39-A, the exit test and the evidence). The owner decides on Telegram media objects and on Telegram mark-read (the frozen spec prohibits `readHistory`).
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Catalog amendment G9: the pin, the guards, D39-A, the exit gate and the evidence (branch `comms-v0.3-catalog`).
+- **Summary:** The Graph API is pinned at v26.0 (v21.0 expires on 2027-01-21). The real-daemon smoke gains four `catalog_*` checks (the directory, a location campaign, a WhatsApp group webhook read by `grp_`, `comms_context_person`). The exit test re-runs every G-task's tests from the plan's headings with nothing skipped, plus one end-to-end MCP path. The client runbooks no longer wait on the amendment.
+- **Files changed:** `src/comms/transports/whatsapp/cloud/http.py`, `scripts/{smoke_daemon,e2e_smoke}.py`, `tests/security/test_catalog_amendment_exit.py` (new), `tests/security/test_d39_pre_exit.py`, `tests/conformance/meta_oracle.py`, `tests/core/providers/test_actor_matrix.py`, `tests/transports/whatsapp_cloud/test_{account_groups,classify,media,templates}.py`, `docs/verification/{comms-v0.3.md,comms-v0.3-rulings.md,comms-v0.3-actor-matrix.md,comms-v0.3-smoke-map.json}`, `docs/runbooks/clients-*.md`, `CLAUDE.md`, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** the full gate passed (GATE ok=1): 5420 passed, 4 skipped; smoke 103/103 (29 against the daemon); formal 57; ruff, format, mypy, build clean; WhatsVault 450.
+- **Follow-ups:** the owner decides Telegram mark-read, Telegram media objects, and merge/push/tag push; D39-B confirms WhatsApp group create's synchronous response live.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** The owner's answers to G9's open questions: spec A47, its plan, and a WhatsApp group-photo fix (branch `comms-v0.3-catalog`).
+- **Summary:** The owner allowed Telegram user mark-read and asked for Telegram media to be built; A47 specifies both (one prohibition lifted, narrowly; `comms_message_send_media` on all three actors; Telegram `med_` refs, download, user upload). The 2026-docs search confirmed WhatsApp group create answers `request_id` (pywa 4.5.0) and found a defect: the group photo must be the multipart part `profile_picture_file`, not `file`. The oracle now refuses any other part.
+- **Files changed:** `src/comms/transports/whatsapp/cloud/http.py`, `tests/conformance/meta_oracle.py`, `docs/comms-spec-v0.3.md` (A47), `docs/verification/{comms-v0.3.md,comms-v0.3-rulings.md}` (A47 pin, R-G9b), `docs/superpowers/plans/2026-09-26-comms-v0.3-a47.md` (new), `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** the oracle test failed on the old part name and passes on the fix; the capability-id test now bounds each amendment's section (it read A47 as part of A46); the full gate (GATE ok=1).
+- **Follow-ups:** the owner approves the A47 plan (H1–H6); merge and push of `comms-v0.3-catalog`.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** The A47 plan gauntleted against the developer docs (branch `comms-v0.3-catalog`).
+- **Summary:** Eighteen findings (Gf1–Gf18) from Telegram's files, file-reference, datacenter and config pages, the method and constructor pages, Bot API 10.3, Meta's media reference and group messaging, pywa 4.5.0 and the installed Telethon 1.45.0. Two corrected A47: files live on their own DC (downloads go there through a borrowed sender under the same allowlist, never refused), and an uploaded file has no message to refresh its reference from (an expiry answers `NOT_FOUND`). The rest refine the plan: the bot's `med_` is keyed by `file_unique_id`; one part-upload helper covers files above 10 MB (`saveBigFilePart`) and is shared with G8's group photo; there are no kind changes on resend; `cdn_supported` stays unset; `FLOOD_PREMIUM_WAIT` is a rate limit; WhatsApp images are JPEG or PNG at most 5 MB; the bot file URL carries the token.
+- **Files changed:** `docs/superpowers/plans/2026-09-26-comms-v0.3-a47.md`, `docs/comms-spec-v0.3.md` (A47 corrected), `docs/verification/comms-v0.3-rulings.md` (re-pin, R-A47-docs), `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** the preflight pin, capability-id and supersession tests; the full gate (GATE ok=1).
+- **Follow-ups:** the owner approves the gauntleted A47 plan before H1.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** The A47 plan gauntleted again, this time by executing the code it relies on (branch `comms-v0.3-catalog`).
+- **Summary:** Thirteen findings (Gx1–Gx13). Three would have broken H1–H3: Telethon's exported-sender path sends `auth.exportAuthorization` and `help.getConfig` through our allowlist; a person's Telegram `cmg_` can be the bot's, with the bot chat's ids; the mark-read facade is WhatsApp-only. Also: the migrate and expired-reference errors need catching before the general classification; there are no media columns (schema v8 `media_facts`); `file_id` is read from the retained update rather than stored twice; Telethon's public `get_input_location` is used and pinned; WhatsApp images are checked by magic bytes; the bot download is streamed, capped and path-checked; and `cmg_` replaces `msg_`, which is WhatsVault's.
+- **Files changed:** `docs/superpowers/plans/2026-09-26-comms-v0.3-a47.md`, `docs/comms-spec-v0.3.md` (A47 corrected), `docs/verification/comms-v0.3-rulings.md` (re-pin, R-A47-docs2), `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** each finding was produced by running Telethon 1.45.0 or our code (a temporary probe test, not committed); the full gate (GATE ok=1).
+- **Follow-ups:** the owner approves the A47 plan before H1.

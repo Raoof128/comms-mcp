@@ -62,6 +62,18 @@ def test_oracle_serves_every_endpoint_the_adapter_calls():
         "reset_group_invite": lambda: api.reset_group_invite("120363049891234567"),
         "update_group": lambda: api.update_group("120363049891234567", {"subject": "New"}),
         "mark_read": lambda: api.mark_read("wamid.HBgLNjE0MDAwMDAwMDEVAgASGBQ"),
+        # catalog amendment G8
+        "group_info": lambda: api.group_info("120363049891234567"),
+        "group_invite": lambda: api.group_invite("120363049891234567"),
+        "join_requests": lambda: api.join_requests("120363049891234567", limit=10, after=None),
+        "answer_join_requests": lambda: api.answer_join_requests(
+            "120363049891234567", ["JR1"], approve=True
+        ),
+        "create_group": lambda: api.create_group({"messaging_product": "whatsapp", "subject": "X"}),
+        "delete_group": lambda: api.delete_group("120363049891234567"),
+        "update_group_photo": lambda: api.update_group_photo("120363049891234567", b"\xff\xd8\xff"),
+        "business_profile": lambda: api.business_profile(),
+        "health_status": lambda: api.health_status(),
     }
     public = {
         name

@@ -26,6 +26,7 @@ from comms.transports.telegram.telegram.rights import SelfRights
 __all__ = ["UserCapability"]
 
 ACTOR = "telegram_user"
+ACCOUNT = "account"  # the account-level target (no group): group.create
 LOOKUP_TIMEOUT_S = 10.0
 _SESSION_STATE = {
     "AUTH_REQUIRED": S.NOT_CONFIGURED,
@@ -53,6 +54,10 @@ _RIGHT = {
     C.INVITE_CREATE: "invite_users",
     C.INVITE_EDIT: "invite_users",
     C.INVITE_REVOKE: "invite_users",
+    C.GROUP_INVITE_RESET: "invite_users",
+    C.MEMBER_TAG: "manage_ranks",  # A46
+    C.REACTION_REMOVE: "delete_messages",
+    C.REACTION_CLEAR: "delete_messages",
     C.INVITE_LIST: "invite_users",
     C.JOIN_REQUEST_LIST: "invite_users",
     C.JOIN_REQUEST_APPROVE: "invite_users",
@@ -103,10 +108,20 @@ class UserCapability:
     def snapshot(self, actor: str, destination: ProviderTarget) -> CapabilitySnapshot:
         if actor != ACTOR or destination.actor != ACTOR:
             raise ValueError("not a telegram_user destination")
-        states = self._states(*unmark_chat_id(destination.identity))
+        if destination.identity == ACCOUNT:  # the account itself (G7): it can create a group
+            states = self._account_states()
+        else:
+            states = self._states(*unmark_chat_id(destination.identity))
         return CapabilitySnapshot(
             ACTOR, destination.destination_ref, states, timeutil.iso(self._clock())
         )
+
+    def _account_states(self) -> dict[C, S]:
+        unusable = _SESSION_STATE.get(self._session.readiness() or "")
+        return {
+            c: (unusable or S.AVAILABLE) if c is C.GROUP_CREATE else S.UNAVAILABLE
+            for c in TELEGRAM_CAPABILITIES
+        }
 
     def _states(self, peer_type: str, peer_id: int) -> dict[C, S]:
         unusable = _SESSION_STATE.get(self._session.readiness() or "")

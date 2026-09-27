@@ -3,7 +3,8 @@
 A bot sees only what Telegram gives it now and what this installation retained as it arrived
 (P §20). ``info`` reads current provider data (chat, administrators, member count) and is
 ``telegram_live``; ``recent`` pages the locally retained updates for the chat and is
-``telegram_local``. History, search and member enumeration are ``PROVIDER_UNSUPPORTED`` and
+``telegram_local``; ``from`` pages one sender's retained updates in a group (G5). History,
+search and member enumeration are ``PROVIDER_UNSUPPORTED`` and
 never reach Telegram: the bot never presents local retention as full history. Every item
 carries its ``source`` and ``observed_at`` (P §21); provider text sits under ``untrusted``
 (A32). A failed live lookup refuses the whole read rather than returning part of it.
@@ -19,7 +20,7 @@ from typing import Any
 from comms.core import timeutil
 from comms.core.delivery.transport import ResultKind
 from comms.core.providers.protocols import ContextPage, ContextQuery, ContextRefused
-from comms.transports.telegram.args import positive_int, take
+from comms.transports.telegram.args import CHAT_PERMISSIONS, positive_int, take
 from comms.transports.telegram.bot.classify import LookupFailed, lookup
 from comms.transports.telegram.bot.http import BotApi
 
@@ -49,6 +50,29 @@ class BotContext:
         if query.kind == "recent":
             args = take(query.args, {}, {"limit": _limit, "cursor": _cursor})
             return self._recent(chat_id, args.get("limit", 20), args.get("cursor"))
+        if query.kind == "admins":  # G6: getChatAdministrators, bots included
+            take(query.args, {}, {})
+            return self._admins(chat_id)
+        if query.kind == "member":  # G6: one member's standing
+            args = take(query.args, {"user_id": _sender}, {})
+            return self._member(chat_id, int(args["user_id"]))
+        if query.kind == "permissions":  # G6: the chat's default permissions
+            take(query.args, {}, {})
+            return self._permissions(chat_id)
+        if query.kind == "join_requests":  # G6: retained chat_join_request updates
+            args = take(query.args, {}, {"limit": _limit, "cursor": _cursor})
+            return self._recent(
+                chat_id, args.get("limit", 20), args.get("cursor"), kind="chat_join_request"
+            )
+        if query.kind == "around":  # G6: retained updates around one message
+            args = take(query.args, {"message_id": _positive}, {"before": _span, "after": _span})
+            return self._around(chat_id, args["message_id"], args.get("before", 10),
+                                args.get("after", 10))  # fmt: skip
+        if query.kind == "from" and chat_id < 0:  # one sender in a group (G5), retained only
+            args = take(query.args, {"sender": _sender}, {"limit": _limit, "cursor": _cursor})
+            return self._recent(
+                chat_id, args.get("limit", 20), args.get("cursor"), sender=int(args["sender"])
+            )
         raise ContextRefused("PROVIDER_UNSUPPORTED")
 
     def _info(self, chat_id: int) -> ContextPage:
@@ -88,16 +112,117 @@ class BotContext:
                 )
         return ContextPage(tuple(items), "telegram_live")
 
-    def _recent(self, chat_id: int, limit: int, cursor: str | None) -> ContextPage:
+    def _admins(self, chat_id: int) -> ContextPage:
+        admins = self._lookup("getChatAdministrators", {"chat_id": chat_id, "return_bots": True})
+        if not isinstance(admins, list):
+            raise ContextRefused("UNAVAILABLE")
+        stamp = {"source": "telegram_live", "observed_at": timeutil.iso(self._clock())}
+        items = []
+        for admin in admins:
+            user = admin.get("user") if isinstance(admin, dict) else None
+            status = admin.get("status") if isinstance(admin, dict) else None
+            role = _ROLES.get(status) if isinstance(status, str) else None
+            if isinstance(user, dict) and type(user.get("id")) is int and role is not None:
+                name = user.get("first_name")
+                items.append({**stamp, "user_id": user["id"], "role": role,
+                              "is_bot": user.get("is_bot") is True,
+                              "untrusted": {"name": name} if isinstance(name, str) else {}})  # fmt: skip
+        return ContextPage(tuple(items), "telegram_live")
+
+    def _member(self, chat_id: int, user_id: int) -> ContextPage:
+        member = self._lookup("getChatMember", {"chat_id": chat_id, "user_id": user_id})
+        status = member.get("status") if isinstance(member, dict) else None
+        if status not in _STANDING:
+            raise ContextRefused("UNAVAILABLE")
+        role, standing = _STANDING[status]
+        item = {"source": "telegram_live", "observed_at": timeutil.iso(self._clock()),
+                "user_id": user_id, "role": role, "status": standing}  # fmt: skip
+        return ContextPage((item,), "telegram_live")
+
+    def _permissions(self, chat_id: int) -> ContextPage:
+        chat = self._lookup("getChat", {"chat_id": chat_id})
+        given = chat.get("permissions") if isinstance(chat, dict) else None
+        if not isinstance(given, dict):
+            raise ContextRefused("UNAVAILABLE")
+        permissions = {k: v for k, v in given.items() if k in CHAT_PERMISSIONS and type(v) is bool}
+        item = {"source": "telegram_live", "observed_at": timeutil.iso(self._clock()),
+                "permissions": permissions}  # fmt: skip
+        return ContextPage((item,), "telegram_live")
+
+    def _lookup(self, method: str, params: Mapping[str, Any]) -> Any:
+        try:
+            return lookup(self._api, method, dict(params))
+        except LookupFailed as failed:
+            raise ContextRefused(_LOOKUP_CODES.get(failed.kind, "UNAVAILABLE")) from None
+
+    def _around(self, chat_id: int, message_id: int, before: int, after: int) -> ContextPage:
+        anchor = self._conn.execute(
+            "SELECT update_id FROM bot_updates WHERE chat_id = ?"
+            " AND json_extract(payload, '$.' || kind || '.message_id') = ?",
+            (chat_id, message_id),
+        ).fetchone()
+        if anchor is None:
+            raise ContextRefused("TARGET_NOT_FOUND")
+        newer = self._conn.execute(
+            "SELECT update_id, kind, payload, received_at FROM bot_updates WHERE chat_id = ?"
+            " AND update_id > ? AND kind <> 'chat_join_request' ORDER BY update_id LIMIT ?",
+            (chat_id, anchor[0], after),
+        ).fetchall()
+        older = self._conn.execute(
+            "SELECT update_id, kind, payload, received_at FROM bot_updates WHERE chat_id = ?"
+            " AND update_id <= ? AND kind <> 'chat_join_request' ORDER BY update_id DESC LIMIT ?",
+            (chat_id, anchor[0], before + 1),
+        ).fetchall()
+        rows = [*reversed(newer), *older]
+        return ContextPage(tuple(_local_item(*row) for row in rows), "telegram_local")
+
+    def _recent(
+        self,
+        chat_id: int,
+        limit: int,
+        cursor: str | None,
+        *,
+        sender: int | None = None,
+        kind: str | None = None,
+    ) -> ContextPage:
+        """Retained updates, newest first: every kind but join requests (they are not messages),
+        or one kind (``chat_join_request``, G6); optionally one sender's (G5)."""
         before = int(cursor) if cursor is not None else None
         rows = self._conn.execute(
             "SELECT update_id, kind, payload, received_at FROM bot_updates WHERE chat_id = ?"
+            " AND (? IS NULL OR json_extract(payload, '$.' || kind || '.from.id') = ?)"
+            " AND (CASE WHEN ? IS NULL THEN kind <> 'chat_join_request' ELSE kind = ? END)"
             " AND (? IS NULL OR update_id < ?) ORDER BY update_id DESC LIMIT ?",
-            (chat_id, before, before, limit + 1),
+            (chat_id, sender, sender, kind, kind, before, before, limit + 1),
         ).fetchall()
         items = tuple(_local_item(*row) for row in rows[:limit])
         next_cursor = str(rows[limit - 1][0]) if len(rows) > limit else None
         return ContextPage(items, "telegram_local", next_cursor)
+
+
+# Bot API ChatMember.status → (role, status), as the user actor reports them (G6).
+_STANDING = {
+    "creator": ("creator", "member"),
+    "administrator": ("admin", "member"),
+    "member": ("member", "member"),
+    "restricted": ("member", "restricted"),
+    "left": (None, "left"),
+    "kicked": (None, "banned"),
+}
+_ROLES = {"creator": "creator", "administrator": "admin"}
+
+
+def _positive(value: object) -> bool:
+    return type(value) is int and value > 0
+
+
+def _span(value: object) -> bool:
+    return type(value) is int and 0 <= value <= 50
+
+
+def _sender(value: object) -> bool:
+    """A Telegram user's marked id: a positive integer, as a string (G5)."""
+    return isinstance(value, str) and value.isascii() and value.isdigit() and int(value) > 0
 
 
 def _limit(value: object) -> bool:
@@ -124,5 +249,11 @@ def _local_item(update_id: int, kind: str, payload: str, received_at: str) -> Ma
         "message_id": body.get("message_id"),
         "date": body.get("date"),
         "from_id": sender.get("id"),
-        "untrusted": {"text": text} if isinstance(text, str) else {},
+        "untrusted": {"text": text} if isinstance(text, str) else _name(kind, sender),
     }
+
+
+def _name(kind: str, sender: Mapping[str, Any]) -> dict[str, Any]:
+    """A join request carries no text; its requester's name is its untrusted content (G6)."""
+    name = sender.get("first_name")
+    return {"name": name} if kind == "chat_join_request" and isinstance(name, str) else {}

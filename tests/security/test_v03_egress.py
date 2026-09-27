@@ -25,6 +25,7 @@ from comms.mcp.catalog import TOOL_CATALOG
 from comms.mcp.dispatch import AuthenticatedClient, Dispatcher
 from comms.mcp.egress import CLASSES, EGRESS_MATRIX
 from comms.mcp.oauth.store import OwnerApprovals
+from comms.runtime.comms_runtime import directory_rules
 from comms.runtime.facades import Services, build_registry
 from comms.runtime.tool_calls import tool_call_handler
 from comms.services.account import AccountService
@@ -43,7 +44,8 @@ from tests.services.test_templates_media_account import WebhookState
 
 BODY = "CANARY-BODY-7f3a91"
 NAME = "CANARY-NAME-c2e8"
-IDENTITIES = (WA_PHONE, WA_PHONE[1:], TG_USER, "-77")
+CONTACT = "+61400999888"  # catalog amendment G3: an identity given as input only
+IDENTITIES = (WA_PHONE, WA_PHONE[1:], TG_USER, "-77", CONTACT, CONTACT[1:])
 BOT_TOKEN = "908180123:AAE-canary-bot-token-0987654321"
 CLIENT = AuthenticatedClient(client_ref="cli_" + "a" * 26, auth_kind="cml1")
 
@@ -120,7 +122,9 @@ def sweep(tmp_path_factory):
             {"whatsapp": fakes.FakeWhatsApp(conn=conn)},
             commit=lambda: commit_context(w["writer"], w["store"]),
         ),
-        directory=DirectoryService(w["writer"], executor),
+        directory=DirectoryService(
+            w["writer"], executor, *directory_rules(w["writer"], w["store"])
+        ),
         templates=None,
         media=None,
         account=AccountService(capability, webhooks=WebhookState()),
@@ -168,6 +172,11 @@ def sweep(tmp_path_factory):
         "template": "ctp_" + "a" * 26,
         "invite": "inv_" + "a" * 26,
         "topic": "top_" + "a" * 26,
+        "display_name": "N",  # catalog amendment G2
+        "tag": "vip",  # A46
+        "transport": "whatsapp",  # G3: contact_add runs for real with the canary
+        "identity": CONTACT,
+        "contact": "rct_" + "a" * 26,
     }
     outputs = {}
     with pytest.MonkeyPatch.context() as mp:
@@ -216,7 +225,8 @@ def test_every_tool_declares_its_egress_class():
     assert set(EGRESS_MATRIX) == {s.name for s in TOOL_CATALOG}
     assert all(classes <= CLASSES and "refs" in classes for classes in EGRESS_MATRIX.values())
     for spec in TOOL_CATALOG:  # a tool that may carry text has a schema field for it
-        carries_text = "untrusted_text" in json.dumps(spec.output_schema)
+        schema = json.dumps(spec.output_schema)  # a text field, or an untrusted object (G2)
+        carries_text = "untrusted_text" in schema or '"untrusted"' in schema
         assert (
             "body" in EGRESS_MATRIX[spec.name] or "names" in EGRESS_MATRIX[spec.name]
         ) == carries_text, spec.name

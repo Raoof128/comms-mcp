@@ -18,6 +18,7 @@ from comms.mcp.schemas import (
     BOOL,
     READ_FAILURES,
     array,
+    enum,
     integer,
     nullable,
     obj,
@@ -30,7 +31,7 @@ from comms.mcp.schemas import (
 from comms.mcp.spec import ToolSpec
 from comms.mcp.tools.context import CONTEXT_FAILURES, CURSOR, PAGE
 
-__all__ = ["GROUP_TOOLS"]
+__all__ = ["A46_TOOLS", "GROUP_TOOLS"]
 
 _GROUP = ref("group")
 _RECIPIENT = ref("recipient")
@@ -139,7 +140,7 @@ GROUP_TOOLS: tuple[ToolSpec, ...] = (
     read(
         "comms_group_members_get",
         "Get a member",
-        "One recipient's membership of the group. Not offered yet: answers PROVIDER_UNSUPPORTED.",
+        "One recipient's role and status in the group (member, restricted, banned or left).",
         "group.members_get",
         {"group": _GROUP, "recipient": _RECIPIENT},
         ["group", "recipient"],
@@ -212,5 +213,62 @@ GROUP_TOOLS: tuple[ToolSpec, ...] = (
         "Lift a restriction",
         "Grant a restricted recipient every permission again.",
         C.MEMBER_RESTRICT,
+    ),
+)
+
+# Spec A46 (owner, 2026-09-26): the admin surface the 2026 docs added. Its own family, appended.
+A46_TOOLS: tuple[ToolSpec, ...] = (
+    _member_write(
+        "tag_set",
+        "Set a member's tag",
+        "Set a regular member's tag: up to 16 characters, no emoji; an empty tag clears it.",
+        C.MEMBER_TAG,
+        {"tag": string(0, 16)},
+        required=["tag"],
+    ),
+    write(
+        "comms_message_reaction_remove",
+        "Remove a member's reaction",
+        "Remove one member's reaction from one message in the group.",
+        "message.reaction_remove",
+        {"group": _GROUP, "message": ref("message"), "recipient": _RECIPIENT, "actor": ACTOR},
+        ["group", "message", "recipient"],
+        _MEMBER,
+        capability=C.REACTION_REMOVE,
+    ),
+    read(
+        "comms_whatsapp_health_status",
+        "WhatsApp messaging health",
+        "Whether the business number can send messages now: AVAILABLE, LIMITED or BLOCKED, "
+        "overall and for each entity involved (the number, the business account, the "
+        "business, the app), with Meta's notes untrusted — never an id.",
+        "whatsapp.health_status",
+        {},
+        [],
+        obj(
+            {
+                "can_send_message": enum(("AVAILABLE", "LIMITED", "BLOCKED")),
+                "entities": array(
+                    obj(
+                        {
+                            "entity_type": string(1, 32),
+                            "can_send_message": enum(("AVAILABLE", "LIMITED", "BLOCKED")),
+                        },
+                        ["entity_type", "can_send_message"],
+                    ),
+                    high=16,
+                ),
+                "untrusted": obj({"notes": array(string(0, 512), high=16)}, ["notes"]),
+            },
+            ["can_send_message", "entities", "untrusted"],
+        ),
+        failures=(*READ_FAILURES, "NOT_CONFIGURED", "PROVIDER_UNAVAILABLE"),
+        open_world=True,
+    ),
+    _member_write(
+        "reactions_clear",
+        "Clear a member's reactions",
+        "Remove a member's recent reactions in the group (Telegram removes up to 10,000).",
+        C.REACTION_CLEAR,
     ),
 )

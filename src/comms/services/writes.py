@@ -18,7 +18,7 @@ from comms.core.providers.capability import Capability
 from comms.core.providers.protocols import ProviderResult, ProviderTarget, SemanticOperation
 from comms.core.providers.semantics import SEMANTICS
 from comms.services.capability import CapabilityService
-from comms.services.mutations import CallContext, MutationExecutor, MutationOutcome
+from comms.services.mutations import CallContext, Created, MutationExecutor, MutationOutcome
 
 __all__ = ["ProviderWrites", "summary", "transport_of"]
 
@@ -62,6 +62,7 @@ class ProviderWrites:
         *,
         objects: Mapping[ObjectArg, object] | None = None,
         object_kind: str | None = None,
+        on_created: Created | None = None,
     ) -> tuple[str, ProviderTarget, MutationOutcome]:
         able = {a: t for a, t in targets.items() if (capability, a) in SEMANTICS}
         if not able:  # no named actor can ever perform it, whatever a snapshot says
@@ -81,6 +82,7 @@ class ProviderWrites:
             SemanticOperation(capability, call),
             request_id,
             object_kind=object_kind,
+            on_created=on_created,
         )
         if outcome.state == "FAILED":
             self._capability.authoritative(chosen, target, ProviderResult("FAILED", outcome.code))

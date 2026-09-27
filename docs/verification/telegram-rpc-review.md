@@ -62,6 +62,7 @@ dropped link fails the in-flight call and only the daemon's keeper reconnects.
 | `cap.invite.list` | `messages.GetExportedChatInvitesRequest` | https://core.telegram.org/method/messages.getExportedChatInvites | none | `READ`, `retry_same_key` |
 | `cap.join_request.list` | `messages.GetChatInviteImportersRequest` | https://core.telegram.org/method/messages.getChatInviteImporters | none | `READ`, `retry_same_key` |
 | `cap.topic.list` | `messages.GetForumTopicsRequest` | https://core.telegram.org/method/messages.getForumTopics | none | `READ`, `retry_same_key` |
+| `cap.topic.list` | `messages.GetForumTopicsByIDRequest` | https://core.telegram.org/method/messages.getForumTopicsByID | none | `READ`, `retry_same_key`; catalog amendment G6: one topic for `comms_group_topic_get` (reviewed 2026-09-26 against the live method page) |
 | `cap.message.send` | `messages.SendMessageRequest` | https://core.telegram.org/method/messages.sendMessage | posts a message | `MESSAGE_SEND`, `retry_same_key` |
 | `cap.message.edit` | `messages.EditMessageRequest` | https://core.telegram.org/method/messages.editMessage | sets a chat or member state | `SET_STATE`, `retry_same_key` |
 | `cap.message.delete` | `channels.DeleteMessagesRequest` | https://core.telegram.org/method/channels.deleteMessages | destroys or converts an object | `DESTRUCTIVE_NONIDEMPOTENT`, `resolve_only` |
@@ -76,6 +77,9 @@ dropped link fails the in-flight call and only the daemon's keeper reconnects.
 | `cap.member.ban` | `channels.EditBannedRequest` | https://core.telegram.org/method/channels.editBanned | sets a chat or member state | `SET_STATE`, `retry_same_key` |
 | `cap.member.unban` | `channels.EditBannedRequest` | https://core.telegram.org/method/channels.editBanned | sets a chat or member state | `SET_STATE`, `retry_same_key` |
 | `cap.member.restrict` | `channels.EditBannedRequest` | https://core.telegram.org/method/channels.editBanned | sets a chat or member state | `SET_STATE`, `retry_same_key` |
+| `cap.member.tag` | `messages.EditChatParticipantRankRequest` | https://core.telegram.org/method/messages.editChatParticipantRank | sets a chat or member state | `SET_STATE`, `retry_same_key`; spec A46: a regular member's tag (reviewed 2026-09-26) |
+| `cap.reaction.remove` | `messages.DeleteParticipantReactionRequest` | https://core.telegram.org/method/messages.deleteParticipantReaction | removes one member's reaction from one message | `SET_STATE`, `retry_same_key`; spec A46 (reviewed 2026-09-26) |
+| `cap.reaction.clear` | `messages.DeleteParticipantReactionsRequest` | https://core.telegram.org/method/messages.deleteParticipantReactions | removes a member's reactions in the group | `SET_STATE`, `retry_same_key`; spec A46 (reviewed 2026-09-26) |
 | `cap.admin.promote` | `channels.EditAdminRequest` | https://core.telegram.org/method/channels.editAdmin | sets a chat or member state | `SET_STATE`, `retry_same_key` |
 | `cap.admin.promote` | `messages.EditChatAdminRequest` | https://core.telegram.org/method/messages.editChatAdmin | sets a chat or member state | `SET_STATE`, `retry_same_key` |
 | `cap.admin.demote` | `channels.EditAdminRequest` | https://core.telegram.org/method/channels.editAdmin | sets a chat or member state | `SET_STATE`, `retry_same_key` |
@@ -83,12 +87,14 @@ dropped link fails the in-flight call and only the daemon's keeper reconnects.
 | `cap.invite.create` | `messages.ExportChatInviteRequest` | https://core.telegram.org/method/messages.exportChatInvite | creates an object | `CREATE`, `resolve_only` |
 | `cap.invite.edit` | `messages.EditExportedChatInviteRequest` | https://core.telegram.org/method/messages.editExportedChatInvite | sets a chat or member state | `SET_STATE`, `retry_same_key` |
 | `cap.invite.revoke` | `messages.EditExportedChatInviteRequest` | https://core.telegram.org/method/messages.editExportedChatInvite | sets a chat or member state | `SET_STATE`, `retry_same_key` |
+| `cap.group.invite.reset` | `messages.ExportChatInviteRequest` | https://core.telegram.org/method/messages.exportChatInvite | creates an object and revokes the old primary link (`legacy_revoke_permanent`) | `DESTRUCTIVE_NONIDEMPOTENT`, `resolve_only`; catalog amendment G6: `comms_group_invite_revoke` with no invite (reviewed 2026-09-26) |
 | `cap.join_request.approve` | `messages.HideChatJoinRequestRequest` | https://core.telegram.org/method/messages.hideChatJoinRequest | sets a chat or member state | `SET_STATE`, `retry_same_key` |
 | `cap.join_request.reject` | `messages.HideChatJoinRequestRequest` | https://core.telegram.org/method/messages.hideChatJoinRequest | sets a chat or member state | `SET_STATE`, `retry_same_key` |
 | `cap.chat.set_title` | `channels.EditTitleRequest` | https://core.telegram.org/method/channels.editTitle | sets a chat or member state | `SET_STATE`, `retry_same_key` |
 | `cap.chat.set_title` | `messages.EditChatTitleRequest` | https://core.telegram.org/method/messages.editChatTitle | sets a chat or member state | `SET_STATE`, `retry_same_key` |
 | `cap.chat.set_description` | `messages.EditChatAboutRequest` | https://core.telegram.org/method/messages.editChatAbout | sets a chat or member state | `SET_STATE`, `retry_same_key` |
 | `cap.chat.set_photo` | `channels.EditPhotoRequest` | https://core.telegram.org/method/channels.editPhoto | creates an object | `CREATE`, `resolve_only` |
+| `cap.chat.set_photo` | `upload.SaveFilePartRequest` | https://core.telegram.org/method/upload.saveFilePart | uploads a file part to the account's temporary storage; nothing is visible until the photo is set | `CREATE`, `resolve_only`; catalog amendment G8: the new group photo, in 512 KiB parts (reviewed 2026-09-26) |
 | `cap.chat.set_photo` | `messages.EditChatPhotoRequest` | https://core.telegram.org/method/messages.editChatPhoto | creates an object | `CREATE`, `resolve_only` |
 | `cap.chat.set_permissions` | `messages.EditChatDefaultBannedRightsRequest` | https://core.telegram.org/method/messages.editChatDefaultBannedRights | sets a chat or member state | `SET_STATE`, `retry_same_key` |
 | `cap.topic.create` | `messages.CreateForumTopicRequest` | https://core.telegram.org/method/messages.createForumTopic | creates an object | `CREATE`, `resolve_only` |

@@ -8,6 +8,7 @@ group destination is minted when it is created or restored, so every group is li
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
@@ -17,6 +18,7 @@ from comms.core.storage.db import write_tx
 __all__ = [
     "GroupError",
     "destination_of",
+    "enabled_groups",
     "group_identity",
     "group_ref",
     "group_ref_in_tx",
@@ -120,18 +122,31 @@ def list_groups(
     )
 
 
-def group_identity(conn: Any, grp: str) -> tuple[str, str]:
-    """``(destination ref, delivery identity)`` of a group — for building provider targets only;
-    never returned to a caller (the runtime facades use it, D30)."""
+def group_identity(conn: Any, grp: str) -> tuple[str, str, str]:
+    """``(destination ref, transport, delivery identity)`` of a group — for building provider
+    targets only; never returned to a caller (the runtime facades use it, D30)."""
     try:
         refs.check(grp, "group")
     except ValueError:
         raise GroupError("unknown group") from None
     row = conn.execute(
-        "SELECT d.ref, i.identity FROM groups g JOIN destinations d ON d.id = g.destination_id"
+        "SELECT d.ref, d.transport, i.identity FROM groups g"
+        " JOIN destinations d ON d.id = g.destination_id"
         " JOIN delivery_identities i ON i.id = d.identity_id WHERE g.ref = ? AND d.enabled = 1",
         (grp,),
     ).fetchone()
     if row is None:
         raise GroupError("unknown group")
-    return str(row[0]), str(row[1])
+    return str(row[0]), str(row[1]), str(row[2])
+
+
+def enabled_groups(conn: Any, transports: Sequence[str], *, limit: int) -> tuple[list[str], bool]:
+    """Enabled groups on these transports, newest first, at most ``limit`` (a person's group
+    activity, G5); the flag says whether more were left out."""
+    marks = ",".join("?" * len(transports))
+    rows = conn.execute(
+        "SELECT g.ref FROM groups g JOIN destinations d ON d.id = g.destination_id"
+        f" WHERE d.enabled = 1 AND d.transport IN ({marks}) ORDER BY g.id DESC LIMIT ?",
+        (*transports, limit + 1),
+    ).fetchall()
+    return [str(r[0]) for r in rows[:limit]], len(rows) > limit

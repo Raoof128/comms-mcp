@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from comms.mcp.spec import ToolSpec
-from comms.mcp.tools.account import ACCOUNT_TOOLS
+from comms.mcp.tools.account import ACCOUNT_TOOLS, MEDIA_STAGE_TOOLS
 from comms.mcp.tools.admin import ADMIN_TOOLS
 from comms.mcp.tools.campaigns import CAMPAIGN_TOOLS
-from comms.mcp.tools.context import CONTEXT_TOOLS
+from comms.mcp.tools.context import CONTEXT_PERSON_TOOLS, CONTEXT_TOOLS
 from comms.mcp.tools.directory import DIRECTORY_TOOLS
-from comms.mcp.tools.groups import GROUP_TOOLS
+from comms.mcp.tools.directory_people import DIRECTORY_PEOPLE_TOOLS
+from comms.mcp.tools.groups import A46_TOOLS, GROUP_TOOLS
 from comms.mcp.tools.messages import MESSAGE_TOOLS
 
 __all__ = ["FAMILIES"]
@@ -21,4 +22,8 @@ FAMILIES: tuple[tuple[ToolSpec, ...], ...] = (
     CAMPAIGN_TOOLS,
     DIRECTORY_TOOLS,
     ACCOUNT_TOOLS,
+    DIRECTORY_PEOPLE_TOOLS,  # catalog amendment G2, appended so earlier order holds
+    CONTEXT_PERSON_TOOLS,  # G5
+    A46_TOOLS,  # spec A46 (G7)
+    MEDIA_STAGE_TOOLS,  # G8 (D3)
 )

@@ -36,12 +36,14 @@ def group_create(args: Mapping[str, Any]) -> dict[str, Any]:
 
 
 CHAT_SPECS = {
+    C.CHAT_SET_PHOTO: specs.chat_photo,  # G8
     C.CHAT_SET_TITLE: specs.set_title,
     C.CHAT_SET_DESCRIPTION: specs.set_description,
     C.CHAT_SET_PERMISSIONS: specs.set_permissions,
     C.INVITE_CREATE: specs.invite_create,
     C.INVITE_EDIT: specs.invite_edit,
     C.INVITE_REVOKE: specs.invite_revoke,
+    C.GROUP_INVITE_RESET: specs.no_args,
     C.JOIN_REQUEST_APPROVE: specs.member,
     C.JOIN_REQUEST_REJECT: specs.member,
     C.TOPIC_CREATE: specs.topic_create,

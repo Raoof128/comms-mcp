@@ -17,7 +17,7 @@ from types import MappingProxyType
 from typing import Any
 
 from comms.core import timeutil
-from comms.core.campaigns.directory import destination_id
+from comms.core.campaigns.directory import destination_id, recipient_of_identity
 from comms.core.campaigns.history import identity_history
 from comms.core.errors import CommsError
 from comms.core.objects import message_identity, object_ref
@@ -41,13 +41,15 @@ INCLUDES = frozenset(
 )
 _SERVED = frozenset({"messages", "members", "admins"})  # the rest arrive with D15
 # P §20–21: what each transport's sources may call themselves. WhatsApp has no provider
-# history (the Cloud API is not a chat-search database), so it is only ever the archive.
+# history (the Cloud API is not a chat-search database), so its messages are only ever the archive.
 _PROVENANCE = MappingProxyType(
     {
         "telegram": frozenset({"telegram_live", "telegram_local"}),
         "whatsapp": frozenset({"whatsapp_webhook_archive"}),
     }
 )
+# G8: WhatsApp group facts (never its messages) are read live from the Groups API.
+_WHATSAPP_LIVE_KINDS = frozenset({"members", "member", "join_requests", "invites"})
 _IDENTITIES = frozenset({"message_id", "sender_id", "from_id", "chat_id", "update_id", "user_id"})
 _MAX_PAGE = 100
 
@@ -127,8 +129,15 @@ class ContextEngine:
     def reader(
         self, targets: Mapping[str, ProviderTarget], capability: Capability, *, fallback: bool
     ) -> ProviderTarget:
-        """The target a Telegram read uses: the user account when it has a source and the
-        capability, else (with ``fallback``) the bot; the one copy of the rule (E11c)."""
+        """The target a read uses; the one copy of the rule (E11c). A WhatsApp group is read from
+        the comms webhook archive, a local source with no provider capability (G1). A Telegram
+        group: the user account when it has a source and the capability, else (with
+        ``fallback``) the bot."""
+        whatsapp = targets.get("whatsapp_cloud")
+        if whatsapp is not None:
+            if "whatsapp_cloud" not in self._sources:
+                raise CommsError("NOT_CONFIGURED")
+            return whatsapp
         user = targets.get("telegram_user")
         code = "NOT_CONFIGURED"
         if user is not None and "telegram_user" in self._sources and self._capability is not None:
@@ -180,11 +189,25 @@ class ContextEngine:
     ) -> dict[str, Any]:
         return self._page(group, target, "recent", {"limit": _limit(limit), **_cursor(cursor)})
 
+    def from_sender(
+        self,
+        group: str,
+        target: ProviderTarget,
+        sender: str,
+        *,
+        limit: int = 20,
+        cursor: str | None = None,
+    ) -> dict[str, Any]:
+        """One sender's messages in a group (G5: a person's group activity)."""
+        return self._page(
+            group, target, "from", {"sender": sender, "limit": _limit(limit), **_cursor(cursor)}
+        )
+
     def around_message(
         self,
         group: str,
         target: ProviderTarget,
-        message_id: int,
+        message_id: int | str,
         *,
         before: int = 10,
         after: int = 10,
@@ -194,7 +217,7 @@ class ContextEngine:
         )
 
     def thread(
-        self, group: str, target: ProviderTarget, message_id: int, *, limit: int = 20
+        self, group: str, target: ProviderTarget, message_id: int | str, *, limit: int = 20
     ) -> dict[str, Any]:
         return self._page(
             group, target, "thread", {"message_id": message_id, "limit": _limit(limit)}
@@ -214,16 +237,40 @@ class ContextEngine:
         if not wanted <= _SERVED:
             raise CommsError("PROVIDER_UNSUPPORTED")
         result: dict[str, Any] = {"group_ref": group}
-        if "messages" in wanted:
-            result["messages"] = self.recent(group, target, limit=message_limit)
-        if wanted & {"members", "admins"}:
-            members = self._page(group, target, "members", {"limit": _MAX_PAGE})
-            if "members" in wanted:
-                result["members"] = members
-            if "admins" in wanted:
-                admins = [i for i in members["items"] if i.get("role") in ("creator", "admin")]
-                result["admins"] = {**members, "items": admins, "next_cursor": None}
+        parts = {
+            "messages": lambda: self.recent(group, target, limit=message_limit),
+            "members": lambda: self._page(group, target, "members", {"limit": _MAX_PAGE}),
+            # G6: read as admins, not derived from a member page the bot cannot produce
+            "admins": lambda: self._admins(group, target),
+        }
+        for part in ("messages", "members", "admins"):
+            if part not in wanted:
+                continue
+            try:
+                result[part] = parts[part]()
+            except CommsError as refused:
+                # a part this source cannot serve at all is left out when another part is
+                # served (G6: the bot has no member list); any other failure refuses the read
+                if refused.code != "PROVIDER_UNSUPPORTED" or len(wanted) == 1:
+                    raise
+        if set(result) == {"group_ref"}:
+            raise CommsError("PROVIDER_UNSUPPORTED")
         return result
+
+    def _admins(self, group: str, target: ProviderTarget) -> dict[str, Any]:
+        """Administrators only, whatever the source returns (a role, never message text)."""
+        page = self._page(group, target, "admins", {})
+        items = [
+            {k: v for k, v in i.items() if k != "untrusted_text"}
+            for i in page["items"]
+            if i.get("role") in ("creator", "admin")
+        ]
+        return {**page, "items": items, "next_cursor": None}
+
+    def read(self, target: ProviderTarget, kind: str, args: Mapping[str, Any]) -> ContextPage:
+        """One raw provider read of any kind, provenance-checked, for the group reads service
+        (G6); it maps every identity to a ref before anything leaves."""
+        return self._read(target, kind, args)
 
     def search(
         self,
@@ -303,6 +350,8 @@ class ContextEngine:
         except ValueError:
             raise CommsError("INVALID_ARGUMENT") from None
         allowed = _PROVENANCE.get(target.transport, frozenset())
+        if target.transport == "whatsapp" and kind in _WHATSAPP_LIVE_KINDS:
+            allowed = frozenset({"whatsapp_live"})
         if page.provenance not in allowed or any(
             item.get("source") != page.provenance for item in page.items
         ):
@@ -315,6 +364,10 @@ class ContextEngine:
         out["untrusted_text"] = untrusted.pop("text", None)
         out["untrusted"] = untrusted
         out["group_ref"] = group
+        if item.get("user_id") is not None:  # G8: a person by ref, when in the directory
+            out["recipient"] = recipient_of_identity(
+                self._conn, target.transport, str(item["user_id"])
+            )
         if item.get("message_id") is not None:
             out["message_ref"] = object_ref(
                 self._conn,

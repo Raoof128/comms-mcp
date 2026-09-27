@@ -87,6 +87,7 @@ class StagedImport:
     adopt: tuple[str, str] | None  # (the payload's binding, this installation's binding)
     payload: Mapping[str, Any]
     expires: float
+    missing: tuple[str, ...] = ()  # transports whose provider this installation lacks (D5)
 
 
 class StagedImports:
@@ -234,6 +235,13 @@ def stage_import(
             adoption = (str(payload["binding"]), local)
         else:
             incompatibilities.append("BINDING_MISMATCH")
+    if _group_conflicts(conn, payload["directory"].get("groups", ())):
+        incompatibilities.append("GROUP_REF_CONFLICT")  # D5: never a silent rebind
+    missing = tuple(
+        transport
+        for transport, key in _PROVIDER_OF.items()
+        if key in payload["providers"] and key not in providers
+    )
     result = StagedImport(
         handle=refs.mint("staged_import"),
         peer=peer,
@@ -243,6 +251,7 @@ def stage_import(
         adopt=adoption,
         payload=payload,
         expires=staged.clock() + STAGE_TTL_S,
+        missing=missing,
     )
     staged.put(result)
     return result
@@ -284,7 +293,7 @@ def commit_import(
     try:
         with writer.transaction() as tx:
             staged.take(handle, peer, _base_digest(conn))  # rechecked under the writer's lock
-            _apply_directory(conn, stage.payload["directory"], stamp)
+            _apply_directory(conn, stage.payload["directory"], stamp, missing=stage.missing)
             key_id = activate_in_tx(conn, "audit-chain-key", old, version, material, stamp)
             tx.open_epoch(
                 "admin.backup_import",
@@ -324,7 +333,30 @@ def _ids(conn: Any, table: str) -> dict[str, int]:
     return {str(r[0]): int(r[1]) for r in conn.execute(f"SELECT ref, id FROM {table}")}
 
 
-def _apply_directory(conn: Any, directory: Mapping[str, Any], stamp: str) -> None:
+# D5: the provider a transport's objects need, by the key a backup is bound to.
+_PROVIDER_OF = {"whatsapp": "meta_phone_number"}
+
+
+def _group_conflicts(conn: Any, groups: Any) -> bool:
+    """Whether a backup group's ref or destination is bound differently here (D5)."""
+    here = dict(
+        conn.execute(
+            "SELECT d.ref, g.ref FROM groups g JOIN destinations d ON d.id = g.destination_id"
+        ).fetchall()
+    )
+    used = {ref: destination for destination, ref in here.items()}
+    for row in groups:
+        mine = here.get(row["destination_ref"])
+        if mine is not None and mine != row["ref"]:
+            return True
+        if used.get(row["ref"], row["destination_ref"]) != row["destination_ref"]:
+            return True
+    return False
+
+
+def _apply_directory(
+    conn: Any, directory: Mapping[str, Any], stamp: str, *, missing: tuple[str, ...] = ()
+) -> None:
     """Replace the live directory with the backup's, in the caller's transaction."""
     # Everything the backup lacks, or holds disabled, is disabled first, so enabling the
     # backup's rows never meets a uniqueness clash with a row that is going away.
@@ -396,9 +428,24 @@ def _apply_directory(conn: Any, directory: Mapping[str, Any], stamp: str) -> Non
                     row["created_at"],
                 ),
             )
+    groups = directory.get("groups", ())  # a payload from before G4 carries none
+    if _group_conflicts(conn, groups):  # rechecked in the commit's transaction
+        raise ImportRefused("the staged import has unresolved incompatibilities")
+    destinations = _ids(conn, "destinations")
+    for row in groups:  # D5: a restored group keeps its grp_
+        conn.execute(
+            "INSERT OR IGNORE INTO groups (ref, destination_id, created_at) VALUES (?, ?, ?)",
+            (row["ref"], destinations[row["destination_ref"]], row["created_at"]),
+        )
     for row in directory["destinations"]:  # every restored group is listed at once (E11b)
         if is_group_identity(row["platform_identity"]):
             group_ref_in_tx(conn, row["ref"], now=timeutil.instant(stamp))
+    for transport in missing:  # D5: restored disabled, refs kept, until the provider returns
+        conn.execute(
+            "UPDATE destinations SET enabled = 0, disabled_at = coalesce(disabled_at, ?)"
+            " WHERE transport = ? AND enabled = 1",
+            (stamp, transport),
+        )
     contact_points = _ids(conn, "contact_points")
     for row in directory["contact_points"]:
         if row["ref"] in contact_points:

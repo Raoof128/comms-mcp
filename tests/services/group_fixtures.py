@@ -40,7 +40,16 @@ def _created(capability):
         C.TOPIC_CREATE: str(n),
         C.MESSAGE_SEND: str(100 + n),
         C.TEMPLATE_CREATE: str(5_000_000 + n),
+        C.MESSAGE_FORWARD: str(200 + n),  # G7
+        C.GROUP_CREATE: str(-(10**12 + 500 + n)),  # G7: the new supergroup's marked id
     }.get(capability)
+
+
+def _created_for(capability, target):
+    """What the real adapter names its creation by: WhatsApp answers a request id (G8)."""
+    if capability is C.GROUP_CREATE and target.transport == "whatsapp":
+        return f"request:REQ{next(_SERIAL)}"
+    return _created(capability)
 
 
 class Admin:
@@ -64,7 +73,7 @@ class Admin:
         return ProviderResult(
             "SUCCEEDED",
             None,
-            provider_ref=_created(op.capability),
+            provider_ref=_created_for(op.capability, target),
             detail=self.details.get(op.capability, {}),
         )
 

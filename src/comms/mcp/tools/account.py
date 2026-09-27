@@ -31,7 +31,7 @@ from comms.mcp.schemas import (
 )
 from comms.mcp.spec import ToolSpec
 
-__all__ = ["ACCOUNT_TOOLS"]
+__all__ = ["ACCOUNT_TOOLS", "MEDIA_STAGE_TOOLS"]
 
 _TRANSPORTS = ("telegram", "whatsapp")
 _STATES = {"type": "object", "additionalProperties": {"type": "string", "maxLength": 32}}
@@ -173,21 +173,35 @@ ACCOUNT_TOOLS: tuple[ToolSpec, ...] = (
     write(
         "comms_media_upload",
         "Upload media",
-        "Upload a staged file. Not offered yet: answers PROVIDER_UNSUPPORTED.",
+        "Upload a file to WhatsApp as a media object, by its staged upload ref (from "
+        "comms_media_stage_begin and _chunk) or, for a file of at most 512 KiB, inline as "
+        "data_b64 with its mime type. Returns its med_ ref.",
         "media.upload",
-        {"file": string(1, 256), "mime": string(1, 128)},
-        ["file", "mime"],
+        {"upload": ref("upload"), "data_b64": string(1, 699052), "mime": string(1, 128)},
+        [],
         provider_result(media=nullable(ref("media"))),
         capability=C.MEDIA_UPLOAD,
     ),
     read(
         "comms_media_download",
         "Download media",
-        "Save a media object to a staged file. Not offered yet: answers PROVIDER_UNSUPPORTED.",
+        "Read a media object's bytes, one base64 slice at a time (offset, length at most "
+        "49152), with its type, size and SHA-256; page until complete.",
         "media.download",
-        {"media": ref("media")},
+        {"media": ref("media"), "offset": integer(0), "length": integer(1, 49152)},
         ["media"],
-        obj({"media": ref("media"), "file": string(1, 256)}, ["media", "file"]),
+        obj(
+            {
+                "media": ref("media"),
+                "mime": string(1, 128),
+                "size": integer(0),
+                "sha256": string(64, 64),
+                "offset": integer(0),
+                "data_b64": string(0, 65536),
+                "complete": BOOL,
+            },
+            ["media", "mime", "size", "sha256", "offset", "data_b64", "complete"],
+        ),
         failures=(*READ_FAILURES, *_PROVIDER_FAILURES),
         open_world=True,
     ),
@@ -213,14 +227,28 @@ ACCOUNT_TOOLS: tuple[ToolSpec, ...] = (
     _status(
         "account_profile",
         "Account profile",
-        "The accounts in use, by actor and kind — never a phone number or user id.",
+        "The accounts in use, by actor and kind, with what each calls itself (the bot's and the "
+        "user's name, the WhatsApp business profile), untrusted — never a phone number, user id "
+        "or username.",
         "account.profile",
         obj(
             {
                 "actors": {
                     "type": "object",
                     "additionalProperties": obj(
-                        {"configured": BOOL, "kind": string(1, 32)}, ["configured", "kind"]
+                        {
+                            "configured": BOOL,
+                            "kind": string(1, 32),
+                            "reachable": nullable(BOOL),
+                            "untrusted": obj(
+                                {
+                                    k: nullable(string(0, 512))
+                                    for k in ("name", "about", "description", "vertical")
+                                },
+                                [],
+                            ),
+                        },
+                        ["configured", "kind", "reachable", "untrusted"],
                     ),
                 }
             },
@@ -377,5 +405,42 @@ ACCOUNT_TOOLS: tuple[ToolSpec, ...] = (
             },
             ["ref", "identities"],
         ),
+    ),
+)
+
+# Catalog amendment G8 (owner decision D3): staging a file for upload, in memory only.
+MEDIA_STAGE_TOOLS: tuple[ToolSpec, ...] = (
+    write(
+        "comms_media_stage_begin",
+        "Begin staging a file",
+        "Begin staging a file for comms_media_upload or a group photo: its mime type, size (at "
+        "most 16 MiB) and SHA-256. Returns a upl_ ref, the largest chunk and the seconds it "
+        "lives (five minutes). Staged files live in memory only, for this client only.",
+        "media.stage_begin",
+        {"mime": string(1, 128), "size": integer(1, 16 * 1024 * 1024), "sha256": string(64, 64)},
+        ["mime", "size", "sha256"],
+        obj(
+            {
+                "upload": ref("upload"),
+                "chunk_max": integer(1),
+                "expires_in": integer(1),
+                "replayed": BOOL,
+            },
+            ["upload", "chunk_max", "expires_in", "replayed"],
+        ),
+        failures=("NOT_FOUND",),
+    ),
+    write(
+        "comms_media_stage_chunk",
+        "Stage the next chunk",
+        "Append the next chunk (seq 0, 1, 2, … in order; base64, at most chunk_max bytes).",
+        "media.stage_chunk",
+        {"upload": ref("upload"), "seq": integer(0), "data_b64": string(1, 65536)},
+        ["upload", "seq", "data_b64"],
+        obj(
+            {"upload": ref("upload"), "received": integer(0), "complete": BOOL, "replayed": BOOL},
+            ["upload", "received", "complete", "replayed"],
+        ),
+        failures=("NOT_FOUND",),
     ),
 )

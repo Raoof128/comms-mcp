@@ -29,7 +29,7 @@ from comms.core.providers.capability import Capability as C
 from comms.core.providers.protocols import ProviderTarget
 from comms.services.capability import CapabilityService
 from comms.services.local import next_cursor, page_args
-from comms.services.mutations import CallContext, MutationExecutor
+from comms.services.mutations import CallContext, Created, MutationExecutor
 from comms.services.writes import ProviderWrites, summary, transport_of
 
 __all__ = ["ADMIN", "MEMBERSHIP", "GroupService"]
@@ -42,13 +42,22 @@ MEMBERSHIP: Mapping[str, Mapping[str, C]] = MappingProxyType(
         "group.member.remove": {"telegram": C.MEMBER_REMOVE, "whatsapp": C.GROUP_MEMBER_REMOVE},
         "group.member.ban": {"telegram": C.MEMBER_BAN},
         "group.member.unban": {"telegram": C.MEMBER_UNBAN},
+        "group.member.tag_set": {"telegram": C.MEMBER_TAG},  # A46
+        "group.member.reactions_clear": {"telegram": C.REACTION_CLEAR},
+        "message.reaction_remove": {"telegram": C.REACTION_REMOVE},
         "group.member.restrict": {"telegram": C.MEMBER_RESTRICT},
         "group.member.unrestrict": {"telegram": C.MEMBER_RESTRICT},
         "group.admin.promote": {"telegram": C.ADMIN_PROMOTE},
         "group.admin.demote": {"telegram": C.ADMIN_DEMOTE},
         "group.admin.update_rights": {"telegram": C.ADMIN_PROMOTE},
-        "group.join_requests.approve": {"telegram": C.JOIN_REQUEST_APPROVE},
-        "group.join_requests.reject": {"telegram": C.JOIN_REQUEST_REJECT},
+        "group.join_requests.approve": {
+            "telegram": C.JOIN_REQUEST_APPROVE,
+            "whatsapp": C.JOIN_REQUEST_APPROVE,
+        },
+        "group.join_requests.reject": {
+            "telegram": C.JOIN_REQUEST_REJECT,
+            "whatsapp": C.JOIN_REQUEST_REJECT,
+        },
     }
 )
 # tool → capability per transport (P §26–29). Hiding a topic has no capability id (C11).
@@ -59,7 +68,7 @@ ADMIN: Mapping[str, Mapping[str, C]] = MappingProxyType(
             "telegram": C.CHAT_SET_DESCRIPTION,
             "whatsapp": C.GROUP_SETTINGS_UPDATE,
         },
-        "group.info.set_photo": {"telegram": C.CHAT_SET_PHOTO},
+        "group.info.set_photo": {"telegram": C.CHAT_SET_PHOTO, "whatsapp": C.GROUP_SETTINGS_UPDATE},
         "group.permissions.set": {"telegram": C.CHAT_SET_PERMISSIONS},
         "group.invite.create": {"telegram": C.INVITE_CREATE},
         "group.invite.edit": {"telegram": C.INVITE_EDIT},
@@ -70,7 +79,7 @@ ADMIN: Mapping[str, Mapping[str, C]] = MappingProxyType(
         "group.topic.reopen": {"telegram": C.TOPIC_REOPEN},
         "group.topic.hide": {},
         "group.topic.unhide": {},
-        "group.delete": {"telegram": C.GROUP_DELETE},
+        "group.delete": {"telegram": C.GROUP_DELETE, "whatsapp": C.GROUP_DELETE},
         "group.migrate": {"telegram": C.GROUP_MIGRATE},
     }
 )
@@ -169,7 +178,10 @@ class GroupService:
             if identity is None:
                 raise CommsError("NOT_FOUND")
             member = _MEMBER_ARG[transport](identity)
-        call = {**args, **_FIXED.get(tool, {}), **member}
+        call = {k: v for k, v in args.items() if k != "message"}
+        call = {**call, **_FIXED.get(tool, {}), **member}
+        # A46: a message ref names the message the member's reaction is on (this group's only)
+        objects = {("message", "message_id"): args["message"]} if "message" in args else {}
         chosen, target, outcome = self._writes.write(
             ctx,
             tool,
@@ -178,6 +190,7 @@ class GroupService:
             call,
             request_id,
             actor,
+            objects=objects,
             object_kind=_CREATES.get(capability),
         )
         result = {**head, **summary(chosen, outcome)}
@@ -205,6 +218,8 @@ class GroupService:
             raise CommsError("INVALID_ARGUMENT")
         transport = transport_of(targets)
         capability = by_transport.get(transport)
+        if tool == "group.invite.revoke" and "invite" not in args:
+            capability = C.GROUP_INVITE_RESET  # G6: no invite named: reset the primary link
         if capability is None:
             raise CommsError("PROVIDER_UNSUPPORTED")
         renamed = _RENAMED.get((tool, transport), {})
@@ -227,6 +242,24 @@ class GroupService:
             **summary(chosen, outcome),
             "object": outcome.result.get("object_ref"),
         }
+
+    def create(
+        self,
+        ctx: CallContext,
+        targets: Mapping[str, ProviderTarget],
+        args: Mapping[str, Any],
+        request_id: str,
+        *,
+        actor: str | None = None,
+        on_created: Created,
+    ) -> dict[str, Any]:
+        """``group.create`` (G7): made from the account; ``on_created`` files the new group in
+        the directory with its ``grp_`` from the provider's new chat id."""
+        chosen, _target, outcome = self._writes.write(
+            ctx, "group.create", targets, C.GROUP_CREATE, args, request_id, actor,
+            on_created=on_created,
+        )  # fmt: skip
+        return {**summary(chosen, outcome), "group": outcome.result.get("group")}
 
     def _invite(self, target: ProviderTarget) -> str | None:
         where = destination_id(self._conn, target.destination_ref)

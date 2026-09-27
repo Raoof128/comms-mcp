@@ -21,12 +21,14 @@ from comms.core.providers.capability import CapabilityState as S
 from comms.core.providers.protocols import ProviderResult, ProviderTarget, SemanticOperation
 from comms.transports.whatsapp.cloud.classify import admin_call
 from comms.transports.whatsapp.cloud.http import GraphApi, GraphTransportError
+from comms.transports.whatsapp.cloud.media import check_upload, upload_media
 from comms.transports.whatsapp.cloud.templates import (
     TemplateOps,
     check_create,
     check_delete,
     check_edit,
 )
+from comms.transports.whatsapp.numbers import WA_GROUP_ID, wa_group_id
 
 __all__ = ["GROUP_CAPABILITIES", "GroupDiscovery", "WhatsAppAdmin", "group_id_of"]
 
@@ -40,6 +42,12 @@ GROUP_CAPABILITIES = (
     C.GROUP_INVITE_RESET,
     C.GROUP_SETTINGS_UPDATE,
     C.GROUP_MESSAGE_SEND,
+    C.MESSAGE_PIN,  # G8: pins, join requests and participants are the Groups API's too
+    C.JOIN_REQUEST_LIST,
+    C.JOIN_REQUEST_APPROVE,
+    C.JOIN_REQUEST_REJECT,
+    C.GROUP_CREATE,  # G8
+    C.GROUP_DELETE,
 )
 _PERMISSION_CODES = frozenset({3, 10, 200, 131005})
 _UNKNOWN_PATH_CODES = frozenset({2500})
@@ -55,10 +63,12 @@ def contact_of(target: ProviderTarget) -> str:
 
 
 def group_id_of(target: ProviderTarget) -> str:
-    kind, sep, group_id = target.identity.partition(":")
-    if target.actor != ACTOR or kind != "group" or not sep or not group_id.isdigit():
+    if target.actor != ACTOR:
         raise ValueError("not a whatsapp group destination")
-    return group_id
+    try:
+        return wa_group_id(target.identity).partition(":")[2]
+    except ValueError:
+        raise ValueError("not a whatsapp group destination") from None
 
 
 class GroupDiscovery:
@@ -123,7 +133,17 @@ _SETTINGS = {
 }
 
 
+WA_PHOTO_MAX = 5 * 1024 * 1024  # Meta: a group picture is a JPEG of at most 5 MB
+
+
 def _settings_args(args: Mapping[str, Any]) -> None:
+    if set(args) == {"photo", "mime"}:  # G8: the group's picture
+        photo = args["photo"]
+        if args["mime"] != "image/jpeg" or not isinstance(photo, bytes):
+            raise ValueError("operation arguments are malformed")
+        if not 0 < len(photo) <= WA_PHOTO_MAX:
+            raise ValueError("operation arguments are malformed")
+        return
     if (
         not args
         or not set(args) <= set(_SETTINGS)
@@ -133,6 +153,8 @@ def _settings_args(args: Mapping[str, Any]) -> None:
 
 
 def _settings(api: GraphApi, group_id: str, args: Mapping[str, Any]) -> ProviderResult:
+    if "photo" in args:
+        return admin_call(lambda: api.update_group_photo(group_id, args["photo"]))
     return admin_call(lambda: api.update_group(group_id, args))
 
 
@@ -195,6 +217,139 @@ def _media_delete(api: GraphApi, _waba: str, args: Mapping[str, Any]) -> Provide
     return admin_call(lambda: api.delete_media(args["media_id"]))
 
 
+# -- catalog amendment G8: group sends, pins and join requests ------------------------------
+
+TEXT_MAX = 4096
+PIN_DAYS = range(1, 31)  # Meta: a pin lasts 1-30 days, and the days are required to pin
+JOIN_PAGE = 100
+
+
+def _send_args(args: Mapping[str, Any]) -> None:
+    text = args.get("text")
+    if set(args) != {"text"} or not (isinstance(text, str) and 1 <= len(text) <= TEXT_MAX):
+        raise ValueError("operation arguments are malformed")
+
+
+def _send(api: GraphApi, group_id: str, args: Mapping[str, Any]) -> ProviderResult:
+    body = {"messaging_product": "whatsapp", "recipient_type": "group", "to": group_id,
+            "type": "text", "text": {"body": args["text"]}}  # fmt: skip
+    return _sent_wamid(admin_call(lambda: api.send_message(body)))
+
+
+def _pin_args(args: Mapping[str, Any]) -> None:
+    days = args.get("expire_days", 30)
+    if (
+        not {"message_id", "pinned"} <= set(args) <= {"message_id", "pinned", "expire_days"}
+        or not (isinstance(args["message_id"], str) and _WAMID.match(args["message_id"]))
+        or type(args["pinned"]) is not bool
+        or type(days) is not int
+        or days not in PIN_DAYS
+    ):
+        raise ValueError("operation arguments are malformed")
+
+
+def _pin(api: GraphApi, group_id: str, args: Mapping[str, Any]) -> ProviderResult:
+    pin: dict[str, Any] = {"type": "pin" if args["pinned"] else "unpin",
+                           "message_id": args["message_id"]}  # fmt: skip
+    if args["pinned"]:
+        pin["expiration_days"] = args.get("expire_days", 30)
+    body = {"messaging_product": "whatsapp", "recipient_type": "group", "to": group_id,
+            "type": "pin", "pin": pin}  # fmt: skip
+    result = admin_call(lambda: api.send_message(body))
+    return ProviderResult(result.outcome, result.code)  # the pin's own wamid names nothing
+
+
+def _sent_wamid(result: ProviderResult) -> ProviderResult:
+    if result.outcome != "SUCCEEDED":
+        return result
+    messages = result.detail.get("messages")
+    first = messages[0] if isinstance(messages, list) and messages else None
+    wamid = first.get("id") if isinstance(first, dict) else None
+    if not isinstance(wamid, str) or not _WAMID.match(wamid):
+        return ProviderResult("OUTCOME_UNKNOWN", None)
+    return ProviderResult("SUCCEEDED", None, provider_ref=wamid)
+
+
+def _join_args(args: Mapping[str, Any]) -> None:
+    _remove_args(args)  # the requester by wa_id, as a removal names its participant
+
+
+def _join(approve: bool) -> Call:
+    def call(api: GraphApi, group_id: str, args: Mapping[str, Any]) -> ProviderResult:
+        """The member's pending request, found by ``wa_id`` (Meta answers requests by their
+        own id), then approved or rejected: one read, one write."""
+        listed = api.join_requests(group_id, limit=JOIN_PAGE, after=None)
+        rows = (listed.envelope or {}).get("data") if listed.http_status == 200 else None
+        if not isinstance(rows, list):
+            return ProviderResult("FAILED", "PROVIDER_UNAVAILABLE")  # nothing was sent
+        request_id = next(
+            (r.get("join_request_id") for r in rows
+             if isinstance(r, dict) and r.get("wa_id") == args["wa_id"]),
+            None,
+        )  # fmt: skip
+        if not isinstance(request_id, str):
+            return ProviderResult("FAILED", "TARGET_NOT_FOUND")
+        result = admin_call(lambda: api.answer_join_requests(group_id, [request_id],
+                                                             approve=approve))  # fmt: skip
+        done = result.detail.get("approved_join_requests" if approve else "rejected_join_requests")
+        if result.outcome == "SUCCEEDED" and not (isinstance(done, list) and request_id in done):
+            return ProviderResult("FAILED", "PROVIDER_UNAVAILABLE")  # Meta listed it as failed
+        return result
+
+    return call
+
+
+_CREATE = {
+    "subject": lambda v: isinstance(v, str) and 1 <= len(v) <= 128,
+    "description": lambda v: isinstance(v, str) and len(v) <= 2048,
+    "join_approval_mode": lambda v: v in ("auto_approve", "approval_required"),
+}
+
+
+def _create_args(args: Mapping[str, Any]) -> None:
+    if (
+        "subject" not in args
+        or not set(args) <= set(_CREATE)
+        or not all(_CREATE[k](v) for k, v in args.items())
+    ):
+        raise ValueError("operation arguments are malformed")
+
+
+def _create(api: GraphApi, _phone: str, args: Mapping[str, Any]) -> ProviderResult:
+    """Meta creates the group asynchronously: its ``request_id`` names it until the
+    ``group_lifecycle_update`` webhook does; a group ``id`` in the answer names it at once."""
+    result = admin_call(lambda: api.create_group({"messaging_product": "whatsapp", **args}))
+    if result.outcome != "SUCCEEDED":
+        return result
+    group, request = result.detail.get("id"), result.detail.get("request_id")
+    if isinstance(group, str) and WA_GROUP_ID.match(group):
+        return ProviderResult("SUCCEEDED", None, provider_ref=f"group:{group}")
+    if isinstance(request, str) and 0 < len(request) <= 256:
+        return ProviderResult("SUCCEEDED", None, provider_ref=f"request:{request}")
+    return ProviderResult("OUTCOME_UNKNOWN", None)  # accepted, but nothing to name it by
+
+
+def _delete(api: GraphApi, group_id: str, args: Mapping[str, Any]) -> ProviderResult:
+    return admin_call(lambda: api.delete_group(group_id))
+
+
+def phone_account(target: ProviderTarget) -> str:
+    """The account-level target (no group yet): ``group.create`` (G8)."""
+    if target.actor != ACTOR or target.identity != "account":
+        raise ValueError("a group is created from the account")
+    return "account"
+
+
+def _media_upload_args(args: Mapping[str, Any]) -> None:
+    if set(args) != {"data", "mime"}:
+        raise ValueError("operation arguments are malformed")
+    check_upload(args["data"], args["mime"])
+
+
+def _media_upload(api: GraphApi, _waba: str, args: Mapping[str, Any]) -> ProviderResult:
+    return upload_media(api, args["data"], args["mime"])
+
+
 Check = Callable[[Mapping[str, Any]], None]
 Call = Callable[[GraphApi, str, Mapping[str, Any]], ProviderResult]
 Where = Callable[[ProviderTarget], str]
@@ -208,6 +363,13 @@ _OPERATIONS: Mapping[C, tuple[Check, Call, Where]] = {
     C.TEMPLATE_EDIT: (_template_edit_args, _template_edit, account_of),
     C.TEMPLATE_DELETE: (_template_delete_args, _template_delete, account_of),
     C.MEDIA_DELETE: (_media_delete_args, _media_delete, account_of),
+    C.MEDIA_UPLOAD: (_media_upload_args, _media_upload, account_of),  # G8 (D3)
+    C.GROUP_MESSAGE_SEND: (_send_args, _send, group_id_of),  # G8
+    C.MESSAGE_PIN: (_pin_args, _pin, group_id_of),
+    C.JOIN_REQUEST_APPROVE: (_join_args, _join(True), group_id_of),
+    C.JOIN_REQUEST_REJECT: (_join_args, _join(False), group_id_of),
+    C.GROUP_CREATE: (_create_args, _create, phone_account),
+    C.GROUP_DELETE: (_reset_args, _delete, group_id_of),
 }
 
 

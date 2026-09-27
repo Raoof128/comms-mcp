@@ -14,11 +14,14 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
+from types import MappingProxyType
 from typing import Any
 
 from comms.core.audit.writer import AuditWriter
+from comms.core.campaigns.binding import identity_binding
 from comms.core.delivery.commitment import commit_context
-from comms.core.keys.slots import KeySlotStore
+from comms.core.errors import CommsError
+from comms.core.keys.slots import KeySlotError, KeySlotStore, load_active
 from comms.mcp.dispatch import Dispatcher
 from comms.mcp.http import lease_authenticator
 from comms.mcp.oauth.server import Built, OAuthSettings, build_oauth
@@ -32,17 +35,21 @@ from comms.services.account import AccountService
 from comms.services.campaigns import CampaignService
 from comms.services.capability import CapabilityService
 from comms.services.context import ContextEngine
-from comms.services.directory import DirectoryService
+from comms.services.directory import DirectoryService, IdentityRule
 from comms.services.groups import GroupService
 from comms.services.handles import ContextHandles
 from comms.services.identity import IdentityService
+from comms.services.media import MediaService
 from comms.services.messages import MessageService
 from comms.services.mutations import MutationExecutor
+from comms.services.templates import TemplateService
+from comms.transports.telegram.peers import marked_chat_id, unmark_chat_id
+from comms.transports.whatsapp.numbers import e164, wa_group_id
 
-__all__ = ["CommsRuntime", "RemoteConfig", "build_comms_runtime"]
+__all__ = ["CommsRuntime", "RemoteConfig", "build_comms_runtime", "directory_rules"]
 
 Handler = Callable[[dict[str, Any]], Any]
-_TELEGRAM = ("telegram_bot", "telegram_user")
+_ACTORS = ("telegram_bot", "telegram_user", "whatsapp_cloud")
 
 
 @dataclass(frozen=True)
@@ -80,6 +87,54 @@ class _InboxCounts:
         }
 
 
+_DESTINATION_KIND = {"user": "private", "chat": "group", "channel": "channel"}
+
+
+def _telegram_user(raw: str) -> str:
+    """A Telegram contact is a numeric user id, stored as ``user:<id>`` (G3)."""
+    if not isinstance(raw, str) or not raw.isascii() or not raw.isdigit() or len(raw) > 20:
+        raise ValueError("unrecognised telegram user")
+    return f"user:{raw}"
+
+
+def _whatsapp_group(raw: str) -> str:
+    """A WhatsApp destination is a group id as Meta gives it, stored as ``group:<id>`` (G4)."""
+    if not isinstance(raw, str) or ":" in raw:
+        raise ValueError("unrecognised whatsapp group")
+    return wa_group_id(f"group:{raw}")
+
+
+def _telegram_destination(raw: str) -> str:
+    """A Telegram destination is a marked chat id: ``-N`` (a group), ``-100…`` (a supergroup or
+    channel) or ``N`` (a private chat); stored in the directory's ``kind:N`` form (G4)."""
+    if not isinstance(raw, str) or not raw.isascii():
+        raise ValueError("unrecognised telegram chat")
+    kind, number = unmark_chat_id(raw)
+    return f"{_DESTINATION_KIND[kind]}:{number}"
+
+
+def directory_rules(
+    writer: AuditWriter, store: KeySlotStore
+) -> tuple[Mapping[tuple[str, str], IdentityRule], Callable[[str, str], str]]:
+    """The directory's identity rules by (kind, transport), and the keyed request binder
+    (G3, G4). Each rule is the transport's one normaliser; the service never imports them."""
+    rules = {
+        ("contact", "whatsapp"): IdentityRule(e164, e164),
+        ("contact", "telegram"): IdentityRule(_telegram_user, marked_chat_id),
+        ("destination", "whatsapp"): IdentityRule(_whatsapp_group, wa_group_id),
+        ("destination", "telegram"): IdentityRule(_telegram_destination, marked_chat_id),
+    }
+
+    def bind(transport: str, identity: str) -> str:
+        try:
+            key, _key_id = load_active(writer.conn, store, "campaign-commit-key")
+        except KeySlotError:
+            raise CommsError("NOT_CONFIGURED") from None
+        return identity_binding(key, transport, identity)
+
+    return MappingProxyType(rules), bind
+
+
 def build_comms_runtime(
     conn: Any,
     writer: AuditWriter,
@@ -108,12 +163,23 @@ def build_comms_runtime(
         campaigns=CampaignService(
             writer, executor, adapters.delivery, commit=lambda: commit_context(writer, store)
         ),
-        directory=DirectoryService(writer, executor),
-        templates=None,
-        media=None,
-        account=AccountService(capability, webhooks=_InboxCounts(conn, adapters)),
+        directory=DirectoryService(writer, executor, *directory_rules(writer, store)),
+        templates=None
+        if adapters.templates is None
+        else TemplateService(conn, capability, executor, adapters.templates),
+        media=None
+        if adapters.media is None
+        else MediaService(conn, capability, executor, adapters.media),
+        account=AccountService(
+            capability,
+            webhooks=_InboxCounts(conn, adapters),
+            profiles=adapters.profiles,
+            phone=adapters.phone,
+            health=adapters.health,
+        ),
         identity=IdentityService(conn),
-        actors=tuple(a for a in _TELEGRAM if a in adapters.admin or a in adapters.context),
+        actors=tuple(a for a in _ACTORS if a in adapters.admin or a in adapters.context),
+        account_target=adapters.account,
     )
     dispatcher = Dispatcher(build_registry(services))
     oauth = None

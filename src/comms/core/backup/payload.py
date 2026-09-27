@@ -68,6 +68,12 @@ def _directory(conn: Any) -> dict[str, Any]:
             " JOIN locations l ON l.id = m.location_id JOIN recipients r ON r.id = m.recipient_id"
             " ORDER BY 1, 2",
         ),
+        # catalog amendment G4, D5: each group's grp_ with its destination, kept on restore
+        "groups": _rows(
+            conn,
+            "SELECT g.ref, d.ref AS destination_ref, g.created_at FROM groups g"
+            " JOIN destinations d ON d.id = g.destination_id ORDER BY g.ref",
+        ),
         "audiences": _rows(conn, "SELECT ref, name, created_at FROM audiences ORDER BY ref"),
         "audience_members": _rows(
             conn,
