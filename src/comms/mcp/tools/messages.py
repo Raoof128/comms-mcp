@@ -140,7 +140,7 @@ MESSAGE_TOOLS: tuple[ToolSpec, ...] = (
         "comms_message_send_media",
         "Send a photo or document",
         "Send a photo or a document to a group: a staged upload ref (from "
-        "comms_media_stage_begin and _chunk), a file of at most 512 KiB inline as data_b64 with "
+        "comms_media_stage_begin and _chunk), a file of at most 32 KiB inline as data_b64 with "
         "its mime type, or a media ref the same account already holds. An optional caption of "
         "at most 1024 characters (UTF-16 units). Returns the new message's ref.",
         "message.send_media",
@@ -148,7 +148,7 @@ MESSAGE_TOOLS: tuple[ToolSpec, ...] = (
             "group": _GROUP,
             "kind": enum(KINDS),
             "upload": ref("upload"),
-            "data_b64": string(1, 699052),
+            "data_b64": string(1, 43692),
             "mime": string(1, 128),
             "media": ref("media"),
             "caption": string(0, 1024),

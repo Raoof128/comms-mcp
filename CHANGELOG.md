@@ -764,3 +764,11 @@
 - **Files changed:** `src/comms/core/providers/semantics.py`, `src/comms/services/media.py`, `src/comms/runtime/{facades,comms_runtime}.py`, `src/comms/mcp/tools/account.py`, `src/comms/transports/telegram/{user/admin,user/admin_messages,user/capability,telegram/telethon_adapter,telegram/send_attempt}.py`, tests (`test_telegram_upload.py` new; the fixtures and the phase-4 guard), `tests/mcp/catalog_pin.json`, `docs/verification/{telegram-rpc-review.md,comms-v0.3-actor-matrix.md,comms-v0.3-rulings.md}`, `AGENT.md`, `CHANGELOG.md`.
 - **Verification:** 9 new tests, written first and seen failing; the full gate (GATE ok=1).
 - **Follow-ups:** H6 (the guards, D39-A checks, the exit test and the evidence).
+
+### 2026-09-27 (Australia/Sydney)
+**Raouf:**
+- **Scope:** A47 H6: the guards, D39-A media checks against a real daemon, the exit gate, the evidence (branch `comms-v0.3-a47`).
+- **Summary:** Driving the real daemon found that G8's staged media never fit the wire (a 48 KiB chunk's base64 is already 64 KiB, the request and frame cap); chunks, slices and inline files are now 32 KiB raw, and a guard test proves every file-carrying call fits on both routes. Two new real-daemon checks: a staged photo sent once by the bot with its replay, and a retained document paged back whole with its SHA-256. The A47 exit test re-runs H0–H6. Evidence and CLAUDE.md updated.
+- **Files changed:** `src/comms/services/uploads.py`, `src/comms/mcp/tools/{account,admin,messages}.py`, `src/comms/runtime/{selftest,facades}.py`, `scripts/{smoke_daemon,e2e_smoke}.py`, `tests/security/{test_media_fits_the_wire,test_a47_exit}.py` (new), `tests/security/test_d39_pre_exit.py`, `tests/transports/test_telegram_download.py`, `tests/mcp/catalog_pin.json`, `docs/verification/{comms-v0.3.md,comms-v0.3-rulings.md,comms-v0.3-smoke-map.json}`, `CLAUDE.md`, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** the full gate (GATE ok=1): 5505 passed, 4 skipped; smoke 105/105 (31 against the daemon); formal 57; WhatsVault 450.
+- **Follow-ups:** the owner merges and pushes `comms-v0.3-catalog` then `comms-v0.3-a47`; D39-B live media checks.

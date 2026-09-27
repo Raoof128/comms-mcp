@@ -175,13 +175,13 @@ ACCOUNT_TOOLS: tuple[ToolSpec, ...] = (
         "comms_media_upload",
         "Upload media",
         "Upload a file as a media object, by its staged upload ref (from "
-        "comms_media_stage_begin and _chunk) or, for a file of at most 512 KiB, inline as "
+        "comms_media_stage_begin and _chunk) or, for a file of at most 32 KiB, inline as "
         "data_b64 with its mime type: to WhatsApp, or kept by the Telegram user account "
         "(actor telegram_user; kind photo or document). Returns its med_ ref.",
         "media.upload",
         {
             "upload": ref("upload"),
-            "data_b64": string(1, 699052),
+            "data_b64": string(1, 43692),
             "mime": string(1, 128),
             "actor": enum(("whatsapp_cloud", "telegram_user")),
             "kind": enum(KINDS),
@@ -194,9 +194,9 @@ ACCOUNT_TOOLS: tuple[ToolSpec, ...] = (
         "comms_media_download",
         "Download media",
         "Read a media object's bytes, one base64 slice at a time (offset, length at most "
-        "49152), with its type, size and SHA-256; page until complete.",
+        "32768), with its type, size and SHA-256; page until complete.",
         "media.download",
-        {"media": ref("media"), "offset": integer(0), "length": integer(1, 49152)},
+        {"media": ref("media"), "offset": integer(0), "length": integer(1, 32768)},
         ["media"],
         obj(
             {
@@ -205,7 +205,7 @@ ACCOUNT_TOOLS: tuple[ToolSpec, ...] = (
                 "size": integer(0),
                 "sha256": string(64, 64),
                 "offset": integer(0),
-                "data_b64": string(0, 65536),
+                "data_b64": string(0, 43692),
                 "complete": BOOL,
             },
             ["media", "mime", "size", "sha256", "offset", "data_b64", "complete"],
@@ -443,7 +443,7 @@ MEDIA_STAGE_TOOLS: tuple[ToolSpec, ...] = (
         "Stage the next chunk",
         "Append the next chunk (seq 0, 1, 2, … in order; base64, at most chunk_max bytes).",
         "media.stage_chunk",
-        {"upload": ref("upload"), "seq": integer(0), "data_b64": string(1, 65536)},
+        {"upload": ref("upload"), "seq": integer(0), "data_b64": string(1, 43692)},
         ["upload", "seq", "data_b64"],
         obj(
             {"upload": ref("upload"), "received": integer(0), "complete": BOOL, "replayed": BOOL},

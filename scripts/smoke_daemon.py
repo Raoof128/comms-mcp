@@ -361,7 +361,8 @@ def drive_directory_and_campaigns(root: Path) -> dict[str, Any]:
             items = page["structuredContent"].get("items", []) if not page["isError"] else []
             return [i["untrusted_text"] for i in items if i["source"] == "telegram_local"]
 
-        out["bot_updates_local"] = _until(lambda: len(local_texts()) == 3)
+        out["bot_updates_local"] = _until(lambda: len(local_texts()) == 4)  # A47: a document
+        out.update(_media_checks(d, seed, grp))
 
         cmp = _campaign(d, backup["rcp"], "Now")
         d.json("campaign", "send", "--campaign", cmp)
@@ -376,7 +377,8 @@ def drive_directory_and_campaigns(root: Path) -> dict[str, Any]:
         d.stop(signal.SIGKILL)  # before it is due
         d.start()
         out["bot_updates_no_duplicate"] = sorted(local_texts()) == [
-            f"selftest update {n}" for n in (1, 2, 3)
+            "selftest document",
+            *(f"selftest update {n}" for n in (1, 2, 3)),
         ]  # the restart polled again from the stored offset: nothing twice
         out["scheduled_once"] = _until(
             lambda: (jobs := _jobs(d, later)) and "PENDING" not in jobs and sum(jobs.values()) == 1,
@@ -425,6 +427,55 @@ def _message(wamid: str, text: str, group: str | None = None) -> bytes:
         "metadata": {"phone_number_id": "1234567890"},
         "contacts": [{"wa_id": SMOKE_PHONE, "profile": {"name": "Smoke"}}],
         "messages": [message]}}]}]}).encode()  # fmt: skip
+
+
+def _media_checks(d: Daemon, seed: Path, grp: str) -> dict[str, Any]:
+    """A47 (H6, D39-A): a staged photo sent to the Telegram group by the bot, once, with its
+    replay; and the bot's retained document paged back whole through the real downloader
+    (getFile, then the file host), with its SHA-256 and type."""
+    import base64
+    import hashlib
+
+    from comms.core import refs
+    from comms.runtime.selftest import SELFTEST_DOCUMENT
+
+    def call(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+        answer = d.http(seed, name, arguments)
+        return {} if answer["isError"] else dict(answer["structuredContent"])
+
+    photo = b"\xff\xd8\xff\xe0" + bytes(range(256)) * 300
+    begun = call("comms_media_stage_begin", {
+        "mime": "image/jpeg", "size": len(photo), "sha256": hashlib.sha256(photo).hexdigest(),
+        "request_id": refs.mint("request")})  # fmt: skip
+    step = int(begun.get("chunk_max") or 1)
+    for seq, start in enumerate(range(0, len(photo), step)):
+        call("comms_media_stage_chunk", {
+            "upload": begun.get("upload"), "seq": seq,
+            "data_b64": base64.b64encode(photo[start : start + step]).decode(),
+            "request_id": refs.mint("request")})  # fmt: skip
+    request = refs.mint("request")
+    args = {"group": grp, "upload": begun.get("upload"), "kind": "photo", "caption": "Salaam",
+            "actor": "telegram_bot", "request_id": request}  # fmt: skip
+    sent, again = call("comms_message_send_media", args), call("comms_message_send_media", args)
+    out = {"media_send": sent.get("result") == "SUCCEEDED"
+           and str(sent.get("message", "")).startswith("cmg_") and again.get("replayed") is True}  # fmt: skip
+
+    items = call("comms_context_recent", {"group": grp, "limit": 10}).get("items", [])
+    media = next((i["media_ref"] for i in items if "media_ref" in i), None)
+    got, offset, page = b"", 0, {}
+    while media is not None:
+        page = call("comms_media_download", {"media": media, "offset": offset})
+        if not page:
+            break
+        piece = base64.b64decode(page["data_b64"])
+        got, offset = got + piece, offset + len(piece)
+        if page["complete"]:
+            break
+    out["media_download"] = (
+        got == SELFTEST_DOCUMENT and page.get("mime") == "application/pdf"
+        and page.get("sha256") == hashlib.sha256(SELFTEST_DOCUMENT).hexdigest()
+    )  # fmt: skip
+    return out
 
 
 def _catalog_checks(d: Daemon, seed: Path, port: int) -> dict[str, Any]:

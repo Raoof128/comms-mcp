@@ -183,7 +183,7 @@ class _Facades:
         }  # fmt: skip
 
     def staged_bytes(self, client: AuthenticatedClient, a: dict[str, Any]) -> tuple[bytes, str]:
-        """A file given as a staged ``upl_`` ref, or inline as ``data_b64`` (at most 512 KiB)
+        """A file given as a staged ``upl_`` ref, or inline as ``data_b64`` (at most 32 KiB, A47)
         with its ``mime``: exactly one (G8, D3)."""
         if ("upload" in a) == ("data_b64" in a):
             raise CommsError("INVALID_ARGUMENT")

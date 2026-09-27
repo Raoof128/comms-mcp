@@ -66,7 +66,7 @@ EXIT_CHECKLIST: dict[str, tuple[str, ...]] = {
         "tests/security/test_d39_pre_exit.py::test_the_real_daemon_checks_are_pinned",
     ),
 }
-DAEMON_CHECKS = 29  # 25 at D39-PRE; catalog amendment G9 added four (R-G9)
+DAEMON_CHECKS = 31  # 25 at D39-PRE; catalog amendment G9 added four (R-G9); A47 H6 two
 
 
 def test_the_checklist_is_the_plan_task_list_in_full():

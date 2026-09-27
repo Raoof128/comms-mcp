@@ -56,6 +56,7 @@ from comms.runtime.state import CommsState
 from comms.transports.telegram.bot.admin import BotAdmin
 from comms.transports.telegram.bot.context import BotContext
 from comms.transports.telegram.bot.http import BotApi
+from comms.transports.telegram.bot.media import BotMedia
 from comms.transports.telegram.bot.updates import BotPoller
 from comms.transports.telegram.peers import marked_chat_id
 from comms.transports.telegram.user.admin import UserAdmin
@@ -91,6 +92,7 @@ def _created(capability: C) -> str | None:
         C.GROUP_INVITE_RESET: f"https://chat.whatsapp.com/Selftest{n:06d}",
         C.TOPIC_CREATE: str(n),
         C.MESSAGE_SEND: str(1000 + n),
+        C.MESSAGE_SEND_MEDIA: str(2000 + n),  # A47: a media send names its new message too
         C.TEMPLATE_CREATE: str(9_000_000 + n),
     }.get(capability)
 
@@ -173,30 +175,42 @@ SELFTEST_CHAT = -1001234567890  # channel:1234567890, marked
 _SELFTEST_BOT = "1:selftest"  # the token shape the pinned client checks; no real bot
 
 
+# A47 (H6): one retained document the selftest bot can download (D39-A)
+SELFTEST_DOCUMENT = b"%PDF-1.7 selftest document " + bytes(range(256)) * 400
+_DOCUMENT = {"file_id": "BQAC-selftest-doc", "file_unique_id": "AgAD-selftest",
+             "mime_type": "application/pdf", "file_size": len(SELFTEST_DOCUMENT)}  # fmt: skip
+
+
 def _bot_updates() -> list[dict[str, Any]]:
-    return [
-        {
+    def update(n: int, **body: Any) -> dict[str, Any]:
+        return {
             "update_id": n,
             "message": {
                 "message_id": 100 + n,
                 "date": 1758800000 + n,
                 "chat": {"id": SELFTEST_CHAT, "type": "supergroup", "title": "MQ Society"},
                 "from": {"id": 42, "is_bot": False, "first_name": "Sara"},
-                "text": f"selftest update {n}",
+                **body,
             },
         }
-        for n in (1, 2, 3)
-    ]
+
+    texts = [update(n, text=f"selftest update {n}") for n in (1, 2, 3)]
+    return [*texts, update(4, document=_DOCUMENT, caption="selftest document")]
 
 
 def _bot_transport() -> Any:
     import httpx
 
     def handle(request: Any) -> Any:
+        if request.url.path.startswith("/file/bot"):  # A47: the one file the selftest holds
+            return httpx.Response(200, content=SELFTEST_DOCUMENT)
         method = request.url.path.rsplit("/", 1)[-1]
+        if method == "getFile":
+            result: Any = {**_DOCUMENT, "file_path": "documents/file_4.pdf"}
+            return httpx.Response(200, json={"ok": True, "result": result})
         if method == "getUpdates":
             offset = int((json.loads(request.content or b"{}") or {}).get("offset") or 0)
-            result: Any = [u for u in _bot_updates() if u["update_id"] >= offset]
+            result = [u for u in _bot_updates() if u["update_id"] >= offset]
         elif method == "getMe":
             result = {"id": 1, "is_bot": True, "first_name": "selftest"}
         else:
@@ -231,6 +245,7 @@ def selftest_adapters(state: CommsState, settings: DaemonSettings) -> Adapters:
         capability=dict.fromkeys(_ACTORS, _Available()),
         admin=dict(admins),
         context={"telegram_bot": BotContext(api, state.conn, clock=clock)},
+        downloads={"telegram_bot": BotMedia(api, state.conn)},  # A47: the real downloader
     )
     adapters.poller = BotPoller(api, state.conn, clock=clock)
     if settings.webhook_port is not None:

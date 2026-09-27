@@ -247,10 +247,10 @@ ADMIN_TOOLS: tuple[ToolSpec, ...] = (
         "group_info_set_photo",
         "Set the photo",
         "Replace the group's photo with a staged image (upload, from comms_media_stage_begin and "
-        "_chunk) or an inline one of at most 512 KiB (data_b64 with mime): JPEG or PNG on "
+        "_chunk) or an inline one of at most 32 KiB (data_b64 with mime): JPEG or PNG on "
         "Telegram (at most 10 MiB), JPEG on WhatsApp (at most 5 MB).",
         C.CHAT_SET_PHOTO,
-        {"upload": ref("upload"), "data_b64": string(1, 699052), "mime": string(1, 128)},
+        {"upload": ref("upload"), "data_b64": string(1, 43692), "mime": string(1, 128)},
         [],
         destructive=True,
     ),

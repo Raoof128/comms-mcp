@@ -648,3 +648,83 @@ R-G6a-docs, R-A46, R-G1 to R-G8d and R-G9 are in `docs/verification/comms-v0.3-r
 `comms-v0.3-catalog-amendment` is a local annotated tag (the branch has the other name). It is not pushed.
 
 No production claim.
+
+## A47: Telegram mark-read and Telegram media (tasks H0–H6)
+
+Plan `docs/superpowers/plans/2026-09-26-comms-v0.3-a47.md`, taken from the owner's answers on 2026-09-26 ("1. allow 2. search 2026 docs we will build it 3. search more docs"). It was gauntleted twice against the developer docs, 18 findings from the docs and then 13 from executing the code (R-A47-docs, R-A47-docs2), and the owner then said "proceed implement inline". Branch `comms-v0.3-a47` off `comms-v0.3-catalog`.
+
+### What exists now
+
+- **Mark-read (H1).** The Telegram user account marks a person's conversation read with `messages.readHistory`. It is reviewed under `cap.message.mark_read` alone, and every other read-acknowledge request stays absent. The tool routes by the `cmg_`'s actor, and the write path refuses another actor's message id outside a supergroup or channel.
+- **Telegram `med_` refs (H2).** A photo or document in a context item gets a `media_ref`:
+  - the user account's is keyed by the message locator;
+  - the bot's is keyed by `file_unique_id`;
+  - schema v8 `media_facts` records the kind, MIME type and size;
+  - no file id or file reference is output.
+- **Download (H3).**
+  - **Bot:** `getFile`, then a streamed and capped GET. The path is checked, and the token never reaches an error.
+  - **User account:** the message is fetched again, then `upload.getFile` runs in aligned slices on the file's own DC, through a reviewed borrowed sender (`media.download`).
+  - **Shared:** one capped reader in `transports/net.py`.
+- **`comms_message_send_media` (H4), on all three actors.** The one shape rule is `core/providers/media.py`.
+  - **Bot:** multipart, or by the retained `file_id`.
+  - **User account:** the one part upload (`file.upload`; `saveBigFilePart` above 10 MB), then a keyed `messages.sendMedia`.
+  - **WhatsApp:** upload, then a group image or document message.
+- **Upload, inspect, delete (H5).**
+  - The user account uploads to itself (`messages.uploadMedia`, peer self).
+  - A media send's documented refusals are final and named.
+  - Inspect of a Telegram `med_` is local.
+  - Delete is B, because Telegram has no file delete.
+- **The catalog holds 130 tools.** A47 adds `comms_message_send_media`.
+
+### What driving the real daemon found (H6)
+
+The D39-A media checks drove `comms selftest-daemon` over HTTP `/mcp` and found that **no staged upload over one chunk could ever cross the wire**. G8 set a chunk at 48 KiB raw, whose base64 alone is 65,536 bytes, and the HTTP request cap and the admin-socket frame are both 64 KiB. G8's 512 KiB inline file could never cross either. G8's tests called the dispatcher directly. Chunks, download slices and inline files are now 32 KiB raw (43,692 base64 characters). `tests/security/test_media_fits_the_wire.py` builds the largest request and answer each schema allows and requires both to fit on both routes.
+
+Earlier tasks found these, each fixed with a test:
+- a refused WhatsApp download escaped as `INTERNAL_ERROR` (H3);
+- the write path did not check which actor minted a message (H1);
+- an unnamed `BadRequest` on a send was `OUTCOME_UNKNOWN` (H5);
+- the WhatsApp group photo's multipart part name was wrong (R-G9b).
+
+### D39-A additions against a real daemon
+
+`phase_v03_daemon` now has 31 checks. The two new ones are:
+- a staged photo is sent to a Telegram group by the bot, once, and replays;
+- a retained Telegram document pages back whole with its SHA-256, through the real `getFile` and file-host path.
+
+### The exit gate
+
+`tests/security/test_a47_exit.py` maps each plan task H0–H6, read from the plan's headings, to its owning tests and re-runs them in a fresh process with nothing skipped. It also checks that:
+- the prohibition moved only as A47 says;
+- every Telegram media cell is served or an honest B;
+- the daemon checks are pinned;
+- the catalog is 130 tools.
+
+### Counts (gate at the A47 head)
+
+| Check | Result |
+|---|---|
+| `uv run pytest -q` | **5505 passed**, 4 skipped (opt-in host and live tests) |
+| `scripts/e2e_smoke.py` | **105/105** (31 in `phase_v03_daemon`) |
+| `pytest tests/formal` | 57 passed |
+| ruff (no cache), ruff format, mypy, `uv build` | clean |
+| WhatsVault suite | **450 passed** |
+
+### Rulings
+
+R-G9b, R-A47-docs, R-A47-docs2, and R-H1 to R-H6 are in `docs/verification/comms-v0.3-rulings.md`.
+
+### Waiting on the owner
+
+- **Merge and push:** `comms-v0.3-catalog`, then `comms-v0.3-a47`, and their local tags.
+- **D39-B live:**
+  - a photo and a document sent to a real WhatsApp group (Meta shows no media sample for groups, Gf12);
+  - a Telegram download from a file on another DC;
+  - WhatsApp group create's synchronous `request_id`.
+- **Campaign media:** still renders to nothing and needs its own amendment. So do albums, videos, voice notes and broadcast channels.
+
+### Tag
+
+`comms-v0.3-a47-media` is a local annotated tag (the branch holds `comms-v0.3-a47`). It is not pushed.
+
+No production claim.

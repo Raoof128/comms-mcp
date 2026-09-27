@@ -5,7 +5,7 @@ size and SHA-256 and returns a ``upl_`` ref; ``chunk`` appends the next piece, s
 order; the upload tool then ``take``s the whole file once. A staged file is bound to the client
 that began it, expires after five minutes, is used once, is capped at 16 MiB (WhatsApp's video
 limit) and is checked against its SHA-256 before anything reaches a provider. Nothing is
-written to disk, and a restart forgets every staged file. A small file (at most 512 KiB) may
+written to disk, and a restart forgets every staged file. A small file (at most 32 KiB, A47) may
 come inline as ``data_b64`` instead. Downloads are held the same way while a client pages
 through them.
 """
@@ -34,8 +34,11 @@ __all__ = [
 ]
 
 MAX_BYTES = 16 * 1024 * 1024
-CHUNK_MAX = 48 * 1024  # raw bytes per chunk: its base64 fits one tool call's frame
-INLINE_MAX = 512 * 1024
+# A47 (H6): a tool call and its answer each cross one 64 KiB HTTP request or admin-socket frame;
+# 32 KiB raw is 43,692 base64 characters, which leaves room for the envelope on both routes
+# (G8's 48 KiB chunk and 512 KiB inline file could never cross; see test_media_fits_the_wire)
+CHUNK_MAX = 32 * 1024  # raw bytes per chunk, per download slice
+INLINE_MAX = CHUNK_MAX  # a file sent inline is one chunk's worth
 TTL_S = 300.0
 MIME_MAX = 128
 

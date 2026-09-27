@@ -283,7 +283,7 @@ def test_through_the_dispatcher_a_bot_file_pages_back_whole(tmp_path):
     got, offset = b"", 0
     while True:
         page = built.dispatcher.call(client, "comms_media_download",
-                                     {"media": ref, "offset": offset, "length": 49152})  # fmt: skip
+                                     {"media": ref, "offset": offset, "length": 32768})  # fmt: skip
         assert page.error_code is None, page.error_code
         assert page.structured["mime"] == "application/pdf"
         piece = base64.b64decode(page.structured["data_b64"])
