@@ -1032,3 +1032,14 @@ Follow the user's engineering lifecycle: design/security analysis, implementatio
   - type Meta's app secret with `comms credential set meta-app-secret`, so the daemon verifies and collects what the relay holds;
   - the app's contact email is still the older `titanfall.1380@gmail.com`;
   - the Terms of Service URL is Meta's placeholder `https://www.facebook.com/`.
+
+### 2026-09-28 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Meta's app secret stored in comms; the relay path verified end to end in production (owner-authorised).
+- **Summary:**
+  - **Secret handling:** after the owner re-entered their Facebook password, the browser wrote the revealed secret straight to a gitignored 0600 file; the script output never entered the transcript. A pseudo-terminal typed it at `comms credential set meta-app-secret`'s `getpass` prompt (version 1, adapters reloaded), and the file was then deleted.
+  - **The waiting message:** Meta's dashboard test webhook, held in the relay since 13:28Z, was pulled, decrypted and verified against Meta's real signature, then inboxed, processed and archived (`whatsapp_messages` = 1). The relay was acked and drained to depth 0, with no quarantine and no gap.
+  - **Doctor:** `ok` true, with no `CREDENTIAL_UNCONFIRMED` for the app secret (confirmed in operation, R-E6).
+- **Files changed:** `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** `comms relay status`, `comms doctor`, a signed pull (depth 0), and a read-only count of the inbox and archive.
+- **Follow-ups:** a real WhatsApp message to the business number (D39-B live acceptance); the Meta contact email and Terms of Service URL.
