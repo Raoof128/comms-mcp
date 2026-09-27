@@ -24,6 +24,8 @@ REVIEWED_RPCS: frozenset[str] = frozenset(
     {
         "messages.GetDialogsRequest",
         "messages.ReadHistoryRequest",  # A47: under cap.message.mark_read only (the owner)
+        "upload.GetFileRequest",  # A47 (H3): media.download only
+        "auth.ExportAuthorizationRequest",  # A47 (H3): a borrowed sender for another DC
         "messages.GetPeerDialogsRequest",
         "messages.GetHistoryRequest",
         "messages.GetMessagesRequest",

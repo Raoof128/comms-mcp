@@ -8,11 +8,75 @@ followed. Only the adapter network modules may import ``httpx`` (pinned by
 
 from __future__ import annotations
 
+import hashlib
+import time
+from dataclasses import dataclass, field
 from urllib.parse import urlsplit
 
 import httpx
 
-__all__ = ["EgressRefused", "host_allowed", "pinned_client", "suffix_pinned_client"]
+__all__ = [
+    "MAX_DOWNLOAD_BYTES",
+    "DownloadRefused",
+    "EgressRefused",
+    "MediaBlob",
+    "blob",
+    "host_allowed",
+    "pinned_client",
+    "read_capped",
+    "suffix_pinned_client",
+]
+
+# D3 and A47: the most any download holds (WhatsApp's video limit; the Bot API allows 20 MB)
+MAX_DOWNLOAD_BYTES = 16 * 1024 * 1024
+_DOWNLOAD_CODES = frozenset(
+    {
+        "NOT_FOUND",
+        "PROVIDER_UNSUPPORTED",
+        "PROVIDER_UNAVAILABLE",
+        "RATE_LIMITED",
+        "INVALID_ARGUMENT",
+    }
+)
+
+
+class DownloadRefused(ValueError):
+    """A download an adapter will not make or finish (G8, A47). A fixed service code and never
+    a URL, a path, a token or a file id; ``retry_after`` only with ``RATE_LIMITED``."""
+
+    def __init__(
+        self, code: str = "PROVIDER_UNAVAILABLE", *, retry_after: int | None = None
+    ) -> None:
+        if code not in _DOWNLOAD_CODES:
+            code = "PROVIDER_UNAVAILABLE"
+        super().__init__(f"download refused: {code}")
+        self.code = code
+        self.retry_after = retry_after if code == "RATE_LIMITED" else None
+
+
+@dataclass(frozen=True)
+class MediaBlob:
+    data: bytes = field(repr=False)
+    mime: str
+    sha256: str
+
+
+def blob(data: bytes, mime: str) -> MediaBlob:
+    return MediaBlob(data, mime, hashlib.sha256(data).hexdigest())
+
+
+def read_capped(response: httpx.Response, *, limit: int, deadline: float) -> bytes:
+    """The one bounded read of a streamed body (G8, A47 Gx12): stops past ``limit`` bytes or
+    ``deadline`` (``time.monotonic``) rather than holding whatever the server sends."""
+    chunks, size = [], 0
+    for chunk in response.iter_bytes():
+        size += len(chunk)
+        if size > limit:
+            raise DownloadRefused("PROVIDER_UNSUPPORTED")  # larger than any download may be
+        if time.monotonic() > deadline:
+            raise DownloadRefused("PROVIDER_UNAVAILABLE")
+        chunks.append(chunk)
+    return b"".join(chunks)
 
 
 class EgressRefused(Exception):

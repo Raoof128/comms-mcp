@@ -46,6 +46,7 @@ class FakeSession:
     def __init__(self) -> None:
         self.entities: dict[int, Any] = {}
         self.dc = None
+        self.dc_id = 2  # the home DC (A47: a file elsewhere goes through a borrowed sender)
 
     def get_input_entity(self, marked_id: int) -> Any:
         if marked_id not in self.entities:
@@ -111,9 +112,20 @@ class FakeClient:
             return types.auth.Authorization(user=me)
         return None
 
-    async def __call__(self, request: Any) -> Any:
+    # A47 (H3): Telethon's borrowed-sender surface, recorded as "borrow:N", "dcN:<request>"
+    async def _borrow_exported_sender(self, dc_id: int) -> Any:
+        self.calls.append(f"borrow:{dc_id}")
+        return ("sender", dc_id)
+
+    async def _return_exported_sender(self, sender: Any) -> None:
+        self.calls.append(f"return:{sender[1]}")
+
+    async def _call(self, sender: Any, request: Any) -> Any:
+        return await self.__call__(request, prefix=f"dc{sender[1]}:")
+
+    async def __call__(self, request: Any, prefix: str = "") -> Any:
         name = qualified(request)
-        self.calls.append(name)
+        self.calls.append(prefix + name)
         if name in self.script:
             outcome = self.script[name]
             if isinstance(outcome, list) and outcome and isinstance(outcome[0], BaseException):

@@ -865,3 +865,11 @@ Follow the user's engineering lifecycle: design/security analysis, implementatio
 - **Files changed:** `src/comms/core/storage/migrations.py`, `src/comms/core/objects.py`, `src/comms/services/context.py`, `src/comms/mcp/tools/context.py`, `src/comms/transports/telegram/telegram/telethon_adapter.py`, `src/comms/transports/telegram/{user,bot}/context.py`, `tests/runtime/test_telegram_media_refs.py` (new), `tests/mcp/catalog_pin.json` (14 context tools gain `media_ref`), the rulings, `AGENT.md`, `CHANGELOG.md`.
 - **Verification:** 6 new tests, written first and seen failing; the full gate (GATE ok=1).
 - **Follow-ups:** H3 (Telegram download).
+
+### 2026-09-27 (Australia/Sydney)
+**Raouf:**
+- **Scope:** A47 H3: downloading a Telegram `med_` on both APIs (branch `comms-v0.3-a47`).
+- **Summary:** Bot: `getFile`, then a streamed and capped GET, with the path checked and the token never reaching an error. User account: the message is fetched again, then `upload.getFile` in aligned slices, on the file's own DC through a reviewed borrowed sender (new `media.download` operation). One capped reader and one `DownloadRefused` in `transports/net.py`. This also fixes a latent defect: a refused WhatsApp download escaped as an internal error. The media service is built even without WhatsApp.
+- **Files changed:** `src/comms/transports/net.py`, `src/comms/transports/whatsapp/cloud/media.py`, `src/comms/transports/telegram/bot/{http,media}.py` (`media.py` new), `src/comms/transports/telegram/user/media.py` (new), `src/comms/transports/telegram/telegram/telethon_adapter.py`, `src/comms/services/media.py`, `src/comms/runtime/{adapters,comms_runtime,facades}.py`, tests (`test_telegram_download.py` new, the fake client, the admin harness, the matrix, update-RPC and phase-4 guards), `docs/verification/{telegram-rpc-review.md,comms-v0.3-actor-matrix.md,comms-v0.3-rulings.md}`, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 24 new tests, written first and seen failing, plus 2 Telethon pins; the full gate (GATE ok=1).
+- **Follow-ups:** H4 (`comms_message_send_media`).

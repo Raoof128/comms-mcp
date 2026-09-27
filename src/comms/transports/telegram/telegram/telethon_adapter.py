@@ -32,6 +32,7 @@ from telethon.tl import functions, types
 
 from comms.core.providers.capability import Capability
 from comms.core.providers.protocols import ProviderResult
+from comms.transports.net import DownloadRefused
 from comms.transports.telegram.admin_profiles import MTPROTO_RIGHT, PROFILES
 from comms.transports.telegram.telegram.deadline import (
     Deadline,
@@ -92,6 +93,20 @@ OPERATIONS: dict[str, frozenset[str]] = {
             "channels.GetMessagesRequest",
             "messages.GetRepliesRequest",  # 4c: get_context inside a forum topic
             "messages.SearchRequest",  # 4c: per-peer search, never SearchGlobal
+        }
+    ),
+    # A47 (H3): a Telegram file, by its message. The message is fetched again for a fresh file
+    # reference, then upload.getFile in slices; a file on another DC is fetched over Telethon's
+    # borrowed sender, whose creation sends help.getConfig (an empty DC cache) and
+    # auth.exportAuthorization through this same allowlist (Gx1). auth.importAuthorization goes
+    # raw on the new sender inside InvokeWithLayer, pinned by tests/telegram/test_update_rpcs.py.
+    "media.download": frozenset(
+        {
+            "messages.GetMessagesRequest",
+            "channels.GetMessagesRequest",
+            "upload.GetFileRequest",
+            "auth.ExportAuthorizationRequest",
+            "help.GetConfigRequest",
         }
     ),
 }
@@ -837,6 +852,7 @@ _ROLE: Mapping[type, str] = MappingProxyType(
 
 
 PHOTO_PART = 512 * 1024  # upload.saveFilePart's part size (G8)
+DOWNLOAD_SLICE = 512 * 1024  # A47: upload.getFile's slice; 1 MiB is divisible by it (Gf9)
 MAX_ADMINS = 200  # a channel's administrators (Telegram caps them at 50; one page holds all)
 
 
@@ -1055,11 +1071,14 @@ class TelethonSession:
         deadline: Deadline,
         budget: WorkBudget,
         passthrough: tuple[type[BaseException], ...] = (errors.SessionPasswordNeededError,),
+        dc_id: int | None = None,
     ) -> Any:
         """Send one reviewed request for ``operation``. Refused before the client otherwise.
 
         ``passthrough`` names Telegram errors a login step handles itself
-        (2FA needed, a phone migrate); everything else is translated.
+        (2FA needed, a phone migrate); everything else is translated. ``dc_id`` (A47) sends it
+        on that DC's borrowed sender when it is not the home DC; the allowlist, the budget and
+        the deadline hold there too, and the sender is always returned.
         """
         if qualified(request) not in OPERATIONS[operation]:
             raise GatewayError("INTERNAL_ERROR")  # a programming error, never a network call
@@ -1078,7 +1097,14 @@ class TelethonSession:
                     with _operation(operation, budget) as current:
                         budget.spend()  # the session charges its own request, always
                         current.precharged.add(id(request))
-                        return await self._client(request)
+                        home = getattr(self._client.session, "dc_id", None)
+                        if dc_id is None or dc_id == home:
+                            return await self._client(request)
+                        sender = await self._client._borrow_exported_sender(dc_id)
+                        try:
+                            return await self._client._call(sender, request)
+                        finally:
+                            await self._client._return_exported_sender(sender)
         except (asyncio.CancelledError, KeyboardInterrupt):
             raise
         except passthrough:
@@ -1110,6 +1136,78 @@ class TelethonSession:
         if self._update_owner != owner:
             raise UpdateStreamTaken
         self._update_sink = sink
+
+    async def download_media(
+        self, peer_type: str, peer_id: int, message_id: int, *, max_bytes: int, timeout: float
+    ) -> bytes:
+        """A47 (H3): one message's photo or document, whole, at most ``max_bytes``.
+
+        The message is fetched for a fresh file reference, then ``upload.getFile`` runs in
+        512 KiB slices at 512 KiB offsets with ``precise`` and ``cdn_supported`` unset (Gf2,
+        Gf9), on the file's own DC (Gf1). An expired reference is fetched again once and a
+        migrate followed once, never looped (Gx3); the Premium throttle stays ``FLOOD_WAIT``.
+        """
+        deadline = Deadline(max(0.001, timeout))
+        budget = WorkBudget(max_rpcs=max_bytes // DOWNLOAD_SLICE + 12)
+        dc_id, location, size = await self._download_source(
+            peer_type, peer_id, message_id, deadline, budget
+        )
+        data, refreshed, moved = bytearray(), False, None
+        while True:
+            if size is not None and size > max_bytes:
+                raise DownloadRefused("PROVIDER_UNSUPPORTED")  # before any slice
+            request = functions.upload.GetFileRequest(location, len(data), DOWNLOAD_SLICE)
+            try:
+                part = await self._call_reviewed(
+                    request, operation="media.download", client_ref="comms", deadline=deadline,
+                    budget=budget, dc_id=moved or dc_id,
+                    passthrough=(errors.FileMigrateError, errors.FileReferenceExpiredError),
+                )  # fmt: skip
+            except errors.FileReferenceExpiredError:
+                if refreshed:
+                    raise DownloadRefused("PROVIDER_UNAVAILABLE") from None
+                refreshed = True
+                dc_id, location, size = await self._download_source(
+                    peer_type, peer_id, message_id, deadline, budget
+                )
+                continue
+            except errors.FileMigrateError as migrate:
+                if moved is not None:
+                    raise DownloadRefused("PROVIDER_UNAVAILABLE") from None
+                moved = int(migrate.new_dc)
+                continue
+            if not isinstance(part, types.upload.File):
+                raise DownloadRefused("PROVIDER_UNSUPPORTED")  # a CDN was never asked for
+            data += part.bytes
+            if len(data) > max_bytes:
+                raise DownloadRefused("PROVIDER_UNSUPPORTED")
+            if len(part.bytes) < DOWNLOAD_SLICE:
+                return bytes(data)
+
+    async def _download_source(
+        self, peer_type: str, peer_id: int, message_id: int, deadline: Deadline, budget: WorkBudget
+    ) -> tuple[int, Any, int | None]:
+        peer = self.input_peer(peer_type, peer_id)  # the entity cache only; a miss is refused
+        wanted = [types.InputMessageID(int(message_id))]
+        request = (
+            functions.channels.GetMessagesRequest(peer, wanted)
+            if peer_type == "channel"
+            else functions.messages.GetMessagesRequest(wanted)
+        )
+        result = await self._call_reviewed(
+            request, operation="media.download", client_ref="comms", deadline=deadline,
+            budget=budget,
+        )  # fmt: skip
+        message = next(
+            (m for m in getattr(result, "messages", None) or ()
+             if isinstance(m, types.Message) and m.id == message_id),
+            None,
+        )  # fmt: skip
+        facts = _media_facts(message.media) if message is not None else None
+        if message is None or facts is None:
+            raise DownloadRefused("NOT_FOUND")
+        dc_id, location = utils.get_input_location(message.media)
+        return int(dc_id), location, facts[2]
 
     async def call_capability(
         self,

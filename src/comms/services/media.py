@@ -14,7 +14,7 @@ from collections.abc import Mapping
 from typing import Any, Protocol
 
 from comms.core.errors import CommsError
-from comms.core.objects import resolve_object
+from comms.core.objects import media_facts, resolve_object
 from comms.core.providers.capability import Capability as C
 from comms.core.providers.protocols import ProviderTarget
 from comms.services.capability import CapabilityService
@@ -39,13 +39,21 @@ class MediaService:
         conn: Any,
         capability: CapabilityService,
         executor: MutationExecutor,
-        source: MediaSource,
+        source: MediaSource | None,
+        *,
+        downloads: Mapping[str, Any] | None = None,
     ) -> None:
         self._conn, self._source = conn, source
+        # A47 (H3): who fetches a ``med_``'s bytes is the actor that minted it
+        self._downloads: dict[str, Any] = dict(downloads or {})
+        if source is not None:
+            self._downloads.setdefault(ACTOR, source)
         self._writes = ProviderWrites(conn, capability, executor)
 
     def inspect(self, media: str) -> dict[str, Any]:
         found = resolve_object(self._conn, media, "media")
+        if self._source is None:
+            raise CommsError("NOT_CONFIGURED")
         try:
             info = self._source.info(found.provider_identity)
         except ValueError:
@@ -94,11 +102,15 @@ class MediaService:
         held = staged.held_download(client, media)
         if held is None:
             found = resolve_object(self._conn, media, "media")
+            source = self._downloads.get(found.actor)
+            if source is None:
+                raise CommsError("NOT_CONFIGURED")
             try:
-                blob = self._source.retrieve(found.provider_identity)
-            except ValueError:
-                raise CommsError("PROVIDER_UNAVAILABLE") from None
-            held = (blob.data, blob.mime)
+                blob = source.retrieve(found.provider_identity)
+            except ValueError as refused:  # a fixed code, never a URL, path or file id
+                raise _refusal(refused) from None
+            facts = media_facts(self._conn, media)  # A47: a Telegram file's type is the ref's
+            held = (blob.data, facts["mime"] if facts else blob.mime)
             staged.hold_download(client, media, *held)
         data, mime = held
         if offset > len(data):
@@ -110,3 +122,25 @@ class MediaService:
             "data_b64": base64.b64encode(piece).decode("ascii"),
             "complete": offset + len(piece) >= len(data),
         }  # fmt: skip
+
+
+_DOWNLOAD_CODES = frozenset(
+    {
+        "NOT_FOUND",
+        "PROVIDER_UNSUPPORTED",
+        "PROVIDER_UNAVAILABLE",
+        "RATE_LIMITED",
+        "INVALID_ARGUMENT",
+    }
+)
+
+
+def _refusal(refused: ValueError) -> CommsError:
+    """An adapter's download refusal as the service error: its fixed code, else unavailable."""
+    code = getattr(refused, "code", None)
+    if code not in _DOWNLOAD_CODES:
+        return CommsError("PROVIDER_UNAVAILABLE")
+    if code == "RATE_LIMITED":
+        wait = getattr(refused, "retry_after", None)
+        return CommsError(code, retry_after=wait if type(wait) is int else None)
+    return CommsError(code)

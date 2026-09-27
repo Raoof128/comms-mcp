@@ -509,6 +509,12 @@ class _Facades:
             raise CommsError("NOT_CONFIGURED")
         return self.s.media
 
+    def downloads(self) -> MediaService:
+        """A47 (H3): downloads need no WhatsApp account; each actor fetches its own refs."""
+        if self.s.media is None:
+            raise CommsError("NOT_CONFIGURED")
+        return self.s.media
+
     def account_target(self) -> ProviderTarget:
         if self.s.account_target is None:
             raise CommsError("NOT_CONFIGURED")
@@ -624,7 +630,7 @@ class _Facades:
             "whatsapp.template_delete": lambda cl, a: self.templates().delete(c(cl), self.account_target(), a["name"], a["request_id"]),
             "media.inspect": lambda cl, a: self.media().inspect(a["media"]),
             "media.upload": self.media_upload,  # G8 (D3)
-            "media.download": lambda cl, a: self.media().download(
+            "media.download": lambda cl, a: self.downloads().download(
                 self.staged, cl.client_ref, a["media"], a.get("offset", 0), a.get("length", CHUNK_MAX)
             ),
             "media.stage_begin": lambda cl, a: self.staged.replayed(

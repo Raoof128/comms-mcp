@@ -66,8 +66,10 @@ def test_a_configured_whatsapp_account_is_an_actor_with_its_services(w):
 def test_without_the_token_whatsapp_is_not_an_actor(w):
     services = _runtime(w, SETTINGS).services
     assert "whatsapp_cloud" not in services.actors
-    assert services.templates is None and services.media is None
-    assert services.account_target is None
+    assert services.templates is None and services.account_target is None
+    # A47 (H3): the media service exists for Telegram downloads; without WhatsApp it holds no
+    # WhatsApp source, so WhatsApp's own media answers NOT_CONFIGURED
+    assert services.media is not None and "whatsapp_cloud" not in services.media._downloads
 
 
 def test_without_a_business_account_id_there_is_no_account_target(w):
