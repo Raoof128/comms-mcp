@@ -897,3 +897,11 @@ Follow the user's engineering lifecycle: design/security analysis, implementatio
 - **Files changed:** `src/comms/services/uploads.py`, `src/comms/mcp/tools/{account,admin,messages}.py`, `src/comms/runtime/{selftest,facades}.py`, `scripts/{smoke_daemon,e2e_smoke}.py`, `tests/security/{test_media_fits_the_wire,test_a47_exit}.py` (new), `tests/security/test_d39_pre_exit.py`, `tests/transports/test_telegram_download.py`, `tests/mcp/catalog_pin.json`, `docs/verification/{comms-v0.3.md,comms-v0.3-rulings.md,comms-v0.3-smoke-map.json}`, `CLAUDE.md`, `AGENT.md`, `CHANGELOG.md`.
 - **Verification:** the full gate (GATE ok=1): 5505 passed, 4 skipped; smoke 105/105 (31 against the daemon); formal 57; WhatsVault 450.
 - **Follow-ups:** the owner merges and pushes `comms-v0.3-catalog` then `comms-v0.3-a47`; D39-B live media checks.
+
+### 2026-09-27 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Land the catalog amendment and A47 on `main` and push (owner: "merge and push all").
+- **Summary:** `comms-v0.3-catalog` merged (`c940ff6`), then `comms-v0.3-a47` (`f60a46f`), both `--no-ff`. The merged tree is byte-identical to the gated A47 head `2a864be`. Pushed `main`, both branches and the tags `comms-v0.3-catalog-amendment` and `comms-v0.3-a47-media`; the evidence records their SHAs.
+- **Files changed:** `docs/verification/comms-v0.3.md`, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** the gate on `2a864be` (GATE ok=1: 5505 passed, smoke 105/105); `main^{tree}` equals `comms-v0.3-a47^{tree}`; `origin/main` equals `main` after the push; the evidence-reading exit tests pass.
+- **Follow-ups:** D39-B (owner-run, live).

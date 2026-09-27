@@ -645,7 +645,7 @@ R-G6a-docs, R-A46, R-G1 to R-G8d and R-G9 are in `docs/verification/comms-v0.3-r
 
 ### Tag
 
-`comms-v0.3-catalog-amendment` is a local annotated tag (the branch has the other name). It is not pushed.
+`comms-v0.3-catalog-amendment` is an annotated tag (the branch is named `comms-v0.3-catalog`), pushed with the owner's approval on 2026-09-27 together with the merge that lands this branch on `main` (`c940ff6`): tag object `feeb56c84592eda2fb41e89b0af51ae1380bbf46` → commit `204a2805f700814b68f0735109f3147253710c0c`.
 
 No production claim.
 
@@ -716,7 +716,7 @@ R-G9b, R-A47-docs, R-A47-docs2, and R-H1 to R-H6 are in `docs/verification/comms
 
 ### Waiting on the owner
 
-- **Merge and push:** `comms-v0.3-catalog`, then `comms-v0.3-a47`, and their local tags.
+- **Merge and push:** done on 2026-09-27 (`main` at `f60a46f`).
 - **D39-B live:**
   - a photo and a document sent to a real WhatsApp group (Meta shows no media sample for groups, Gf12);
   - a Telegram download from a file on another DC;
@@ -725,6 +725,6 @@ R-G9b, R-A47-docs, R-A47-docs2, and R-H1 to R-H6 are in `docs/verification/comms
 
 ### Tag
 
-`comms-v0.3-a47-media` is a local annotated tag (the branch holds `comms-v0.3-a47`). It is not pushed.
+`comms-v0.3-a47-media` is an annotated tag (the branch is named `comms-v0.3-a47`), pushed with the owner's approval on 2026-09-27 together with the merge that lands it on `main` (`f60a46f`): tag object `f3a2eeab67ab3d2d12618faed5c7a6ecac34a9b5` → commit `2a864bef8d8e2a3df0fd2d6651f72142b38e2832`.
 
 No production claim.
