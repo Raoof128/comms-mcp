@@ -1123,3 +1123,22 @@ Follow the user's engineering lifecycle: design/security analysis, implementatio
 - **Files changed:** `AGENT.md`, `CHANGELOG.md`.
 - **Verification:** `comms_campaign_status` and `delivery_report`, and the message read back in Telegram Web.
 - **Follow-ups:** consider a person-addressed send (or a per-campaign actor) if one-off DMs through the MCP are wanted.
+
+### 2026-09-28 (Australia/Sydney)
+**Raouf:**
+- **Scope:** The owner's Friends group message, and the defect it exposed (branch `telegram-creator-rights`, ruling R-TG2).
+- **Summary:**
+  - **The message:** the owner asked for a cute Persian "good morning, please confirm numbers for Cafe Cat on Sunday so I can call and book" in their Friends group. The MCP send was refused (`CAPABILITY_UNAVAILABLE`), so the message was sent from the owner's own Telegram Web session (read back at 08:04). Nothing was sent twice.
+  - **Causes:**
+    - I first entered Telegram Web's id (`-4331185481`); comms wants `-1004331185481`. That destination is disabled and the correct one added.
+    - v0.3 has no dialog discovery, so the session's entity cache was empty. It was filled once through the adapter's reviewed `admin.discover` read, with the daemon stopped.
+    - **The defect:** Telegram's `getParticipant` answer for the creator omitted the channel from `chats`, and comms read that as not authorized for every right. `self_rights` now makes one `messages.getPeerDialogs` read (already reviewed; added to `cap.member.get` and to the review document) when the channel is missing; `channels.getChannels` stays absent.
+- **Files changed:** `src/comms/transports/telegram/telegram/telethon_adapter.py`, `docs/verification/telegram-rpc-review.md`, `tests/transports/telegram_user/test_self_rights.py`, the rulings (R-TG2), `AGENT.md`, `CHANGELOG.md`.
+- **Verification:**
+  - 4 new tests (2 seen failing first).
+  - Full gate GATE ok=1 (5615 passed; smoke 108).
+  - Live: Friends reads as megagroup/creator, and over MCP `telegram_user` has `message.send`, `message.pin` and `admin.promote` AVAILABLE.
+- **Follow-ups:**
+  - dialog discovery for v0.3 (the entity cache fills only from updates);
+  - `scan_dialogs`' `_views` raises on an unknown entity type;
+  - a person-addressed send tool.

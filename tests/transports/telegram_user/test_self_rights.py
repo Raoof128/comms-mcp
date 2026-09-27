@@ -185,3 +185,66 @@ async def test_lookup_failures_are_gateway_errors(tmp_path):
             tmp_path, GET, _participant(types.ChannelParticipantSelf(1, 2, None)), peer=("user", 1)
         )
     assert failed.value.code == "NOT_ACCESSIBLE"  # a user is not a group
+
+
+# -- found live (2026-09-28): Telegram's getParticipant answer can omit the channel ------------
+
+PEER_DIALOGS = "messages.GetPeerDialogsRequest"
+
+
+def _bare(participant):
+    """channels.channelParticipant as Telegram answered it live: ``chats`` is empty."""
+    return types.channels.ChannelParticipant(participant=participant, chats=[], users=[])
+
+
+def _peer_dialogs(*chats):
+    return types.messages.PeerDialogs(dialogs=[], messages=[], chats=list(chats), users=[],
+                                      state=types.updates.State(1, 0, None, 0, 0))  # fmt: skip
+
+
+async def _rights_scripted(tmp_path, script):
+    fake = FakeClient(script)
+    fake.session.remember(_channel())
+    session = TelethonSession(
+        TelegramConfig(api_id=1, session_dir=tmp_path / "s"),
+        api_hash="0" * 32,
+        client_factory=lambda *a, **k: fake,
+    )
+    await session.start()
+    try:
+        return await session.self_rights("channel", 77, timeout=5), fake.calls
+    finally:
+        await session.stop()
+
+
+async def test_a_creator_whose_answer_omits_the_channel_is_still_the_creator(tmp_path):
+    view, calls = await _rights_scripted(tmp_path, {
+        GET: _bare(types.ChannelParticipantCreator(1, types.ChatAdminRights())),
+        PEER_DIALOGS: _peer_dialogs(_channel(forum=True)),
+    })  # fmt: skip
+    assert (view.kind, view.status, view.is_forum) == ("megagroup", "creator", True)
+    assert calls[-2:] == [GET, PEER_DIALOGS]  # one more reviewed read, only when needed
+
+
+async def test_a_member_whose_answer_omits_the_channel_gets_its_defaults_from_the_dialog(tmp_path):
+    view, _calls = await _rights_scripted(tmp_path, {
+        GET: _bare(types.ChannelParticipantSelf(1, 2, None)),
+        PEER_DIALOGS: _peer_dialogs(_channel(default_banned_rights=MUTED)),
+    })  # fmt: skip
+    assert (view.status, view.denied) == ("member", {"send_messages"})
+
+
+async def test_an_answer_with_the_channel_needs_no_second_read(tmp_path):
+    _view, calls = await _rights_scripted(tmp_path, {
+        GET: _participant(types.ChannelParticipantCreator(1, types.ChatAdminRights())),
+    })  # fmt: skip
+    assert PEER_DIALOGS not in calls
+
+
+async def test_no_channel_anywhere_is_still_not_accessible(tmp_path):
+    with pytest.raises(GatewayError) as exc:
+        await _rights_scripted(tmp_path, {
+            GET: _bare(types.ChannelParticipantSelf(1, 2, None)),
+            PEER_DIALOGS: _peer_dialogs(),
+        })  # fmt: skip
+    assert exc.value.code == "NOT_ACCESSIBLE"

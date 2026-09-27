@@ -55,6 +55,7 @@ dropped link fails the in-flight call and only the daemon's keeper reconnects.
 | `cap.member.list` | `channels.GetParticipantsRequest` | https://core.telegram.org/method/channels.getParticipants | none | `READ`, `retry_same_key` |
 | `cap.member.list` | `messages.GetFullChatRequest` | https://core.telegram.org/method/messages.getFullChat | none | `READ`, `retry_same_key` |
 | `cap.member.get` | `channels.GetParticipantRequest` | https://core.telegram.org/method/channels.getParticipant | none | `READ`, `retry_same_key` |
+| `cap.member.get` | `messages.GetPeerDialogsRequest` | https://core.telegram.org/method/messages.getPeerDialogs | none | `READ`, `retry_same_key` |
 | `cap.member.get` | `messages.GetFullChatRequest` | https://core.telegram.org/method/messages.getFullChat | none | `READ`, `retry_same_key` |
 | `cap.admin.list` | `channels.GetParticipantsRequest` | https://core.telegram.org/method/channels.getParticipants | none | `READ`, `retry_same_key` |
 | `cap.admin.list` | `messages.GetFullChatRequest` | https://core.telegram.org/method/messages.getFullChat | none | `READ`, `retry_same_key` |
