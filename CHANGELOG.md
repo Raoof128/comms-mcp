@@ -892,3 +892,18 @@
 - **Files changed:** `site/` (new), `.github/workflows/pages.yml` (new), `tests/security/test_public_site.py` (new), `relay/test/relay.test.ts`, `AGENT.md`, `CHANGELOG.md`.
 - **Verification:** 5 new site tests; the full gate GATE ok=1 (5601 passed; smoke 108; relay 15).
 - **Follow-ups:** set the policy URL and the deletion URL in Meta's app settings, then publish W-Vault.
+
+### 2026-09-28 (Australia/Sydney)
+**Raouf:**
+- **Scope:** W-Vault published in Meta (owner-authorised).
+- **Summary:**
+  - **Pages:** GitHub Pages deployed `site/` through the pinned workflow (run succeeded). `/`, `/privacy/` and `style.css` answer 200 to Meta's crawler user agent.
+  - **Settings:** W-Vault's Basic settings now point at `https://raoof128.github.io/telegram-mcp/privacy/`, with deletion instructions at `…/privacy/#deletion`; both persisted after a reload.
+  - **Publish:** Meta reported "All required app settings are complete", then "Your app was successfully published".
+  - **Use cases:** Threads, Instagram and Messenger stay attached with standard access only; any advanced permission still needs App Review.
+- **Files changed:** `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** the live URL probes, Meta's confirmation, and the settings read back.
+- **Follow-ups (owner):**
+  - type Meta's app secret with `comms credential set meta-app-secret`, so the daemon verifies and collects what the relay holds;
+  - the app's contact email is still the older `titanfall.1380@gmail.com`;
+  - the Terms of Service URL is Meta's placeholder `https://www.facebook.com/`.
