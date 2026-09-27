@@ -918,3 +918,22 @@
 - **Files changed:** `AGENT.md`, `CHANGELOG.md`.
 - **Verification:** `comms relay status`, `comms doctor`, a signed pull (depth 0), and a read-only count of the inbox and archive.
 - **Follow-ups:** a real WhatsApp message to the business number (D39-B live acceptance); the Meta contact email and Terms of Service URL.
+
+### 2026-09-28 (Australia/Sydney)
+**Raouf:**
+- **Scope:** WhatsApp pricing, which number is in use, and group announcements. Research and decisions only; no code.
+- **Summary:**
+  - **Current number:** the live install uses Meta's test number +1 555 200 6424 (phone number id `1236981939507514`, WABA `2507089659791632`). It can message only verified test recipients, and there are none. The owner's personal number (0402 310 686) is not connected; the owner decided to leave it for now.
+  - **Pricing (Meta docs, 2026):**
+    - Receiving is free.
+    - Until 1 October 2026, replies inside the 24-hour customer service window are free.
+    - From 1 October 2026, service messages are charged at the utility rate, after 1,000 free per business number per month. The free tier is stated by partners (360dialog, SendPulse, Wati) and not yet on Meta's own page.
+    - Templates the business starts are always charged. Australia is on the "Rest of Asia Pacific" rate card.
+  - **Personal number as the business number:** it must first be deleted from WhatsApp (history lost). Coexistence needs the WhatsApp Business app plus a Solution Partner or Tech Provider, drops group sync and keeps 6 months of history. Advised against; a spare number is the clean route.
+  - **Groups API limits:** Official Business Account only (30 days on the platform, business verification, approved display name, two-step verification), at most 8 participants, invite-link only, API-created groups only, and each group send uses one unit per delivered recipient. comms can never post into existing phone-app groups or communities.
+  - **No messages sent yet:** the live system has sent nothing, because the access token, bot token and Telegram session are not configured.
+  - **Recommendation for society announcements:** Telegram groups through comms, and a WhatsApp Community announcement group posted manually.
+  - **Sending through WhatsApp Web** in the controlled browser is possible, but WhatsApp's Terms forbid automated or bulk sending and it risks a ban on the owner's number. It is to be done only as occasional one-off sends the owner approves (text and group shown first), never as a comms pipeline or a one-to-one broadcast. Not set up.
+- **Files changed:** `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** Meta's pricing, non-template pricing, Groups API, Official Business Account and registration pages, read 2026-09-28.
+- **Follow-ups (owner):** a spare number for production; the Telegram bot token or session for announcements; the Meta contact email and Terms of Service URL.
