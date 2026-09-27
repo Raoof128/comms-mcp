@@ -151,7 +151,7 @@ def test_the_bot_keys_a_file_by_its_unique_id_and_stores_no_file_id(tmp_path):
 def test_schema_v8_holds_media_facts(tmp_path):
     w = group_world(tmp_path)
     version = w["conn"].execute("SELECT max(version) FROM schema_version").fetchone()[0]
-    assert version == 8
+    assert version >= 8  # v9 (A48) adds the relay tables
     cols = [r[1] for r in w["conn"].execute("PRAGMA table_info(media_facts)")]
     assert cols == ["object_id", "media_kind", "mime", "size", "origin", "recorded_at"]
 

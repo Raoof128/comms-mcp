@@ -948,3 +948,14 @@ Follow the user's engineering lifecycle: design/security analysis, implementatio
 - **Files changed:** `relay/` (new: `src/{index,mailbox,pull_sig,limits}.ts`, `test/`, `wrangler.jsonc`, `package.json`, `package-lock.json`, `tsconfig.json`, `vitest.config.ts`, `.dev.vars.example`), `.gitignore`, `tests/security/test_relay_static.py` (new), `tests/fixtures/relay/wrangler_dev_page.json` (a page from the real Worker), the relay design, the rulings (R-R2), `AGENT.md`, `CHANGELOG.md`.
 - **Verification:** 14 Vitest tests in workerd, including the shared pull-signature vectors and a 2.5 MiB batch reassembled exactly; the Worker run under `wrangler dev`, with its ciphertext decrypted by the daemon's `age`; full gate GATE ok=1 (the first run caught one lint finding, fixed and re-run).
 - **Follow-ups:** R3 (the collector).
+
+### 2026-09-27 (Australia/Sydney)
+**Raouf:**
+- **Scope:** WhatsApp relay R3: the daemon's collector (branch `comms-relay`).
+- **Summary:** `transports/whatsapp/relay_client.py` is the one new network module: one pinned https origin, signed pulls and acks, a bounded answer, strict shapes and fixed errors. The collector, `runtime/relay.py`, is a 60-second worker loop. It works in `seq` order: decrypt, check the envelope against its row, reassemble parts, verify Meta's signature (the only place it is checked, D-R1), store in the inbox, move progress forward, then ack. A refused row is quarantined in comms.db with its ciphertext, because an ack is cumulative. Gaps not covered by a purge are recorded, and a clock skew is told apart from a wrong key.
+  - Schema v9 holds `relay_state`, `relay_quarantine` and `relay_gaps`.
+  - `comms.json` takes `"relay": {"url": ...}`, and with a relay the local listener is not served; the verify token lives in the Worker.
+  - The composition loads the relay keys from the key slots.
+- **Files changed:** `src/comms/transports/whatsapp/relay_client.py`, `src/comms/runtime/relay.py` (new); `src/comms/runtime/{adapters,assemble,settings,workers}.py`, `src/comms/core/storage/migrations.py`; tests (`tests/runtime/test_relay_collector.py`, `test_relay_wiring.py`, `tests/transports/test_relay_client.py` new; egress pin, v8 pin); the egress matrix in `docs/verification/comms-v0.3.md`; the rulings (R-R3); `AGENT.md`; `CHANGELOG.md`.
+- **Verification:** 35 new tests, written first and seen failing, including a crash between the commit and the ack, junk, parts, gaps, clock skew, and the real Worker's captured ciphertext; full gate GATE ok=1.
+- **Follow-ups:** R4 (operator commands, doctor), R5 (end to end).

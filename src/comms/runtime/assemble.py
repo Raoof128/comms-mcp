@@ -14,16 +14,24 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+from comms.core.backup import age
 from comms.core.backup.export_import import StagedImports
 from comms.core.backup.transfer import TransferRegistry
-from comms.runtime.adapters import Adapters
+from comms.core.keys.slots import load_active
+from comms.runtime.adapters import Adapters, RelayKeys
 from comms.runtime.comms_runtime import CommsRuntime, RemoteConfig, build_comms_runtime
 from comms.runtime.operator import LegacySide
 from comms.runtime.proofs import build_proofs
 from comms.runtime.settings import DaemonSettings
 from comms.runtime.state import CommsState
 
-__all__ = ["AdaptersFactory", "Assembled", "assemble_runtime", "production_adapters"]
+__all__ = [
+    "AdaptersFactory",
+    "Assembled",
+    "assemble_runtime",
+    "production_adapters",
+    "relay_keys",
+]
 
 AdaptersFactory = Callable[[CommsState, DaemonSettings], Adapters]
 
@@ -35,6 +43,13 @@ class Assembled:
 
     def __repr__(self) -> str:
         return "Assembled(<redacted>)"
+
+
+def relay_keys(state: CommsState, transport: Any = None) -> RelayKeys:
+    """A48: the pull key and the age identity, recomputed and checked by ``load_active``."""
+    identity, _ = load_active(state.conn, state.store, "relay-age-key")
+    pull_key, _ = load_active(state.conn, state.store, "relay-pull-key")
+    return RelayKeys(pull_key, (age.identity_from_raw(identity),), transport)
 
 
 def production_adapters(
@@ -60,6 +75,7 @@ def production_adapters(
             archive=archive if archive is not None else CommsArchive(state.conn, clock=clock),
             telegram_session=telegram_session,
             run=run,
+            relay_keys=relay_keys(state) if settings.adapter.relay_url is not None else None,
         )
         return adapters
 
