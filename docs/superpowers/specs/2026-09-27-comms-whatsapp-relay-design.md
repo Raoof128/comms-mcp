@@ -37,7 +37,7 @@ Meta only ever talks to Cloudflare. The Mac is never reachable from the internet
   - A body is never refused for size below 8 MiB. Meta sets no size limit and batches up to 1000 updates. A body over 1 MiB is stored as several rows sharing one `batch` id and a part index; a Durable Object row holds at most 2 MB.
 - **`GET /webhooks/meta/<path-token>`.** The verify-token handshake (`hub.mode=subscribe`, `hub.verify_token` compared in constant time, `hub.challenge` echoed). It never delivers anything.
 - **`POST /pull`, `POST /ack`.** Daemon-only, with signed requests (see Keys). `/pull {after, limit}` returns up to 50 rows or 256 KiB of `{seq, received_at, ciphertext}`, plus `purged_through`. `/ack {through}` deletes rows with `seq ≤ through`. It is idempotent: repeating it deletes nothing new.
-- **Worker secrets** (`secrets.required`, so a deploy fails if one is missing): `RELAY_PATH_TOKEN`, `META_VERIFY_TOKEN`, `RELAY_PULL_KEY`. Meta's app secret is deliberately absent (D-R1). **Plain variable:** `RELAY_AGE_RECIPIENT`, the public `age1…` key.
+- **Worker secrets** (`secrets.required`, so a deploy fails if one is missing): `RELAY_PATH_TOKEN`, `META_VERIFY_TOKEN`, `RELAY_PULL_KEY`, and `RELAY_AGE_RECIPIENT`. The recipient is the public `age1…` key; it is a secret only so that nothing owner-specific is committed (R-R2). Meta's app secret is deliberately absent (D-R1).
 
 ### 2. `Mailbox`: one SQLite Durable Object
 

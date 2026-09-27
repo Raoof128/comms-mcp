@@ -933,3 +933,18 @@ Follow the user's engineering lifecycle: design/security analysis, implementatio
 - **Files changed:** `docs/comms-spec-v0.3.md` (A48), the relay design (marked approved), the plan (new), the rulings (pin, R-R0), `src/comms/core/{domains,relay_sig,validators}.py`, `src/comms/core/keys/{purposes,ids,slots,rotate}.py`, `src/comms/core/backup/age.py` (`identity_from_raw`), `src/comms/runtime/provision.py`, `src/comms/transports/whatsapp/webhooks/{signature,ingress}.py`, tests (`tests/core/test_relay_sig.py`, `tests/transports/whatsapp_webhooks/test_signature.py` new; purposes, wire-frozen, provision), `tests/fixtures/relay/pull_signature_vectors.json`.
 - **Verification:** New tests written first and seen failing; full gate GATE ok=1 (5519 passed, 4 skipped; smoke 106; WhatsVault 450).
 - **Follow-ups:** R2 (the Worker and Mailbox), R3 (the collector), R4 (operator and doctor), R5 (end to end).
+
+### 2026-09-27 (Australia/Sydney)
+**Raouf:**
+- **Scope:** WhatsApp relay R2: the Cloudflare Worker and its Mailbox (`relay/`, branch `comms-relay`).
+- **Summary:** A TypeScript Worker on the secret webhook path.
+  - **Refusals:** the wrong token 404, a non-JSON body 415, a malformed signature header 401, a body over 8 MiB 413, and the Mailbox's rate bound 429. It answers 200 only once the batch is stored, and 503 otherwise.
+  - **Handshake:** the verify-token handshake is in constant time.
+  - **Pulls:** `/pull` and `/ack` are signed under `comms-relay-pull/v1`.
+  - **Mailbox:** one SQLite Durable Object. It `age`-encrypts the envelope `{batch, part, parts, raw_b64, received_at, signature}` to the daemon and stores bodies over 1 MiB as parts in one transaction. `seq` is `AUTOINCREMENT`, and a daily alarm purges rows after 30 days and raises `purged_through`.
+  - **D-R1:** no app secret anywhere.
+
+  Running it under `wrangler dev` found that workerd refuses a main module exporting a constant, which Vitest did not catch. The limits moved to `src/limits.ts`, and a test pins the exports. Dependencies are pinned exactly and every install script is denied. The gate now runs `(cd relay && npm ci && npm run check)`.
+- **Files changed:** `relay/` (new: `src/{index,mailbox,pull_sig,limits}.ts`, `test/`, `wrangler.jsonc`, `package.json`, `package-lock.json`, `tsconfig.json`, `vitest.config.ts`, `.dev.vars.example`), `.gitignore`, `tests/security/test_relay_static.py` (new), `tests/fixtures/relay/wrangler_dev_page.json` (a page from the real Worker), the relay design, the rulings (R-R2), `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 14 Vitest tests in workerd, including the shared pull-signature vectors and a 2.5 MiB batch reassembled exactly; the Worker run under `wrangler dev`, with its ciphertext decrypted by the daemon's `age`; full gate GATE ok=1 (the first run caught one lint finding, fixed and re-run).
+- **Follow-ups:** R3 (the collector).

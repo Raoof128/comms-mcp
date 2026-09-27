@@ -1,0 +1,27 @@
+{
+  "name": "comms-relay",
+  "private": true,
+  "type": "module",
+  "description": "The always-on WhatsApp relay for the comms daemon (spec A48)",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "wrangler types && tsc --noEmit",
+    "check": "npm run typecheck && npm test",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "age-encryption": "0.3.1"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.2.8",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11",
+    "wrangler": "4.141.0"
+  },
+  "allowScripts": {
+    "esbuild": false,
+    "workerd": false,
+    "fsevents": false
+  }
+}
