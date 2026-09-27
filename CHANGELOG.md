@@ -982,3 +982,19 @@
     - doctor no longer reports `telegram-session`;
     - a `/start` sent to @raouf_comms_bot from the owner's account was retained within seconds (1 update, offset advanced).
 - **Follow-ups:** the owner confirms the new "raoufcomms" login in Telegram ("Yes, it's me"); other worker steps (relay pull, delivery) still make short synchronous calls on the loop, bounded by their timeouts.
+
+### 2026-09-28 (Australia/Sydney)
+**Raouf:**
+- **Scope:** First live message sent through the comms MCP: to the owner's Telegram Saved Messages (owner-requested test).
+- **Summary:** Over HTTP `/mcp` with the `claude-code` client:
+  - `comms_location_create` made "Personal" (`loc_ah2k…`).
+  - `comms_directory_destination_create` added the private chat 70267295 ("Saved Messages", `dst_al7w…`); private chats get no `grp_`.
+  - A one-destination campaign ran: `create`, `set_content`, `set_targets {destinations}`, `validate`, `preview` (1 recipient), `send`. It finished COMPLETE/SENT, with the job ACCEPTED on the first attempt, and the text appeared in Saved Messages at 07:57.
+
+  Only the user account can post to Saved Messages, so `telegram_delivery_actor` was set to `telegram_user` for this test and restored to the bot default afterwards (two daemon restarts).
+- **Findings:**
+  - The catalog has no direct "send to one person" tool: `comms_message_send` takes only a `grp_`, so a DM goes through a campaign.
+  - The campaign's Telegram actor is one install-wide setting, not per campaign.
+- **Files changed:** `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** `comms_campaign_status` and `delivery_report`, and the message read back in Telegram Web.
+- **Follow-ups:** consider a person-addressed send (or a per-campaign actor) if one-off DMs through the MCP are wanted.
