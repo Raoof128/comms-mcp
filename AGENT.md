@@ -913,3 +913,11 @@ Follow the user's engineering lifecycle: design/security analysis, implementatio
 - **Files changed:** `scripts/smoke_sweep.py` (new), `scripts/{smoke_daemon,e2e_smoke}.py`, `src/comms/runtime/selftest.py`, `src/comms/mcp/tools/{admin,account}.py`, `tests/mcp/catalog_pin.json`, `tests/security/{test_a47_exit,test_d39_pre_exit}.py`, `docs/verification/{comms-v0.3.md,comms-v0.3-rulings.md,comms-v0.3-smoke-map.json}`, `CLAUDE.md`, `AGENT.md`, `CHANGELOG.md`.
 - **Verification:** the full gate (GATE ok=1): 5506 passed, 4 skipped; smoke 106/106; formal 57; WhatsVault 450.
 - **Follow-ups:** the owner merges and pushes `comms-v0.3-sweep`; D39-B live.
+
+### 2026-09-27 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Land the whole-catalog sweep on `main` and push (owner: "commit and push and merge").
+- **Summary:** `comms-v0.3-sweep` merged `--no-ff` as `326c12d`; the merged tree is byte-identical to the gated branch head `d899c6a`. `main` and `comms-v0.3-sweep` are pushed. On this day `main` gained: the catalog amendment (`c940ff6`, tag `comms-v0.3-catalog-amendment`), A47 (`f60a46f`, tag `comms-v0.3-a47-media`), the tag-SHA record (`cbf62dc`) and the sweep (`326c12d`).
+- **Files changed:** `AGENT.md`, `CHANGELOG.md` (this entry); the ledger (gitignored).
+- **Verification:** the gate on `d899c6a` (GATE ok=1: 5506 passed, 4 skipped; smoke 106/106; formal 57; WhatsVault 450); `main^{tree}` equals `comms-v0.3-sweep^{tree}`; `origin/main` equals `main`. Zurvan updated with this day's decisions, claims and open questions (tags `telegram-mcp,comms`).
+- **Follow-ups:** D39-B, owner-run and live: a WhatsApp group photo and document, a Telegram download from another DC, WhatsApp group create's `request_id`, and the P §88 acceptance rows. Campaign media needs its own amendment.
