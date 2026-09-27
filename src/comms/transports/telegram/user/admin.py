@@ -34,6 +34,7 @@ from comms.transports.telegram.user.send import (
     forward,
     random_id_for,
     send,
+    send_media,
 )
 
 __all__ = ["UserAdmin"]
@@ -64,6 +65,14 @@ class AdminSession(TextSender, Forwarder, Protocol):
     async def set_chat_photo(
         self, peer_type: str, peer_id: int, data: bytes, *, timeout: float
     ) -> ProviderResult: ...
+
+    async def prepare_media(
+        self, spec: Mapping[str, Any], *, timeout: float
+    ) -> Any: ...  # A47: an InputMedia, or a ProviderResult refusal
+
+    async def send_media_once(
+        self, peer: Any, media: Any, caption: str, random_id: int, *, timeout: float
+    ) -> Any: ...
 
 
 Runner = Callable[[Coroutine[Any, Any, Any]], Any]
@@ -106,6 +115,8 @@ class UserAdmin:
             return self._send(spec, peer_type, peer_id, target.identity, op_key)
         if op.capability is Capability.MESSAGE_FORWARD:
             return self._forward(spec, peer_type, peer_id, target.identity, op_key)
+        if op.capability is Capability.MESSAGE_SEND_MEDIA:
+            return self._send_media(spec, peer_type, peer_id, target.identity, op_key)
         if op.capability is Capability.GROUP_CREATE:
             return self.create_group(op.args)
         if op.capability is Capability.CHAT_SET_PHOTO:  # G8: uploaded in parts, then set
@@ -152,6 +163,23 @@ class UserAdmin:
             forward(
                 self._session, from_peer, spec["message_id"], to_peer, chat, random_id_for(op_key)
             )
+        )
+        return _sent(delivered)
+
+    def _send_media(
+        self, spec: Mapping[str, Any], peer_type: str, peer_id: int, chat: str, op_key: str
+    ) -> ProviderResult:
+        """A47 (H4): the file prepared once (parts, or its message fetched again), then one
+        keyed ``messages.sendMedia`` with its reconciliation."""
+        try:
+            peer = self._session.input_peer(peer_type, peer_id)
+        except GatewayError:
+            return ProviderResult("FAILED", "PROVIDER_UNAVAILABLE")  # provably unsent
+        prepared = self._run(self._session.prepare_media(spec, timeout=ADMIN_TIMEOUT_S))
+        if isinstance(prepared, ProviderResult):
+            return prepared
+        delivered: DeliveryResult = self._run(
+            send_media(self._session, peer, chat, prepared, spec["caption"], random_id_for(op_key))
         )
         return _sent(delivered)
 

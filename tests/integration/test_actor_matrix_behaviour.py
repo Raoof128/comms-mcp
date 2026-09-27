@@ -228,6 +228,8 @@ def _arguments(spec, w, actor, dispatcher, message, cursor):
         arguments["name"] = "renamed"  # an edit must change something
     if spec.name in ("comms_group_info_set_photo", "comms_media_upload"):  # G8: staged bytes
         arguments.update(data_b64="/9j/4AAQ", mime="image/jpeg")
+    if spec.name == "comms_message_send_media":  # A47 (H4): a real JPEG, inline
+        arguments.update(kind="photo", data_b64="/9j/4AAQ", mime="image/jpeg")
     if spec.requires_request_id:
         arguments["request_id"] = refs.mint("request")
     return arguments

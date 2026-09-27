@@ -45,6 +45,7 @@
       "mcp__comms__comms_message_edit",
       "mcp__comms__comms_message_forward",
       "mcp__comms__comms_message_mark_read",
+      "mcp__comms__comms_message_send_media",
       "mcp__comms__comms_message_pin",
       "mcp__comms__comms_message_reaction_remove",
       "mcp__comms__comms_message_reply",

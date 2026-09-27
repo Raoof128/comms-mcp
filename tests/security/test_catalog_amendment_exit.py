@@ -148,7 +148,8 @@ def test_the_catalog_is_a45_and_a46_in_full():
     }  # fmt: skip
     a46 = {"comms_group_member_tag_set", "comms_message_reaction_remove",
            "comms_group_member_reactions_clear", "comms_whatsapp_health_status"}  # fmt: skip
-    assert a45 | a46 <= names and len(TOOL_CATALOG) == 129
+    # A47 (after the amendment's tag) adds comms_message_send_media: 129 + 1
+    assert a45 | a46 <= names and len(TOOL_CATALOG) == 130
 
 
 def test_the_whole_path_over_mcp(tmp_path):

@@ -159,7 +159,7 @@ def build_comms_runtime(
         ),
         handles=ContextHandles(conn, store, clock=clock),
         groups=GroupService(conn, capability, executor),
-        messages=MessageService(conn, capability, executor),
+        messages=MessageService(conn, capability, executor, clock=clock),
         campaigns=CampaignService(
             writer, executor, adapters.delivery, commit=lambda: commit_context(writer, store)
         ),

@@ -30,6 +30,7 @@ __all__ = [
     "forward",
     "random_id_for",
     "send",
+    "send_media",
 ]
 
 RECONCILE_WINDOW_S = 10.0
@@ -39,6 +40,12 @@ ACTOR = "telegram_user"
 class Forwarder(Protocol):
     async def forward_once(
         self, from_peer: Any, message_id: int, to_peer: Any, random_id: int, *, timeout: float
+    ) -> SendAttempt: ...
+
+
+class MediaSender(Protocol):
+    async def send_media_once(
+        self, peer: Any, media: Any, caption: str, random_id: int, *, timeout: float
     ) -> SendAttempt: ...
 
 
@@ -93,6 +100,25 @@ async def forward(
         return await session.forward_once(
             from_peer, message_id, to_peer, random_id, timeout=remaining
         )
+
+    return await _reconciled(once, chat, clock)
+
+
+async def send_media(
+    session: MediaSender,
+    peer: Any,
+    chat: str,
+    media: Any,
+    caption: str,
+    random_id: int,
+    *,
+    clock: Callable[[], float] = time.monotonic,
+) -> DeliveryResult:
+    """A photo or document (A47 H4): deduplicated by ``random_id`` exactly as a send; the file
+    was uploaded once before, and the one reissue reuses it."""
+
+    async def once(remaining: float) -> SendAttempt:
+        return await session.send_media_once(peer, media, caption, random_id, timeout=remaining)
 
     return await _reconciled(once, chat, clock)
 

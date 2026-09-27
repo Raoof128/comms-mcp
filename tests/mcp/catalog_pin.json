@@ -1,5 +1,5 @@
 {
-  "count": 129,
+  "count": 130,
   "names": [
     "comms_capability_list",
     "comms_context_get",
@@ -18,6 +18,7 @@
     "comms_message_edit",
     "comms_message_delete",
     "comms_message_forward",
+    "comms_message_send_media",
     "comms_message_pin",
     "comms_message_unpin",
     "comms_message_mark_read",
@@ -149,6 +150,7 @@
     "comms_message_edit": "e1be2f0048c97b8175e2650e93d6bbdf801fb81354ecac06f5250e54a99ad91b",
     "comms_message_delete": "cb89a5d38dae3b2da0e8198a5759902029cea91e8e135df594b00426103cbf12",
     "comms_message_forward": "abbd19256e3fc026ba02788bac0fadf179e7b909eb8e7e47e5b8b77f079147d0",
+    "comms_message_send_media": "3b55d83fdf4ed86386aa837c6b9c48566d10caab597a93d877b9da07612361cd",
     "comms_message_pin": "60af4383ca0845e45555747628a54c1682c6ac4d79ba38b4446127491f656e00",
     "comms_message_unpin": "dd2c108cf14dd44bc1a77293029407b7a94a054a5fce460fafce4bcded05321c",
     "comms_message_mark_read": "16efedefb14778ae46947ae4a61fa07fb339cae4e878814d2260ec54dcea530d",
@@ -262,5 +264,5 @@
     "comms_media_stage_begin": "cc37c528b84fea6b6f408154321a3b7b5d1aae8e86d2a09a389dab7e9888ae8e",
     "comms_media_stage_chunk": "deef3f81493eb7ab12757745ac66b1c64b3eaced773285a991db95995a8ce5c4"
   },
-  "catalog": "a21d6ff1a31a47fd0df713dbf2b89b4360b6df93dc8062346b2d7d0dc262f5ac"
+  "catalog": "e633faad8f86de1b7271a9415b71818df4aa5e24f0d4cfc62757186ed51749e1"
 }

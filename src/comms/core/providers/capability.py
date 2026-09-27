@@ -105,3 +105,5 @@ class Capability(StrEnum):
     GROUP_INVITE_RESET = "group.invite.reset"
     GROUP_SETTINGS_UPDATE = "group.settings.update"
     GROUP_MESSAGE_SEND = "group.message.send"
+    # A47 (H4): a photo or a document to a group, on every actor
+    MESSAGE_SEND_MEDIA = "message.send_media"

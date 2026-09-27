@@ -159,11 +159,12 @@ def _telegram_bot(
         return None
     api = BotApi(secrets, version=version)
     adapters.capability["telegram_bot"] = BotCapability.from_api(api, clock=clock)
-    adapters.admin["telegram_bot"] = BotAdmin(api)
+    files = BotMedia(api, conn)  # A47: downloads and resends read the retained file_id
+    adapters.admin["telegram_bot"] = BotAdmin(api, files=files.file_id)
     adapters.context["telegram_bot"] = BotContext(api, conn, clock=clock)
     adapters.poller = BotPoller(api, conn, clock=clock)
     adapters.profiles["telegram_bot"] = bot_profile(api)
-    adapters.downloads["telegram_bot"] = BotMedia(api, conn)  # A47
+    adapters.downloads["telegram_bot"] = files  # A47
     return BotDelivery(api)
 
 

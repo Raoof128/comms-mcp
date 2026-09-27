@@ -25,6 +25,8 @@ REVIEWED_RPCS: frozenset[str] = frozenset(
         "messages.GetDialogsRequest",
         "messages.ReadHistoryRequest",  # A47: under cap.message.mark_read only (the owner)
         "upload.GetFileRequest",  # A47 (H3): media.download only
+        "upload.SaveBigFilePartRequest",  # A47 (H4): the one part upload above 10 MB
+        "messages.SendMediaRequest",  # A47 (H4): keyed by random_id
         "auth.ExportAuthorizationRequest",  # A47 (H3): a borrowed sender for another DC
         "messages.GetPeerDialogsRequest",
         "messages.GetHistoryRequest",

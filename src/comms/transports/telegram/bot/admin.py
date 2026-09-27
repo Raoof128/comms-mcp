@@ -14,6 +14,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from typing import Any
 
+from comms.core.providers import media
 from comms.core.providers.capability import Capability
 from comms.core.providers.protocols import ProviderResult, ProviderTarget, SemanticOperation
 from comms.core.providers.semantics import SEMANTICS
@@ -38,6 +39,7 @@ _REF_FIELDS: Mapping[Capability, str] = {
     **REF_FIELDS,
     Capability.MESSAGE_SEND: "message_id",
     Capability.MESSAGE_FORWARD: "message_id",
+    Capability.MESSAGE_SEND_MEDIA: "message_id",  # A47 (H4)
 }
 assert all(not SEMANTICS[(c, ACTOR)].steps for c in _REQUESTS)  # no saga is ever one call
 
@@ -45,8 +47,10 @@ assert all(not SEMANTICS[(c, ACTOR)].steps for c in _REQUESTS)  # no saga is eve
 class BotAdmin:
     operations = frozenset(_REQUESTS)
 
-    def __init__(self, api: BotApi) -> None:
+    def __init__(self, api: BotApi, *, files: Callable[[str], str] | None = None) -> None:
         self._api = api
+        # A47 (H4): a held file's ``file_id`` by its ``file_unique_id`` (the retained update)
+        self._files = files
 
     def __repr__(self) -> str:
         return "BotAdmin(<redacted>)"
@@ -62,6 +66,23 @@ class BotAdmin:
             raise NotImplementedError("the bot does not perform this operation as one call")
         return build(int(target.identity), op.args)
 
+    def _send_media(
+        self, method: str, params: dict[str, Any], args: Mapping[str, Any]
+    ) -> BotResponse | ProviderResult:
+        """A47 (H4): the file as a multipart part named by its kind, or by ``file_id``."""
+        field = args["kind"]
+        if "data" in args:
+            name = media.neutral_name(args["mime"])
+            part = (name, args["data"], args["mime"])
+            return self._api.call_multipart(method, params, {field: part})
+        try:
+            file_id = self._files(args["media_id"]) if self._files is not None else None
+        except ValueError:
+            file_id = None
+        if not isinstance(file_id, str):
+            return ProviderResult("FAILED", "NOT_FOUND")  # purged or never retained; unsent
+        return self._api.call(method, {**params, field: file_id})
+
     def invoke(self, op: SemanticOperation, target: ProviderTarget, op_key: str) -> ProviderResult:
         method, params = self._request(op, target)
         try:
@@ -69,6 +90,11 @@ class BotAdmin:
             if op.capability is Capability.CHAT_SET_PHOTO:  # G8: the photo as a file part
                 photo = ("photo", op.args["photo"], op.args["mime"])
                 outcome = self._api.call_multipart(method, params, {"photo": photo})
+            elif op.capability is Capability.MESSAGE_SEND_MEDIA:
+                sent = self._send_media(method, params, op.args)
+                if isinstance(sent, ProviderResult):
+                    return sent
+                outcome = sent
             else:
                 outcome = self._api.call(method, params)
         except BotTransportError as exc:

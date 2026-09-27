@@ -98,7 +98,7 @@ def test_every_cited_method_is_real():
     )
 
     pinned = {r for m in (READ_RPCS, WRITE_RPCS, ADMIN_RPCS) for rs in m.values() for r in rs}
-    pinned |= set(UPDATE_RPCS) | OPERATIONS["media.download"]  # A47 H3: a read, not a capability
+    pinned |= set(UPDATE_RPCS) | OPERATIONS["media.download"] | OPERATIONS["file.upload"]  # A47
     bot_src = "".join(
         p.read_text() for p in (ROOT / "src/comms/transports/telegram/bot").glob("*.py")
     )

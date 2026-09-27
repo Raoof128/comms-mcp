@@ -64,6 +64,8 @@ BOT_METHODS = frozenset(
         "deleteMessageReaction",  # A46 (Bot API 10.0)
         "deleteAllMessageReactions",
         "getFile",  # A47 (H3): then one streamed GET on the file host
+        "sendPhoto",  # A47 (H4): multipart, or by file_id
+        "sendDocument",
         "approveChatJoinRequest",
         "declineChatJoinRequest",
         "createForumTopic",

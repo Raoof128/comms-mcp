@@ -42,7 +42,7 @@ from comms.services.groups import GroupService
 from comms.services.handles import ContextHandles
 from comms.services.identity import IdentityService
 from comms.services.media import MediaService
-from comms.services.messages import MessageService
+from comms.services.messages import MessageService, check_send_media
 from comms.services.mutations import CallContext
 from comms.services.registry import ServiceRegistry
 from comms.services.templates import TemplateService
@@ -199,6 +199,23 @@ class _Facades:
         return self.s.groups.admin(
             _ctx(client), "group.info.set_photo", a["group"], targets,
             {"photo": photo, "mime": mime}, a["request_id"], actor=a.get("actor"),
+        )  # fmt: skip
+
+    def send_media(self, client: AuthenticatedClient, a: dict[str, Any]) -> dict[str, Any]:
+        """A47 (H4): the shape is checked before a staged file is taken, so a refused call
+        leaves the upload usable."""
+        targets = self.targets(a["group"])  # NOT_FOUND before a staged file is taken
+        check_send_media(a.get("kind"), a.get("caption"))
+        data = mime = None
+        if "media" in a:
+            if "upload" in a or "data_b64" in a:
+                raise CommsError("INVALID_ARGUMENT")  # exactly one source
+        else:
+            data, mime = self.staged_bytes(client, a)
+        return self.s.messages.send_media(
+            _ctx(client), a["group"], targets, a["request_id"], kind=a["kind"],
+            caption=a.get("caption"), data=data, mime=mime, media=a.get("media"),
+            actor=a.get("actor"),
         )  # fmt: skip
 
     def media_upload(self, client: AuthenticatedClient, a: dict[str, Any]) -> dict[str, Any]:
@@ -545,6 +562,7 @@ class _Facades:
             "message.pin": self.pin(True),
             "message.unpin": self.pin(False),
             "message.mark_read": self.mark_read,
+            "message.send_media": self.send_media,  # A47 (H4)
             "group.list": lambda cl, a: s.groups.list(limit=a.get("limit", 50), cursor=a.get("cursor")),
             "group.get": lambda cl, a: s.groups.get(a["group"]),
             "group.context": lambda cl, a: self.context_get(cl, {**a, "include": ["messages", "members", "admins"]}),

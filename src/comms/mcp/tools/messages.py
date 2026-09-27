@@ -8,6 +8,7 @@ back to the bot. A delete reports the scope the provider performed. Marking read
 from __future__ import annotations
 
 from comms.core.providers.capability import Capability as C
+from comms.core.providers.media import KINDS
 from comms.mcp.schemas import (
     ACTOR,
     array,
@@ -134,6 +135,28 @@ MESSAGE_TOOLS: tuple[ToolSpec, ...] = (
         ["group", "message", "to_group"],
         _SENT,
         capability=C.MESSAGE_FORWARD,
+    ),
+    write(
+        "comms_message_send_media",
+        "Send a photo or document",
+        "Send a photo or a document to a group: a staged upload ref (from "
+        "comms_media_stage_begin and _chunk), a file of at most 512 KiB inline as data_b64 with "
+        "its mime type, or a media ref the same account already holds. An optional caption of "
+        "at most 1024 characters (UTF-16 units). Returns the new message's ref.",
+        "message.send_media",
+        {
+            "group": _GROUP,
+            "kind": enum(KINDS),
+            "upload": ref("upload"),
+            "data_b64": string(1, 699052),
+            "mime": string(1, 128),
+            "media": ref("media"),
+            "caption": string(0, 1024),
+            "actor": ACTOR,
+        },
+        ["group", "kind"],
+        _SENT,
+        capability=C.MESSAGE_SEND_MEDIA,
     ),
     write(
         "comms_message_pin",

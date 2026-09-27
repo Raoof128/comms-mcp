@@ -41,6 +41,7 @@ def _created(capability):
         C.MESSAGE_SEND: str(100 + n),
         C.TEMPLATE_CREATE: str(5_000_000 + n),
         C.MESSAGE_FORWARD: str(200 + n),  # G7
+        C.MESSAGE_SEND_MEDIA: str(300 + n),  # A47 (H4): the new message's id
         C.GROUP_CREATE: str(-(10**12 + 500 + n)),  # G7: the new supergroup's marked id
     }.get(capability)
 

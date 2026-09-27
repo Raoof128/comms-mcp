@@ -32,7 +32,7 @@ class BotMedia:
         return "BotMedia(<redacted>)"
 
     def retrieve(self, file_unique_id: str) -> MediaBlob:
-        file_id = self._file_id(file_unique_id)
+        file_id = self.file_id(file_unique_id)
         try:
             answer = self._api.call("getFile", {"file_id": file_id})
         except BotTransportError:
@@ -55,7 +55,8 @@ class BotMedia:
         )
         return blob(data, "application/octet-stream")  # the service reads the type from the ref
 
-    def _file_id(self, file_unique_id: str) -> str:
+    def file_id(self, file_unique_id: str) -> str:
+        """The newest retained ``file_id`` for a file (H3's download, H4's resend)."""
         if (
             not isinstance(file_unique_id, str)
             or not file_unique_id.isascii()

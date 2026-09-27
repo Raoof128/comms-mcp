@@ -102,9 +102,13 @@ class ProviderWrites:
         if not isinstance(ref, str):
             raise CommsError("INVALID_ARGUMENT")
         found = resolve_object(self.conn, ref, kind)
-        if found.transport != target.transport or found.destination_id != destination_id(
-            self.conn, target.destination_ref
-        ):
+        if found.transport != target.transport:
+            raise CommsError("NOT_FOUND")
+        if kind == "media":  # A47 (H4): a file is its holder's, in any chat, never another's
+            if found.actor != target.actor:
+                raise CommsError("NOT_FOUND")
+            return found.provider_identity
+        if found.destination_id != destination_id(self.conn, target.destination_ref):
             raise CommsError("NOT_FOUND")  # another group's object is not this group's
         identity = found.provider_identity
         if kind == "message":
