@@ -879,3 +879,16 @@
   - type Meta's app secret with `comms credential set meta-app-secret`; the daemon then collects and verifies the waiting row;
   - publish the W-Vault app, because unpublished apps get only dashboard test webhooks;
   - later, a real service-account install, which means re-piping the two relay keys.
+
+### 2026-09-27 (Australia/Sydney)
+**Raouf:**
+- **Scope:** W-Vault's public privacy policy on this repository's GitHub Pages (owner-authorised), required before Meta will publish the app.
+- **Summary:**
+  - **Sources:** written from Meta's 2026 Privacy Policy Expectations (the app's own policy, clearly marked, crawlable, stating what is collected, why, and how to request deletion), the WhatsApp Business Messaging Policy (published policy; data other than message content used only to support messaging; no sharing between customers), and Meta's Cloud API data-privacy page (30-day retention).
+  - **Policy content:** it names the operator, what is collected, how it is used, the processors (Meta, Cloudflare with ciphertext only, and Anthropic when the operator asks for AI help), storage and security, retention, deletion steps, rights under the Australian Privacy Act and the GDPR, children, and changes.
+  - **Pages:** plain HTML with no script and no tracking; a `.github/workflows/pages.yml` publishes `site/` alone, with actions pinned to commit SHAs; Pages is enabled with the workflow as its source.
+  - **The live daemon** moved to `local_port` 8866, because the gate's host probes need 8766 free.
+  - **Flaky timeout:** the 2.5 MiB Worker test now has an explicit 30 s budget after one timeout under load.
+- **Files changed:** `site/` (new), `.github/workflows/pages.yml` (new), `tests/security/test_public_site.py` (new), `relay/test/relay.test.ts`, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 5 new site tests; the full gate GATE ok=1 (5601 passed; smoke 108; relay 15).
+- **Follow-ups:** set the policy URL and the deletion URL in Meta's app settings, then publish W-Vault.
