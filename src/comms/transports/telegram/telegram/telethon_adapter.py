@@ -134,7 +134,14 @@ READ_RPCS: Mapping[Capability, frozenset[str]] = MappingProxyType(
             {"channels.GetParticipantsRequest", "messages.GetFullChatRequest"}
         ),
         Capability.MEMBER_GET: frozenset(
-            {"channels.GetParticipantRequest", "messages.GetFullChatRequest"}
+            {
+                "channels.GetParticipantRequest",
+                "messages.GetFullChatRequest",
+                # R-TG2: getParticipant may omit the channel from ``chats`` (a creator's own
+                # answer did, live); the channel's kind, forum flag and defaults then come from
+                # one peer-dialog read, already reviewed for retrieval.
+                "messages.GetPeerDialogsRequest",
+            }
         ),
         Capability.ADMIN_LIST: frozenset(
             {"channels.GetParticipantsRequest", "messages.GetFullChatRequest"}
@@ -389,8 +396,8 @@ def _flags(tl: Any) -> frozenset[str]:
     return frozenset(k for k, v in tl.to_dict().items() if v is True)
 
 
-def _channel_rights(result: Any, channel_id: int) -> SelfRights:
-    channel = next((c for c in result.chats if getattr(c, "id", None) == channel_id), None)
+def _channel_rights(result: Any, channel_id: int, chats: list[Any]) -> SelfRights:
+    channel = next((c for c in chats if getattr(c, "id", None) == channel_id), None)
     if not isinstance(channel, types.Channel):
         raise GatewayError("NOT_ACCESSIBLE")
     kind: Any = "megagroup" if channel.megagroup else "broadcast"
@@ -1476,7 +1483,17 @@ class TelethonSession:
                 )
             except errors.UserNotParticipantError:
                 return SelfRights("megagroup", "left")
-            return _channel_rights(result, peer_id)
+            chats = list(result.chats)
+            if not any(getattr(c, "id", None) == peer_id for c in chats):
+                dialogs = await self.call_capability(
+                    Capability.MEMBER_GET,
+                    functions.messages.GetPeerDialogsRequest(
+                        [types.InputDialogPeer(self.input_peer("channel", peer_id))]
+                    ),
+                    timeout=timeout,
+                )
+                chats = list(dialogs.chats)
+            return _channel_rights(result, peer_id, chats)
         if peer_type == "chat":
             result = await self.call_capability(
                 Capability.MEMBER_GET,
