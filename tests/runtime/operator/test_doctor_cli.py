@@ -75,3 +75,17 @@ def test_an_unprovisioned_state_is_one_finding(tmp_path, capsys):
     report = json.loads(capsys.readouterr().out)
     assert [f["code"] for f in report["findings"]] == ["NOT_PROVISIONED"]
     assert not Path(tmp_path / "nothing").exists()  # never created
+
+
+def test_a_logged_in_telegram_session_is_not_reported_missing(daemon_world, capsys):
+    paths = daemon_world["paths"]
+    daemon_world["state"].conn.close()
+    before = {
+        s for code, s in _codes(_doctor(paths, capsys)) if code == "CREDENTIAL_NOT_CONFIGURED"
+    }
+    assert "telegram-session" in before
+    session_dir = paths.state_dir / "telegram"
+    session_dir.mkdir(mode=0o700, exist_ok=True)
+    (session_dir / "primary.session").write_bytes(b"")
+    after = {s for code, s in _codes(_doctor(paths, capsys)) if code == "CREDENTIAL_NOT_CONFIGURED"}
+    assert "telegram-session" not in after

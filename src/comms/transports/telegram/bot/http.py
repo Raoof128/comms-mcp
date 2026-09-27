@@ -128,13 +128,18 @@ class BotApi:
     def __repr__(self) -> str:
         return "BotApi(<redacted>)"
 
-    def call(self, method: str, params: Mapping[str, Any]) -> BotResponse:
+    def call(
+        self, method: str, params: Mapping[str, Any], *, timeout: float | None = None
+    ) -> BotResponse:
+        """One call. ``timeout`` overrides the client's for this request (the long poll)."""
         if method not in BOT_METHODS:
             raise BotRefused("the bot api method is not allowed")
         stage: Literal["not_sent", "ambiguous"] | None = None
         try:
             response = self._client.post(
-                f"{BOT_ORIGIN}/bot{self._token}/{method}", json=dict(params)
+                f"{BOT_ORIGIN}/bot{self._token}/{method}",
+                json=dict(params),
+                timeout=httpx.USE_CLIENT_DEFAULT if timeout is None else timeout,
             )
         except (httpx.ConnectError, httpx.ConnectTimeout):
             stage = "not_sent"

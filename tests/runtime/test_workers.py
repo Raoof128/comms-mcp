@@ -196,3 +196,22 @@ def test_effect_loops_pause_while_degraded_and_resume_when_the_hold_is_released(
 
     asyncio.run(go())
     assert effect.calls >= 1
+
+
+async def test_an_async_step_is_awaited_and_classified_like_a_sync_one(conn):
+    """A step may return an awaitable (the bot's long poll waits off the loop); it is awaited,
+    and its failures are classified exactly as a synchronous step's."""
+    calls = {"ok": 0, "flaky": 0}
+
+    async def ok():
+        calls["ok"] += 1
+
+    async def flaky():
+        calls["flaky"] += 1
+        raise BotTransportError("not_sent")
+
+    workers = Workers(conn, (Loop("ok", ok, 0.01, False), Loop("flaky", flaky, 0.01, False)),
+                      clock=lambda: NOW)  # fmt: skip
+    await _run_until(workers, lambda: calls["ok"] >= 3 and calls["flaky"] >= 1)
+    assert calls["ok"] >= 3 and calls["flaky"] >= 1
+    assert not is_degraded(conn)  # a recoverable failure, not a safety one

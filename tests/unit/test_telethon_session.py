@@ -320,3 +320,43 @@ async def test_without_the_opt_in_no_handler_is_registered(tmp_path):
     await session.start()
     assert fake.handlers == []
     await session.stop()
+
+
+async def test_connecting_a_logged_in_session_runs_telethons_own_requests_reviewed(tmp_path):
+    """Found live (2026-09-28): Telethon's connect() on a logged-in session sends
+    users.GetUsers and updates.GetState itself. Outside a reviewed operation the gateway's
+    guard refused them, so every start reported Telegram unreachable."""
+    from comms.transports.telegram.telegram import telethon_adapter as ta
+
+    class LoggedIn(FakeClient):
+        async def connect(self):  # Telethon 1.45: get_me, then _on_login's GetState, GetDifference
+            for request in (
+                functions.users.GetUsersRequest([types.InputUserSelf()]),
+                functions.updates.GetStateRequest(),
+                functions.updates.GetDifferenceRequest(pts=1, date=None, qts=0),
+            ):
+                ta._admitted(ta.qualified(request))  # the same guard as _GatewayClient._call
+            self.connected = True
+
+    session, fake, _c = _session(tmp_path, client=LoggedIn())
+    await session.start()
+    assert fake.connected and session.readiness() is None
+
+
+def test_outside_every_operation_only_telethons_own_reviewed_requests_go():
+    from comms.transports.telegram.telegram import telethon_adapter as ta
+
+    for name in ta.UPDATE_RPCS:
+        assert ta._admitted(name) is None
+    for name in ("messages.SendMessageRequest", "auth.LogOutRequest", "messages.GetHistoryRequest"):
+        with pytest.raises(PermissionError):
+            ta._admitted(name)
+
+
+def test_inside_an_operation_only_its_own_requests_go():
+    from comms.transports.telegram.telegram import telethon_adapter as ta
+
+    with ta._operation("admin.status", WorkBudget(max_rpcs=5)):
+        assert ta._admitted("users.GetUsersRequest") is not None
+        with pytest.raises(PermissionError):
+            ta._admitted("updates.GetDifferenceRequest")  # an update RPC, but not this operation's

@@ -49,6 +49,13 @@ def _legacy(paths: CommsPaths) -> tuple[Any, Any] | None:
     return conn, legacy_verifier(load_key("audit-chain-key"), checkpoint_public_for(conn))
 
 
+def _telegram_session(paths: CommsPaths) -> bool:
+    """A logged-in session exists where the daemon keeps it (``state/telegram``)."""
+    from comms.transports.telegram.telegram.telethon_adapter import SESSION_FILE
+
+    return (paths.state_dir / "telegram" / SESSION_FILE).is_file()
+
+
 def open_read_only(paths: CommsPaths) -> Any:
     """comms.db under the pointer's key only: no repair, no migration, nothing created."""
     key = FileSecretStore(paths.secrets_dir).get(ITEM, KeyPointer(paths.db_key_pointer).get())
@@ -88,6 +95,7 @@ def run_doctor(paths: CommsPaths, *, now: datetime) -> dict[str, Any]:
             now=now,
             legacy_conn=None if legacy is None else legacy[0],
             legacy=None if legacy is None else legacy[1],
+            telegram_session=_telegram_session(paths),
         )
         return _report(bootstrap_state(conn, store, paths), findings)
     finally:

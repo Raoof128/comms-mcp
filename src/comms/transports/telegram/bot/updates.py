@@ -9,6 +9,7 @@ both: a configured webhook mode, or Telegram's own 409 for an active webhook, re
 
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -38,6 +39,8 @@ ALLOWED_UPDATES = (
     "chat_join_request",
 )
 LONG_POLL_SECONDS = 25
+# Telegram holds an empty getUpdates open for up to LONG_POLL_SECONDS: the read must outlast it.
+POLL_READ_TIMEOUT_S = LONG_POLL_SECONDS + 10
 Mode = Literal["polling", "webhook"]
 
 
@@ -90,17 +93,33 @@ class BotPoller:
         self._api, self._conn, self._clock, self._on_update = api, conn, clock, on_update
 
     def poll_once(self) -> PollReport:
+        return self._finish(self._fetch(self._begin()))
+
+    async def poll_once_async(self) -> PollReport:
+        """The daemon's worker step: the long poll waits in a thread, so the one event loop keeps
+        serving; the offset read and every write stay on the loop's thread (one connection)."""
+        params = self._begin()
+        return self._finish(await asyncio.to_thread(self._fetch, params))
+
+    def _begin(self) -> dict[str, Any]:
         mode, offset = state(self._conn)
         if mode != "polling":
             raise PollingRefused
-        params = {
+        return {
             "offset": offset,
             "timeout": LONG_POLL_SECONDS,
             "allowed_updates": list(ALLOWED_UPDATES),
         }
+
+    def _fetch(self, params: dict[str, Any]) -> BotResponse | None:
+        """The network call alone: no database access, so it may run off the loop."""
         try:
-            response = self._api.call("getUpdates", params)
+            return self._api.call("getUpdates", params, timeout=POLL_READ_TIMEOUT_S)
         except BotTransportError:
+            return None
+
+    def _finish(self, response: BotResponse | None) -> PollReport:
+        if response is None:
             return PollReport("unavailable")
         updates = self._updates(response)
         if updates is None:

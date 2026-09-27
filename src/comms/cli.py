@@ -84,7 +84,7 @@ def _tool(args: argparse.Namespace) -> int:
         print("comms: the daemon is not reachable", file=sys.stderr)
         return 3
     if response.get("ok") is not True:
-        print(f"comms: {response.get('code', 'INTERNAL_ERROR')}", file=sys.stderr)
+        print(f"comms: {_refusal(response)}", file=sys.stderr)
         return 4
     print(json.dumps(response["data"], indent=2, sort_keys=True))
     return 0 if response["data"].get("error") is None else 4
@@ -99,6 +99,13 @@ def _read_credential() -> str:
     return getpass.getpass("value (not echoed): ")
 
 
+def _refusal(response: dict[str, Any]) -> str:
+    """The daemon's code and its reason. Reasons are fixed, non-secret strings by design."""
+    code = str(response.get("code", "INTERNAL_ERROR"))
+    reason = response.get("reason")
+    return f"{code}: {reason}" if isinstance(reason, str) and reason else code
+
+
 def _telegram_flow(words: tuple[str, ...]) -> int:
     """``transport telegram login|revoke-session`` (D39-PRE E8a): CLI-driven steps over the
     daemon's retained login admin commands. Phone and code are prompted; a 2FA password is read
@@ -111,7 +118,7 @@ def _telegram_flow(words: tuple[str, ...]) -> int:
     def step(args: dict[str, Any]) -> dict[str, Any]:
         response = _admin_request(None, {"cmd": command, "args": args})
         if response.get("ok") is not True:
-            raise ValueError(str(response.get("code", "INTERNAL_ERROR")))
+            raise ValueError(_refusal(response))
         data: dict[str, Any] = response["data"]
         return data
 
@@ -151,7 +158,7 @@ def _backup_flow(words: tuple[str, ...], args: argparse.Namespace) -> int:
             None, {"cmd": "operator", "args": {"command": list(command), **fields}}
         )
         if response.get("ok") is not True:
-            raise ValueError(str(response.get("code", "INTERNAL_ERROR")))
+            raise ValueError(_refusal(response))
         data: dict[str, Any] = response["data"]
         return data
 
@@ -231,7 +238,7 @@ def _operator(args: argparse.Namespace) -> int:
         print("comms: the daemon is not reachable", file=sys.stderr)
         return 3
     if response.get("ok") is not True:
-        print(f"comms: {response.get('code', 'INTERNAL_ERROR')}", file=sys.stderr)
+        print(f"comms: {_refusal(response)}", file=sys.stderr)
         return 4
     print(json.dumps(response["data"], indent=2, sort_keys=True))
     return 0

@@ -962,3 +962,23 @@
   - log Telegram Web and my.telegram.org out of the controlled browser if they are not wanted there;
   - add the bot to society groups for announcements;
   - set up WhatsApp's `meta-access-token` when production WhatsApp sending is wanted.
+
+### 2026-09-28 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Fix the Telegram defects found while setting Telegram up live: three reported, one found underneath them (branch `telegram-fixes`, ruling R-TG1).
+- **Summary:**
+  1. **Guard:** Telethon's own requests (`UPDATE_RPCS`: `connect` on a logged-in session sends `users.GetUsers`, `updates.GetState`, `updates.GetDifference`; the update loop adds difference requests) were reviewed but never admitted by the guard, so every start reported "Telegram unreachable". The one guard, `_admitted`, now allows only an operation's own requests inside it and only `UPDATE_RPCS` outside every operation. A first attempt, wrapping `connect()` in an operation, was rejected: the update-loop task inherits that context.
+  2. **Bot poller:** the 25 s long poll ran under a 10 s client timeout, so the bot received nothing, and it froze the daemon's event loop about 10 s in every 16. `getUpdates` now gets its own read timeout (the poll plus 10 s); `poll_once_async` waits in a thread while the offset read and every write stay on the loop thread; `Workers` await an awaitable step.
+  3. **Doctor:** it judges `telegram-session` by the session file (`SESSION_FILE`, one copy), not the credential store.
+  4. **CLI:** it prints `CODE: reason` for every refusal (login and operator commands).
+- **Files changed:** `src/comms/transports/telegram/telegram/telethon_adapter.py`, `src/comms/transports/telegram/bot/{http,updates}.py`, `src/comms/runtime/{workers,doctor}.py`, `src/comms/core/doctor.py`, `src/comms/cli.py`; tests (`tests/unit/test_telethon_session.py`, `tests/transports/telegram_bot/test_updates.py`, `tests/runtime/test_workers.py`, `tests/core/test_doctor.py`, `tests/runtime/operator/test_doctor_cli.py`, `tests/cli/test_cli_operator.py`); the rulings (R-TG1); `AGENT.md`; `CHANGELOG.md`.
+- **Verification:**
+  - 11 new tests, written first and seen failing.
+  - Full gate GATE ok=1 (5611 passed; smoke 108/108; formal 57; WhatsVault 450; relay 15).
+  - Live checks:
+    - the real session starts ready in both update modes (3.0 s and 2.8 s);
+    - the daemon log no longer says "unreachable at start";
+    - admin requests are answered steadily, about every 2 s, with no 10 s stalls;
+    - doctor no longer reports `telegram-session`;
+    - a `/start` sent to @raouf_comms_bot from the owner's account was retained within seconds (1 update, offset advanced).
+- **Follow-ups:** the owner confirms the new "raoufcomms" login in Telegram ("Yes, it's me"); other worker steps (relay pull, delivery) still make short synchronous calls on the loop, bounded by their timeouts.
