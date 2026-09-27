@@ -90,12 +90,7 @@ def active_version(conn: Any, purpose: str) -> tuple[int, str] | None:
 
 def _checked(store: KeySlotStore, purpose: str, version: int, stored_id: str) -> bytes:
     material = store.read(purpose, version)
-    recomputed = (
-        ids.ed25519_key_id(ids.ed25519_public(material))
-        if stored_id.startswith("ed25519:")
-        else ids.hmac_key_id(material)
-    )
-    if recomputed != stored_id:
+    if key_id_for(purpose, material) != stored_id:  # the one rule, by the purpose's kind
         raise KeySlotError("key id mismatch")
     return material
 
@@ -141,6 +136,8 @@ def key_id_for(purpose: str, material: bytes) -> str:
         return ids.ed25519_key_id(ids.ed25519_public(material))
     if kind == "opaque":
         return ids.opaque_key_id(material)
+    if kind == "x25519":
+        return ids.x25519_key_id(ids.x25519_public(material))
     raise KeySlotError("no key id rule for this key kind")
 
 

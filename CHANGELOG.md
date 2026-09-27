@@ -796,3 +796,15 @@
 - **Files changed:** `AGENT.md`, `CHANGELOG.md` (this entry); the ledger (gitignored).
 - **Verification:** the gate on `d899c6a` (GATE ok=1: 5506 passed, 4 skipped; smoke 106/106; formal 57; WhatsVault 450); `main^{tree}` equals `comms-v0.3-sweep^{tree}`; `origin/main` equals `main`. Zurvan updated with this day's decisions, claims and open questions (tags `telegram-mcp,comms`).
 - **Follow-ups:** D39-B, owner-run and live: a WhatsApp group photo and document, a Telegram download from another DC, WhatsApp group create's `request_id`, and the P §88 acceptance rows. Campaign media needs its own amendment.
+
+### 2026-09-27 (Australia/Sydney)
+**Raouf:**
+- **Scope:** WhatsApp relay R0 and R1: spec A48, the relay keys, the frozen pull signature, and one copy of Meta's signature rule (branch `comms-relay`).
+- **Summary:** Spec A48 makes the approved relay design normative, including D-R1: the relay never holds Meta's app secret. Two new key purposes are minted by `comms keys provision`:
+  - `relay-age-key`: a new `x25519` kind, with key id `x25519:sha256:<public>`; rotating it is refused in this version;
+  - `relay-pull-key`: `hmac`.
+
+  `comms.core.relay_sig` signs under the frozen domain `comms-relay-pull/v1`, with eight byte-equality vectors. Found while building: `slots._checked` held a second copy of the key-id rule, and it now calls `key_id_for`; the audit key-id validator accepts `x25519`. Meta's `X-Hub-Signature-256` check moved into `webhooks/signature.py` (one copy). The local listener accepts up to 8 MiB, since Meta sets no limit and batches up to 1000 updates.
+- **Files changed:** `docs/comms-spec-v0.3.md` (A48), the relay design (marked approved), the plan (new), the rulings (pin, R-R0), `src/comms/core/{domains,relay_sig,validators}.py`, `src/comms/core/keys/{purposes,ids,slots,rotate}.py`, `src/comms/core/backup/age.py` (`identity_from_raw`), `src/comms/runtime/provision.py`, `src/comms/transports/whatsapp/webhooks/{signature,ingress}.py`, tests (`tests/core/test_relay_sig.py`, `tests/transports/whatsapp_webhooks/test_signature.py` new; purposes, wire-frozen, provision), `tests/fixtures/relay/pull_signature_vectors.json`.
+- **Verification:** New tests written first and seen failing; full gate GATE ok=1 (5519 passed, 4 skipped; smoke 106; WhatsVault 450).
+- **Follow-ups:** R2 (the Worker and Mailbox), R3 (the collector), R4 (operator and doctor), R5 (end to end).

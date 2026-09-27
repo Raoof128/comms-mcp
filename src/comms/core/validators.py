@@ -27,7 +27,7 @@ __all__ = [
 
 Validator = Callable[[Any], bool]
 _HEX64 = re.compile(r"[0-9a-f]{64}\Z")
-_KEY_ID = re.compile(r"(hmac|ed25519):sha256:[0-9a-f]{64}\Z")
+_KEY_ID = re.compile(r"(hmac|ed25519|x25519):sha256:[0-9a-f]{64}\Z")
 
 
 def ref(kind: str) -> Validator:

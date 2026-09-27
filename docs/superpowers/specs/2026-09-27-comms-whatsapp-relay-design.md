@@ -1,6 +1,6 @@
 # Comms WhatsApp relay: design
 
-**Status:** the owner approved the design section by section on 2026-09-27. Each section was checked against the 2026 developer docs, and the whole design was gauntleted by execution. **One change after approval needs the owner's decision:** the self-review found that a Worker holding Meta's app secret could forge messages. The design below keeps the app secret off Cloudflare (see Threat model, decision D-R1). This document awaits the owner's review before an implementation plan is written.
+**Status:** approved by the owner on 2026-09-27, including D-R1 (the app secret stays off Cloudflare). Each section was checked against the 2026 developer docs, and the whole design was gauntleted by execution. Spec amendment A48 in `docs/comms-spec-v0.3.md` makes it normative.
 
 ## Intent
 
@@ -70,7 +70,7 @@ The HMAC check leaves `WebhookIngress._signed` and becomes a module-level functi
   - `relay-age-key`: an X25519 `age` identity; only its public half leaves the Mac;
   - `relay-pull-key`: 32 random bytes shared with the Worker.
 
-  Both are created by `comms keys provision`. `comms credential rotate relay-pull-key` covers both sides. On an `age` key rotation, the old identity stays decrypt-only until the mailbox is empty.
+  Both are created by `comms keys provision`. The pull key rotates like any HMAC key (`comms keys rotate relay-pull-key`), then goes to the Worker through a pipe. Rotating the `age` key is refused in this version: a queued row could otherwise outlive the only key that opens it. A later amendment can add a rotation that keeps the old identity decrypt-only until the mailbox is empty.
 - **The pull signature** is `HMAC-SHA256(pull-key, "comms-relay-pull/v1\0" ‖ method ‖ "\0" ‖ path ‖ "\0" ‖ timestamp ‖ "\0" ‖ body)`, in the headers `X-Comms-Timestamp` and `X-Comms-Signature`.
   - The Worker refuses a timestamp more than 300 s from its clock.
   - Replay is harmless by construction (`/pull` is read-only ciphertext, `/ack` is idempotent), so there is no replay cache.
@@ -86,7 +86,7 @@ The HMAC check leaves `WebhookIngress._signed` and becomes a module-level functi
 
 ## Threat model
 
-**Decision D-R1 (needs the owner's decision): Meta's app secret never goes to Cloudflare.** Whoever holds the app secret can make a validly signed webhook, so a Worker holding it would let a Cloudflare-account attacker forge messages the Mac accepts. Instead:
+**Decision D-R1 (the owner approved it on 2026-09-27): Meta's app secret never goes to Cloudflare.** Whoever holds the app secret can make a validly signed webhook, so a Worker holding it would let a Cloudflare-account attacker forge messages the Mac accepts. Instead:
 - Meta's callback URL carries an unguessable 32-byte path token;
 - the Worker stores what arrives on it unverified (rate-limited, encrypted to the Mac);
 - the Mac is the only verifier: an unsigned or mis-signed row is quarantined and never enters the inbox.

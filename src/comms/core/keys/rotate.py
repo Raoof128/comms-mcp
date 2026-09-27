@@ -43,7 +43,10 @@ from comms.core.storage.db import write_tx
 __all__ = ["RotationCrash", "activate_in_tx", "clean_orphans", "find_orphans", "rotate"]
 
 _GENERIC_ROTATIONS = frozenset({"new_id", "invalidate", "seal_epoch"})
-_GENERIC_KINDS = frozenset({"hmac", "ed25519"})
+_GENERIC_KINDS = frozenset({"hmac", "ed25519", "x25519"})
+# A48: an X25519 age identity is minted once. A rotation is refused in this version: a
+# queued relay row could outlive the only key that opens it.
+_FIRST_VERSION_ONLY = frozenset({"x25519"})
 _DESTROY_AT_ROTATION = frozenset({"at_rotation", "at_once"})
 
 
@@ -164,6 +167,8 @@ def rotate(
     require_not_degraded(conn)
     clean_orphans(conn, store, purpose)
     old = active_version(conn, purpose)
+    if old is not None and spec.kind in _FIRST_VERSION_ONLY:
+        raise KeySlotError("rotating this key is refused in this version (A48)")
     old_version = old[0] if old else 0
     version = store.write_version(purpose, material)
     prove(material)

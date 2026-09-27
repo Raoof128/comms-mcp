@@ -136,6 +136,20 @@ def test_after_the_genesis_a_missing_purpose_is_minted_by_the_audited_rotation(t
     ).fetchone()[0]
     assert rotations == len(report.created)
 
+    # A48: the relay's age identity is minted once; rotating it is refused in this version,
+    # because a queued row could outlive the only key that opens it.
+    import os
+
+    from comms.core.keys import rotate as rot
+    from comms.core.keys.slots import KeySlotError
+
+    writer = AuditWriter(conn, SlotChainKeys(conn, store), paths.anchor, clock=lambda: NOW)
+    before = load_active(conn, store, "relay-age-key")
+    with pytest.raises(KeySlotError, match="refused"):
+        rot.rotate(writer, store, "relay-age-key", material=os.urandom(32),
+                   prove=lambda m: None, now=NOW)  # fmt: skip
+    assert load_active(conn, store, "relay-age-key") == before
+
 
 def test_the_cli_runs_provision_locally_without_a_daemon(tmp_path, run, capsys):
     import json
