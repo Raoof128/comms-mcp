@@ -111,3 +111,40 @@ def test_the_bot_has_no_standalone_upload(tmp_path):
         "data_b64": _b64(JPEG), "mime": "image/jpeg", "actor": "telegram_bot",
         "request_id": refs.mint("request")})  # fmt: skip
     assert got.error_code in ("INVALID_ARGUMENT", "PROVIDER_UNSUPPORTED") and admin.calls == []
+
+
+# -- found live (2026-09-28): Telegram types an uploaded photo by its file name ---------------
+
+PNG = b"\x89PNG\r\n\x1a\n" + b"p" * 3000
+
+
+@pytest.mark.parametrize(("data", "mime", "name"), [(JPEG, "image/jpeg", "file.jpg"),
+                                                     (PNG, "image/png", "file.png")], ids=["jpeg", "png"])  # fmt: skip
+def test_an_uploaded_photo_is_named_with_its_extension(tmp_path, data, mime, name):
+    """Named plain ``file``, Telegram refused every photo upload with PHOTO_EXT_INVALID."""
+    _result, sent, _calls = _invoke(tmp_path, {
+        "upload.SaveFilePartRequest": True,
+        "messages.UploadMediaRequest": types.MessageMediaPhoto(photo=PHOTO)},
+        C.MEDIA_UPLOAD, {"data": data, "mime": mime, "kind": "photo"}, ACCOUNT)  # fmt: skip
+    assert sent[-1].media.file.name == name
+
+
+def test_a_photo_sent_from_staged_bytes_is_named_with_its_extension(tmp_path):
+    def sent(request):
+        return types.Updates(updates=[types.UpdateMessageID(id=79, random_id=request.random_id)],
+                             users=[], chats=[], date=None, seq=0)  # fmt: skip
+
+    result, requests, _calls = _invoke(tmp_path, {"upload.SaveFilePartRequest": True,
+                                                  "messages.SendMediaRequest": sent},
+        C.MESSAGE_SEND_MEDIA, {"kind": "photo", "data": JPEG, "mime": "image/jpeg"}, SUPER)  # fmt: skip
+    assert result.outcome == "SUCCEEDED"
+    assert requests[-1].media.file.name == "file.jpg"
+
+
+def test_a_refused_upload_is_failed_with_its_code_not_unknown(tmp_path):
+    result, _sent, calls = _invoke(tmp_path, {
+        "upload.SaveFilePartRequest": True,
+        "messages.UploadMediaRequest": errors.PhotoExtInvalidError(request=None)},
+        C.MEDIA_UPLOAD, {"data": JPEG, "mime": "image/jpeg", "kind": "photo"}, ACCOUNT)  # fmt: skip
+    assert (result.outcome, result.code) == ("FAILED", "INVALID_ARGUMENT")
+    assert calls.count("messages.UploadMediaRequest") == 1

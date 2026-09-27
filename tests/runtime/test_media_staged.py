@@ -266,3 +266,14 @@ def test_whatsapp_sets_the_group_picture_as_multipart():
         admin.validate(
             SemanticOperation(C.GROUP_SETTINGS_UPDATE, {"photo": JPEG, "mime": "image/png"}), group
         )
+
+
+def test_a_group_photo_is_uploaded_with_its_extension(tmp_path):
+    """Found live (2026-09-28): Telegram types an uploaded photo by its file name."""
+    from telethon.tl import types
+
+    ok = types.Updates(updates=[], users=[], chats=[], date=None, seq=0)
+    _result, sent, _calls = _invoke(tmp_path, {"upload.SaveFilePartRequest": True,
+                                               "channels.EditPhotoRequest": ok},
+                                    C.CHAT_SET_PHOTO, {"photo": JPEG, "mime": "image/jpeg"}, SUPER)  # fmt: skip
+    assert sent[-1].photo.file.name == "file.jpg"

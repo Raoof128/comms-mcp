@@ -31,7 +31,7 @@ from telethon import password as srp
 from telethon.tl import functions, types
 
 from comms.core.providers.capability import Capability
-from comms.core.providers.media import neutral_name
+from comms.core.providers.media import image_type, neutral_name
 from comms.core.providers.protocols import ProviderResult
 from comms.transports.net import DownloadRefused
 from comms.transports.telegram.admin_profiles import MTPROTO_RIGHT, PROFILES
@@ -1292,10 +1292,11 @@ class TelethonSession:
         )
         return await self._keyed_send(Capability.MESSAGE_SEND, request, random_id, timeout)
 
-    async def upload_parts(self, data: bytes, *, timeout: float) -> Any | None:
+    async def upload_parts(self, data: bytes, *, name: str, timeout: float) -> Any | None:
         """The one part upload (A47 Gf6; G8): 512 KiB parts, ``upload.saveFilePart`` and
         ``inputFile`` up to 10 MB, ``upload.saveBigFilePart`` and ``inputFileBig`` above (no
-        MD5 then). None when a part fails: nothing was sent that names the file."""
+        MD5 then). None when a part fails: nothing was sent that names the file. ``name``
+        carries the type's extension: Telegram types an uploaded photo by it (R-TG3)."""
         file_id = secrets.randbits(63)
         parts = [data[i : i + PHOTO_PART] for i in range(0, len(data), PHOTO_PART)]
         big = len(data) > BIG_FILE_BYTES
@@ -1313,8 +1314,8 @@ class TelethonSession:
             except GatewayError:
                 return None
         if big:
-            return types.InputFileBig(file_id, len(parts), "file")
-        return types.InputFile(file_id, len(parts), "file", md5_checksum="")
+            return types.InputFileBig(file_id, len(parts), name)
+        return types.InputFile(file_id, len(parts), name, md5_checksum="")
 
     async def set_chat_photo(
         self, peer_type: str, peer_id: int, data: bytes, *, timeout: float
@@ -1322,7 +1323,8 @@ class TelethonSession:
         """A group's photo (G8): the bytes through the one part upload, then
         ``channels.editPhoto`` / ``messages.editChatPhoto``, classified as every admin call.
         A part that fails means nothing was set: the photo is provably unchanged."""
-        uploaded = await self.upload_parts(data, timeout=timeout)
+        name = neutral_name(image_type(data) or "image/jpeg")  # a group photo is JPEG or PNG
+        uploaded = await self.upload_parts(data, name=name, timeout=timeout)
         if uploaded is None:
             return ProviderResult("FAILED", "PROVIDER_UNAVAILABLE")
         return await self.admin_request(
@@ -1337,7 +1339,9 @@ class TelethonSession:
         changes kind on resend (Gf5). A ``ProviderResult`` is a refusal: nothing was sent."""
         kind = spec["kind"]
         if "data" in spec:
-            uploaded = await self.upload_parts(spec["data"], timeout=timeout)
+            uploaded = await self.upload_parts(
+                spec["data"], name=neutral_name(spec["mime"]), timeout=timeout
+            )
             if uploaded is None:
                 return ProviderResult("FAILED", "PROVIDER_UNAVAILABLE")
             if kind == "photo":
@@ -1386,7 +1390,9 @@ class TelethonSession:
         """A47 (H5): the part upload, then ``messages.uploadMedia(peer=inputPeerSelf)`` (Gf16).
         The ref is ``upload:<kind>:<id>:<access_hash>:<file reference hex>``, kept only in the
         encrypted store; nothing refreshes it, so an expired one is refused at send (Gf15)."""
-        uploaded = await self.upload_parts(spec["data"], timeout=timeout)
+        uploaded = await self.upload_parts(
+            spec["data"], name=neutral_name(spec["mime"]), timeout=timeout
+        )
         if uploaded is None:
             return ProviderResult("FAILED", "PROVIDER_UNAVAILABLE")
         if spec["kind"] == "photo":
@@ -1398,7 +1404,14 @@ class TelethonSession:
             )
         request = functions.messages.UploadMediaRequest(types.InputPeerSelf(), media)
         try:
-            result = await self.call_capability(Capability.MEDIA_UPLOAD, request, timeout=timeout)
+            result = await self.call_capability(
+                Capability.MEDIA_UPLOAD, request, timeout=timeout,
+                passthrough=tuple(_MEDIA_REFUSED),
+            )  # fmt: skip
+        except tuple(_MEDIA_REFUSED) as exc:  # Telegram refused it: nothing was created
+            return ProviderResult(
+                "FAILED", next(c for kind, c in _MEDIA_REFUSED.items() if isinstance(exc, kind))
+            )
         except GatewayError as exc:
             if exc.code == "FLOOD_WAIT" and exc.retry_after:
                 return ProviderResult(
