@@ -986,3 +986,21 @@ Follow the user's engineering lifecycle: design/security analysis, implementatio
 - **Files changed:** `src/comms/runtime/selftest_relay.py` (new), `src/comms/runtime/selftest.py`, `scripts/smoke_daemon.py`, `scripts/e2e_smoke.py`, `relay/test/relay.test.ts`, `docs/runbooks/whatsapp-relay.md` (new), `docs/verification/comms-relay.md` (new), the smoke map, the rulings (R-R5), tests (`tests/runtime/test_selftest_relay.py`, `tests/security/test_relay_exit.py` new; egress, runbooks, D39 check count), `CLAUDE.md`, `AGENT.md`, `CHANGELOG.md`.
 - **Verification:** full gate GATE ok=1: 5596 passed, 4 skipped; smoke 108/108 (34 against the real daemon); formal 57; WhatsVault 450; relay 15 Vitest tests in workerd.
 - **Follow-ups:** owner-run steps: `wrangler login`, the four Worker secrets (`comms relay setup`), `wrangler deploy`, Meta's callback URL, then the live check under D39-B. Merge and push await the owner.
+
+### 2026-09-27 (Australia/Sydney)
+**Raouf:**
+- **Scope:** WhatsApp relay: merged, pushed and deployed (owner-authorised).
+- **Summary:**
+  - **Merge:** `comms-relay` merged to `main` (`ea8a7f1`) with tag `comms-relay-v1`, and both pushed.
+  - **Host:** the service-account install is not runnable yet: the `comms` binary sits under `~/Desktop`, which other users cannot reach, and there is no launchd job for `comms daemon`. The owner chose to run comms under their own user.
+    - State: `~/Library/Application Support/comms/state`; runtime: `…/comms/run`, both 0700.
+    - Keys provisioned; cutover COMPLETE; the daemon runs with `relay.url` set.
+  - **Worker:** deployed to `https://comms-relay.raoof-r12.workers.dev` on the owner's Cloudflare account. The pull key and recipient went from `comms relay` into a transient 0600 secrets file that was removed at once. The path token and verify token are kept in `…/comms/relay-meta.env` (0600), because they are also typed into Meta.
+  - **Live probes:** 404 on unknown paths and on a wrong token, the handshake echoes, a signed pull returns 200, and a forged pull returns 401.
+  - **Meta:** W-Vault's callback URL was verified and saved by Meta's own handshake. The subscribed fields are `messages`, `group_lifecycle_update`, `group_participants_update`, `group_settings_update` and `group_status_update`. Meta's dashboard test message reached the relay, encrypted (mailbox depth 1).
+- **Files changed:** `AGENT.md` and `CHANGELOG.md` only. Nothing secret is in the repo.
+- **Verification:** the probes above, run against production.
+- **Follow-ups (owner):**
+  - type Meta's app secret with `comms credential set meta-app-secret`; the daemon then collects and verifies the waiting row;
+  - publish the W-Vault app, because unpublished apps get only dashboard test webhooks;
+  - later, a real service-account install, which means re-piping the two relay keys.
