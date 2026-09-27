@@ -169,7 +169,7 @@ def build_comms_runtime(
         else TemplateService(conn, capability, executor, adapters.templates),
         # A47 (H3): built whenever any actor can download; WhatsApp adds upload, inspect, delete
         media=MediaService(
-            conn, capability, executor, adapters.media, downloads=adapters.downloads
+            conn, capability, executor, adapters.media, downloads=adapters.downloads, clock=clock
         ),
         account=AccountService(
             capability,

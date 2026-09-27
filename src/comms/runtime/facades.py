@@ -29,6 +29,7 @@ from comms.core.errors import CommsError
 from comms.core.groups import GroupError, enabled_groups, group_identity
 from comms.core.objects import resolve_object
 from comms.core.providers.capability import Capability
+from comms.core.providers.media import KINDS
 from comms.core.providers.protocols import ProviderTarget
 from comms.mcp.catalog import TOOL_CATALOG
 from comms.mcp.dispatch import AuthenticatedClient
@@ -219,9 +220,30 @@ class _Facades:
         )  # fmt: skip
 
     def media_upload(self, client: AuthenticatedClient, a: dict[str, Any]) -> dict[str, Any]:
-        media = self.media()  # NOT_CONFIGURED before a staged file is taken
+        """WhatsApp's media store (G8), or, A47 (H5), a file the Telegram user account uploads
+        to itself; with both configured the caller says which (as a group create does)."""
+        actor = a.get("actor") or self._upload_actor()
+        if actor == "telegram_user":  # NOT_CONFIGURED before a staged file is taken
+            if actor not in self.s.actors:
+                raise CommsError("NOT_CONFIGURED")
+            media, target = (
+                self.downloads(),
+                ProviderTarget("telegram", actor, "account", "account"),
+            )
+        else:
+            media, target = self.media(), self.account_target()
+        if a.get("kind") not in (None, *KINDS):
+            raise CommsError("INVALID_ARGUMENT")
         data, mime = self.staged_bytes(client, a)
-        return media.upload(_ctx(client), self.account_target(), data, mime, a["request_id"])
+        return media.upload(_ctx(client), target, data, mime, a["request_id"], kind=a.get("kind"))
+
+    def _upload_actor(self) -> str:
+        able = [actor for actor in (_WHATSAPP, "telegram_user") if actor in self.s.actors]
+        if not able:
+            raise CommsError("NOT_CONFIGURED")
+        if len(able) > 1:
+            raise CommsError("AMBIGUOUS_TARGET")  # a WhatsApp or a Telegram file: say which
+        return able[0]
 
     # -- forward (catalog amendment G7) -------------------------------------------------
 
@@ -646,7 +668,7 @@ class _Facades:
                 c(cl), self.account_target(), {k: a[k] for k in ("name", "language", "category", "components")}, a["request_id"]),
             "whatsapp.template_edit": lambda cl, a: self.templates().edit(c(cl), self.account_target(), a["template"], a["components"], a["request_id"]),
             "whatsapp.template_delete": lambda cl, a: self.templates().delete(c(cl), self.account_target(), a["name"], a["request_id"]),
-            "media.inspect": lambda cl, a: self.media().inspect(a["media"]),
+            "media.inspect": lambda cl, a: self.downloads().inspect(a["media"]),  # A47: any ref
             "media.upload": self.media_upload,  # G8 (D3)
             "media.download": lambda cl, a: self.downloads().download(
                 self.staged, cl.client_ref, a["media"], a.get("offset", 0), a.get("length", CHUNK_MAX)
@@ -659,7 +681,7 @@ class _Facades:
                 cl.client_ref, a["request_id"],
                 lambda: self.staged.chunk(cl.client_ref, a["upload"], a["seq"], a["data_b64"]),
             ),
-            "media.delete": lambda cl, a: self.media().delete(c(cl), self.account_target(), a["media"], a["request_id"]),
+            "media.delete": lambda cl, a: self.downloads().delete(c(cl), self.s.account_target, a["media"], a["request_id"]),
             "account.status": self.account_status(None),
             "account.capabilities": lambda cl, a: {"actors": s.capability.list()},
             "telegram.bot_status": self.account_status(("telegram_bot",)),

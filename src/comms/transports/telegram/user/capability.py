@@ -84,6 +84,7 @@ _SPECIAL = frozenset(
         C.HISTORY_SEARCH,
         C.TOPIC_LIST,
         C.MESSAGE_MARK_READ,  # A47: never a group
+        C.MEDIA_UPLOAD,  # A47 (H5): the account's own, never a chat's
     }
 )
 assert set(TELEGRAM_CAPABILITIES) == _SEND | _ROSTER | set(_RIGHT) | _SPECIAL  # one rule each
@@ -121,7 +122,7 @@ class UserCapability:
     def _account_states(self) -> dict[C, S]:
         unusable = _SESSION_STATE.get(self._session.readiness() or "")
         return {
-            c: (unusable or S.AVAILABLE) if c is C.GROUP_CREATE else S.UNAVAILABLE
+            c: (unusable or S.AVAILABLE) if c in (C.GROUP_CREATE, C.MEDIA_UPLOAD) else S.UNAVAILABLE
             for c in TELEGRAM_CAPABILITIES
         }
 
@@ -160,7 +161,7 @@ def _state(cap: C, view: SelfRights) -> S:
 
     if cap in (C.HISTORY_READ, C.HISTORY_SEARCH):
         return S.AVAILABLE
-    if cap is C.MESSAGE_MARK_READ:  # A47: a group is never marked read
+    if cap in (C.MESSAGE_MARK_READ, C.MEDIA_UPLOAD):  # A47: never a group's
         return S.UNAVAILABLE
     if cap in _SEND:
         if view.kind == "broadcast":

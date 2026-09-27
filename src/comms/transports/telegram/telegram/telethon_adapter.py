@@ -45,7 +45,7 @@ from comms.transports.telegram.telegram.deadline import (
 )
 from comms.transports.telegram.telegram.errors import GatewayError
 from comms.transports.telegram.telegram.rights import SelfRights
-from comms.transports.telegram.telegram.send_attempt import SendAttempt
+from comms.transports.telegram.telegram.send_attempt import SendAttempt, SendRefused
 from comms.transports.telegram.telegram.updates_view import NeutralUpdate
 
 __all__ = [
@@ -161,6 +161,8 @@ WRITE_RPCS: Mapping[Capability, frozenset[str]] = MappingProxyType(
         # A47 (H4): the file's parts, then the keyed send; a held file's message is fetched
         # again under the read operation ``media.download`` (no write set holds a read)
         Capability.MESSAGE_SEND_MEDIA: frozenset({"messages.SendMediaRequest"}),
+        # A47 (H5): a file the account keeps for later sends, uploaded to itself
+        Capability.MEDIA_UPLOAD: frozenset({"messages.UploadMediaRequest"}),
     }
 )
 _BAN = frozenset({"channels.EditBannedRequest"})
@@ -336,6 +338,25 @@ _SEND_REFUSED = (
     errors.MessageTooLongError,
 )
 
+
+# A47 (Gf15, Gf17): a media send's own final refusals, each with its service code
+_MEDIA_REFUSED: Mapping[type[BaseException], str] = MappingProxyType(
+    {
+        errors.FileReferenceExpiredError: "NOT_FOUND",  # an uploaded file: upload it again
+        errors.FileReferenceInvalidError: "NOT_FOUND",
+        errors.ChatSendMediaForbiddenError: "NOT_AUTHORIZED",
+        errors.PhotoInvalidDimensionsError: "INVALID_ARGUMENT",
+        errors.PhotoInvalidError: "INVALID_ARGUMENT",
+        errors.PhotoExtInvalidError: "INVALID_ARGUMENT",
+        errors.PhotoSaveFileInvalidError: "INVALID_ARGUMENT",
+        errors.ImageProcessFailedError: "INVALID_ARGUMENT",
+        errors.MediaEmptyError: "INVALID_ARGUMENT",
+        errors.MediaInvalidError: "INVALID_ARGUMENT",
+        errors.MediaCaptionTooLongError: "INVALID_ARGUMENT",
+        errors.FilePartsInvalidError: "INVALID_ARGUMENT",
+        errors.FilePartMissingError: "INVALID_ARGUMENT",
+    }
+)
 
 _ALL_ADMIN_RIGHTS = frozenset(
     name for name in inspect.signature(types.ChatAdminRights.__init__).parameters if name != "self"
@@ -1297,6 +1318,8 @@ class TelethonSession:
                 return types.InputMediaUploadedPhoto(uploaded)
             name = types.DocumentAttributeFilename(neutral_name(spec["mime"]))
             return types.InputMediaUploadedDocument(uploaded, spec["mime"], [name], force_file=True)
+        if str(spec["media_id"]).startswith("upload:"):
+            return _uploaded_media(str(spec["media_id"]), kind)
         chat, _sep, message_id = str(spec["media_id"]).rpartition(":")
         try:
             peer_type, peer_id = unmark_chat_id(chat)
@@ -1333,12 +1356,48 @@ class TelethonSession:
             return types.InputMediaDocument(utils.get_input_document(held.document))
         return ProviderResult("FAILED", "NOT_FOUND")
 
+    async def upload_media_self(self, spec: Mapping[str, Any], *, timeout: float) -> ProviderResult:
+        """A47 (H5): the part upload, then ``messages.uploadMedia(peer=inputPeerSelf)`` (Gf16).
+        The ref is ``upload:<kind>:<id>:<access_hash>:<file reference hex>``, kept only in the
+        encrypted store; nothing refreshes it, so an expired one is refused at send (Gf15)."""
+        uploaded = await self.upload_parts(spec["data"], timeout=timeout)
+        if uploaded is None:
+            return ProviderResult("FAILED", "PROVIDER_UNAVAILABLE")
+        if spec["kind"] == "photo":
+            media: Any = types.InputMediaUploadedPhoto(uploaded)
+        else:
+            name = types.DocumentAttributeFilename(neutral_name(spec["mime"]))
+            media = types.InputMediaUploadedDocument(
+                uploaded, spec["mime"], [name], force_file=True
+            )
+        request = functions.messages.UploadMediaRequest(types.InputPeerSelf(), media)
+        try:
+            result = await self.call_capability(Capability.MEDIA_UPLOAD, request, timeout=timeout)
+        except GatewayError as exc:
+            if exc.code == "FLOOD_WAIT" and exc.retry_after:
+                return ProviderResult(
+                    "FAILED", "RATE_LIMITED", detail={"retry_after": exc.retry_after}
+                )
+            return ProviderResult("OUTCOME_UNKNOWN", None)
+        held: Any = None
+        if spec["kind"] == "photo" and isinstance(result, types.MessageMediaPhoto):
+            held = result.photo if isinstance(result.photo, types.Photo) else None
+        elif spec["kind"] == "document" and isinstance(result, types.MessageMediaDocument):
+            held = result.document if isinstance(result.document, types.Document) else None
+        if held is None:
+            return ProviderResult("OUTCOME_UNKNOWN", None)  # uploaded, but nothing names it
+        reference = bytes(held.file_reference).hex()
+        ref = f"upload:{spec['kind']}:{held.id}:{held.access_hash}:{reference}"
+        return ProviderResult("SUCCEEDED", None, provider_ref=ref)
+
     async def send_media_once(
         self, peer: Any, media: Any, caption: str, random_id: int, *, timeout: float
     ) -> SendAttempt:
         """One ``messages.sendMedia`` carrying ``random_id`` (A47; A20), classified as a send."""
         request = functions.messages.SendMediaRequest(peer, media, caption, random_id=random_id)
-        return await self._keyed_send(Capability.MESSAGE_SEND_MEDIA, request, random_id, timeout)
+        return await self._keyed_send(
+            Capability.MESSAGE_SEND_MEDIA, request, random_id, timeout, _MEDIA_REFUSED
+        )
 
     async def forward_once(
         self, from_peer: Any, message_id: int, to_peer: Any, random_id: int, *, timeout: float
@@ -1351,16 +1410,26 @@ class TelethonSession:
         return await self._keyed_send(Capability.MESSAGE_FORWARD, request, random_id, timeout)
 
     async def _keyed_send(
-        self, capability: Capability, request: Any, random_id: int, timeout: float
+        self,
+        capability: Capability,
+        request: Any,
+        random_id: int,
+        timeout: float,
+        refusals: Mapping[type[BaseException], str] = MappingProxyType({}),
     ) -> SendAttempt:
-        """One keyed send-shaped call, classified (A20): the one copy for send and forward."""
+        """One keyed send-shaped call, classified (A20): the one copy for send and forward.
+        ``refusals`` (A47) name a send's own final refusals: they raise ``SendRefused`` with
+        their code, since Telegram refused the request and nothing was sent."""
         try:
             result = await self.call_capability(
                 capability,
                 request,
                 timeout=timeout,
-                passthrough=(errors.RandomIdDuplicateError, *_SEND_REFUSED),
+                passthrough=(errors.RandomIdDuplicateError, *_SEND_REFUSED, *refusals),
             )
+        except tuple(refusals) as exc:  # a named refusal: final, never reissued
+            code = next(c for kind, c in refusals.items() if isinstance(exc, kind))
+            raise SendRefused(code) from None
         except errors.RandomIdDuplicateError:
             return SendAttempt("duplicate")
         except _SEND_REFUSED:
@@ -2250,6 +2319,24 @@ def _media_facts(media: Any) -> tuple[str, str, int | None] | None:
         mime = media.document.mime_type if 3 <= len(media.document.mime_type or "") <= 128 else None
         return "document", mime or "application/octet-stream", int(media.document.size)
     return None
+
+
+def _uploaded_media(identity: str, kind: str) -> Any:
+    """A47 (H5): an uploaded file's ``InputMedia`` from its stored ref, or a refusal."""
+    parts = identity.split(":")
+    numbers = len(parts) == 5 and all(p.lstrip("-").isdigit() for p in parts[2:4])
+    if not numbers:
+        return ProviderResult("FAILED", "NOT_FOUND")
+    _tag, held_kind, file_id, access_hash, reference = parts
+    if held_kind != kind:
+        return ProviderResult("FAILED", "INVALID_ARGUMENT")  # a file never changes kind (Gf5)
+    try:
+        ref = bytes.fromhex(reference)
+    except ValueError:
+        return ProviderResult("FAILED", "NOT_FOUND")
+    if kind == "photo":
+        return types.InputMediaPhoto(types.InputPhoto(int(file_id), int(access_hash), ref))
+    return types.InputMediaDocument(types.InputDocument(int(file_id), int(access_hash), ref))
 
 
 def _media_kind(media: Any) -> str | None:

@@ -69,6 +69,18 @@ def send_media(args: Mapping[str, Any]) -> dict[str, Any]:
     return {**spec, "media_id": args["media_id"]}
 
 
+def media_upload(args: Mapping[str, Any]) -> dict[str, Any]:
+    """A47 (H5): a file the account uploads to itself, by kind."""
+    data, mime, kind = args.get("data"), args.get("mime"), args.get("kind")
+    if set(args) != {"data", "mime", "kind"} or kind not in media.KINDS:
+        raise ValueError("operation arguments are malformed")
+    if not isinstance(data, bytes) or not data or not isinstance(mime, str):
+        raise ValueError("operation arguments are malformed")
+    if kind == "photo" and media.image_type(data) is None:
+        raise ValueError("photo refused")
+    return {"data": data, "mime": mime, "kind": kind}
+
+
 MESSAGE_SPECS = {
     C.MESSAGE_SEND: _send,
     C.MESSAGE_EDIT: _edit,

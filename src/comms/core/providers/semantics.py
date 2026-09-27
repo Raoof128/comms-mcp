@@ -124,6 +124,7 @@ SUPPORT: Mapping[C, tuple[str, ...]] = MappingProxyType(
         # the bot has no read state outside a business connection
         C.MESSAGE_MARK_READ: (USER, CLOUD),
         C.MESSAGE_SEND_MEDIA: (*_TELEGRAM, CLOUD),  # A47 (H4)
+        C.MEDIA_UPLOAD: (USER, CLOUD),  # A47 (H5): messages.uploadMedia to the account itself
     }
 )
 

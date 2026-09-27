@@ -13,6 +13,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from comms.core.providers.capability import Capability as C
+from comms.core.providers.media import KINDS
 from comms.mcp.schemas import (
     ACTOR,
     ANY_OBJECT,
@@ -173,11 +174,18 @@ ACCOUNT_TOOLS: tuple[ToolSpec, ...] = (
     write(
         "comms_media_upload",
         "Upload media",
-        "Upload a file to WhatsApp as a media object, by its staged upload ref (from "
+        "Upload a file as a media object, by its staged upload ref (from "
         "comms_media_stage_begin and _chunk) or, for a file of at most 512 KiB, inline as "
-        "data_b64 with its mime type. Returns its med_ ref.",
+        "data_b64 with its mime type: to WhatsApp, or kept by the Telegram user account "
+        "(actor telegram_user; kind photo or document). Returns its med_ ref.",
         "media.upload",
-        {"upload": ref("upload"), "data_b64": string(1, 699052), "mime": string(1, 128)},
+        {
+            "upload": ref("upload"),
+            "data_b64": string(1, 699052),
+            "mime": string(1, 128),
+            "actor": enum(("whatsapp_cloud", "telegram_user")),
+            "kind": enum(KINDS),
+        },
         [],
         provider_result(media=nullable(ref("media"))),
         capability=C.MEDIA_UPLOAD,

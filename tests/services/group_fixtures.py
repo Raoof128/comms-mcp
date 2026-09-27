@@ -50,6 +50,8 @@ def _created_for(capability, target):
     """What the real adapter names its creation by: WhatsApp answers a request id (G8)."""
     if capability is C.GROUP_CREATE and target.transport == "whatsapp":
         return f"request:REQ{next(_SERIAL)}"
+    if capability is C.MEDIA_UPLOAD and target.transport == "telegram":  # A47 (H5)
+        return f"upload:photo:{next(_SERIAL)}:1:00"
     return _created(capability)
 
 
