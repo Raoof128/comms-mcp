@@ -27,10 +27,12 @@ from comms.core.keys.purposes import PURPOSES
 from comms.core.keys.rotate import find_orphans
 from comms.core.keys.slots import KeySlotError, KeySlotStore, load_active, registry_public_for
 
-__all__ = ["REQUIRED_KEYS", "Finding", "doctor"]
+__all__ = ["REQUIRED_KEYS", "Finding", "doctor", "relay_findings"]
 
 REQUIRED_KEYS = ("audit-chain-key", "audit-checkpoint-key", "campaign-commit-key", "backup-key")
 MAINTENANCE_EVERY = timedelta(days=7)
+RELAY_STALE_AFTER = timedelta(minutes=10)  # A48: no successful pull while the daemon tries
+RELAY_BACKLOG_OLD = timedelta(days=25)  # A48: the relay purges after 30 days
 _CREDENTIALS = tuple(sorted(n for n, p in PURPOSES.items() if p.rotation == "staged"))
 
 
@@ -167,6 +169,45 @@ def _credentials(conn: Any) -> list[Finding]:
     return missing + unconfirmed
 
 
+def relay_findings(conn: Any, now: datetime) -> list[Finding]:
+    """A48: the relay collector's state. Nothing when no relay was ever used."""
+    row = conn.execute(
+        "SELECT oldest_received_at, last_attempt_at, last_success_at, last_error, clock_skew_s"
+        " FROM relay_state WHERE id = 1"
+    ).fetchone()
+    if row is None:
+        return []
+    oldest, attempt, success, error, skew = row
+    now = timeutil.utc(now)
+    out = []
+    if error in ("unreachable", "malformed"):
+        out.append(Finding("RELAY_UNREACHABLE", None, "the last pull did not reach the relay"))
+    elif error == "refused":
+        out.append(Finding("RELAY_REFUSED", None, "the relay refused the pull key (re-export it)"))
+    elif error == "clock":
+        out.append(
+            Finding("RELAY_CLOCK", None, f"this clock is {-int(skew or 0)} s off the relay's")
+        )
+    trying = attempt is not None and now - timeutil.instant(attempt) <= RELAY_STALE_AFTER
+    if trying and (success is None or now - timeutil.instant(success) > RELAY_STALE_AFTER):
+        out.append(Finding("RELAY_STALE", None, "no successful pull in the last ten minutes"))
+    if oldest is not None and now - timeutil.instant(oldest) > RELAY_BACKLOG_OLD:
+        out.append(Finding("RELAY_BACKLOG_OLD", None, "a queued row nears the 30-day purge"))
+    gaps = conn.execute("SELECT coalesce(sum(to_seq - from_seq + 1), 0) FROM relay_gaps").fetchone()
+    if gaps[0]:
+        out.append(
+            Finding("RELAY_GAP", None, f"{gaps[0]} relay row(s) vanished without an ack or a purge")
+        )
+    held = conn.execute("SELECT count(*) FROM relay_quarantine").fetchone()[0]
+    if held:
+        out.append(
+            Finding(
+                "RELAY_QUARANTINE", None, f"{held} relay row(s) quarantined (comms relay status)"
+            )
+        )
+    return out
+
+
 def doctor(
     conn: Any,
     store: KeySlotStore,
@@ -179,6 +220,7 @@ def doctor(
     findings += _chains(conn, store, legacy_conn, legacy)
     findings += _lineage(conn)
     findings += _credentials(conn)
+    findings += relay_findings(conn, now)
     if is_degraded(conn):
         findings.append(
             Finding("AUDIT_DEGRADED", None, "the audit integrity latch is set; run audit repair")

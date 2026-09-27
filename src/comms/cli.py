@@ -336,6 +336,43 @@ def _doctor(args: argparse.Namespace) -> int:
     return 0 if report["ok"] or not args.production else 1
 
 
+def _relay(args: argparse.Namespace) -> int:
+    """``comms relay …`` (A48): local and read-only. A secret goes only into a pipe."""
+    import json
+
+    from comms.runtime.operator import relay
+    from comms.runtime.paths import CommsPaths, default_state_dir
+
+    verb = args.operator[1]
+    state = getattr(args, "state_dir", None)
+    paths = CommsPaths(Path(state) if state else default_state_dir())
+    if verb == "setup":
+        print(relay.setup_text())
+        return 0
+    if verb in ("export-pull-key", "new-path") and sys.stdout.isatty():
+        target = "RELAY_PULL_KEY" if verb == "export-pull-key" else "RELAY_PATH_TOKEN"
+        print(f"comms: a secret is written only into a pipe:"
+              f" comms relay {verb} | npx wrangler secret put {target}", file=sys.stderr)  # fmt: skip
+        return 4
+    try:
+        if verb == "status":
+            print(json.dumps(relay.status(paths), indent=2, sort_keys=True))
+            return 0
+        if verb == "new-path":
+            text = relay.new_path_token()
+        elif verb == "export-pull-key":
+            text = relay.pull_key_hex(paths)
+        else:
+            text = relay.recipient(paths)
+    except relay.RelayOpRefused as refused:
+        print(f"comms: {refused}", file=sys.stderr)
+        return 4
+    # no newline into a pipe: `wrangler secret put` stores exactly what it reads
+    sys.stdout.write(text + ("\n" if sys.stdout.isatty() else ""))
+    sys.stdout.flush()
+    return 0
+
+
 def _hello(runtime_dir: str | None) -> Any:
     """The daemon's non-secret security epoch, over the admin socket's ``hello`` control."""
     from comms.transports.telegram.ipc.framing import decode_json_frame, encode_json_frame
@@ -397,6 +434,11 @@ def main(argv: list[str] | None = None) -> None:
         return
     if argv[:3] == ["keys", "rotate", "comms-db-key"]:
         code = _rekey(build_parser().parse_args(argv))
+        if code:
+            raise SystemExit(code)
+        return
+    if argv[:1] == ["relay"]:
+        code = _relay(build_parser().parse_args(argv))
         if code:
             raise SystemExit(code)
         return

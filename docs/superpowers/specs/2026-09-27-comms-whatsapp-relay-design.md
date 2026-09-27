@@ -100,7 +100,7 @@ The HMAC check leaves `WebhookIngress._signed` and becomes a module-level functi
 
 **Residual risks, named:**
 - a Cloudflare-account holder can drop or delay messages;
-- a leaked path token lets junk consume free-tier writes, until `comms relay rotate-path` issues a new token and the owner updates Meta's callback URL.
+- a leaked path token lets junk consume free-tier writes, until `comms relay new-path` issues a new token and the owner updates Meta's callback URL.
 
 Gap detection catches accidental loss, not a determined account holder, who can also fake `purged_through`.
 

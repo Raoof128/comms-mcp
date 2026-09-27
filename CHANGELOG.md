@@ -834,3 +834,17 @@
 - **Files changed:** `src/comms/transports/whatsapp/relay_client.py`, `src/comms/runtime/relay.py` (new); `src/comms/runtime/{adapters,assemble,settings,workers}.py`, `src/comms/core/storage/migrations.py`; tests (`tests/runtime/test_relay_collector.py`, `test_relay_wiring.py`, `tests/transports/test_relay_client.py` new; egress pin, v8 pin); the egress matrix in `docs/verification/comms-v0.3.md`; the rulings (R-R3); `AGENT.md`; `CHANGELOG.md`.
 - **Verification:** 35 new tests, written first and seen failing, including a crash between the commit and the ack, junk, parts, gaps, clock skew, and the real Worker's captured ciphertext; full gate GATE ok=1.
 - **Follow-ups:** R4 (operator commands, doctor), R5 (end to end).
+
+### 2026-09-27 (Australia/Sydney)
+**Raouf:**
+- **Scope:** WhatsApp relay R4: the owner's relay commands and doctor (branch `comms-relay`).
+- **Summary:** `comms relay` runs locally and only reads.
+  - `recipient` prints the public key.
+  - `export-pull-key` and `new-path` refuse a terminal and write only to a pipe, with no trailing newline.
+  - `status` reports the collector's progress and counts.
+  - `setup` prints the ordered checklist.
+
+  Doctor adds `RELAY_UNREACHABLE`, `RELAY_REFUSED`, `RELAY_CLOCK`, `RELAY_STALE` (only while the daemon is trying), `RELAY_BACKLOG_OLD`, `RELAY_GAP` and `RELAY_QUARANTINE`, and none when no relay was ever used. `runtime/doctor.open_read_only` is the one read-only opener.
+- **Files changed:** `src/comms/runtime/operator/relay.py` (new), `src/comms/cli.py`, `src/comms/cli_commands/operator.py`, `src/comms/core/doctor.py`, `src/comms/runtime/doctor.py`; tests (`tests/core/test_doctor_relay.py`, `tests/runtime/test_relay_operator.py` new; the operator-group pin); the plan and design (`new-path`); the rulings (R-R4); `AGENT.md`; `CHANGELOG.md`.
+- **Verification:** 18 new tests, written first and seen failing; full gate GATE ok=1.
+- **Follow-ups:** R5 (the smoke against `wrangler dev`, the runbook, the evidence).

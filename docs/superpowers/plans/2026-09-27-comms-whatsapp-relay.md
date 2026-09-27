@@ -215,7 +215,7 @@ export class Mailbox extends DurableObject<Env> {
 **Commands:**
 - `comms relay recipient`: prints the public `age1…` key, which is not a secret.
 - `comms relay export-pull-key`: writes the raw key as hex to stdout only when stdout is **not** a TTY, so it can only go into a pipe. On a TTY it refuses with "pipe it into: npx wrangler secret put RELAY_PULL_KEY".
-- `comms relay rotate-path`: 32 random bytes as base64url; the same pipe-only rule.
+- `comms relay new-path`: 32 random bytes as base64url; the same pipe-only rule.
 - `comms relay setup`: prints the ordered checklist.
   1. `cd relay && npm ci`.
   2. The two pipes above.
