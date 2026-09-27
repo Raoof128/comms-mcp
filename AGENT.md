@@ -1142,3 +1142,25 @@ Follow the user's engineering lifecycle: design/security analysis, implementatio
   - dialog discovery for v0.3 (the entity cache fills only from updates);
   - `scan_dialogs`' `_views` raises on an unknown entity type;
   - a person-addressed send tool.
+
+### 2026-09-28 (Australia/Sydney)
+**Raouf:**
+- **Scope:** A live end-to-end run of every Telegram tool that can address the owner's Saved Messages, and the defects it found (branch `telegram-e2e-fixes`, ruling R-TG3).
+- **Summary:**
+  - **Coverage:** 49 tools were driven over HTTP `/mcp` as the owner's account: account and status, directory, locations, audiences, campaigns (sent, scheduled then unscheduled then rescheduled, cancelled, retry, resolve), context read-back and paging, mark-read, and media stage, upload, inspect, download and delete. 63 of 65 checks passed on the first run.
+  - **Not coverable here:** the 62 group-addressed tools cannot address a private chat.
+  - **Defects found and fixed:**
+    1. `comms_account_status` and `comms_telegram_bot_status` answered INTERNAL_ERROR, because the bot's snapshot ran `int("account")`. The account-level identity now has one home (`ACCOUNT_TARGET`), and the bot answers it from `getMe`.
+    2. Every photo the user account uploaded was named `file`, and Telegram refused it (`PHOTO_EXT_INVALID`); the upload reported OUTCOME_UNKNOWN, and staged photo sends and group photos shared the same helper. Uploads are now named by type (`file.jpg`, `file.png`), and upload refusals are FAILED with their code.
+  - **Not a defect:** a freshly uploaded file answers download with NOT_FOUND by design, since Telegram downloads read a message's media (A47).
+  - **A side effect of the first run:** its cleanup step opted out the owner's own Telegram identity as a contact. Opt-outs are permanent by design and no tool reverses one, so campaigns can no longer address the owner as a person; the Saved Messages destination still works.
+- **Files changed:** `src/comms/transports/telegram/{capabilities,bot/capability,user/capability,telegram/telethon_adapter}.py`; tests (`tests/transports/telegram_bot/test_capability.py`, `tests/transports/test_telegram_upload.py`, `tests/runtime/test_media_staged.py`); the rulings (R-TG3); `AGENT.md`; `CHANGELOG.md`.
+- **Verification:**
+  - 8 new tests, seen failing first.
+  - Full gate GATE ok=1 (5622 passed; smoke 108/108; formal 57; WhatsVault 450; relay 15).
+  - Live: both status tools answer, a photo upload returns SUCCEEDED with a `med_`, inspect works, and download and delete give their documented refusals.
+- **Follow-ups:**
+  - a throwaway private group to cover the 62 group tools live;
+  - decide whether the owner may reverse an opt-out;
+  - dialog discovery;
+  - a person-addressed send tool.

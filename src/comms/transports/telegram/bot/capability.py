@@ -24,7 +24,7 @@ from comms.core.providers.protocols import CapabilitySnapshot, ProviderTarget
 from comms.core.providers.semantics import SUPPORT
 from comms.transports.telegram.bot.classify import LookupFailed, lookup
 from comms.transports.telegram.bot.http import BotApi, BotRefused
-from comms.transports.telegram.capabilities import TELEGRAM_CAPABILITIES
+from comms.transports.telegram.capabilities import ACCOUNT_TARGET, TELEGRAM_CAPABILITIES
 
 __all__ = ["TELEGRAM_CAPABILITIES", "BotCapability"]
 
@@ -103,20 +103,36 @@ class BotCapability:
         if actor != ACTOR or destination.actor != ACTOR:
             raise ValueError("not a telegram_bot destination")
         states = {c: S.PROVIDER_UNSUPPORTED for c in TELEGRAM_CAPABILITIES}
-        states.update(self._bot_states(int(destination.identity)))
+        if destination.identity == ACCOUNT_TARGET:  # the bot itself: no account-level right
+            unusable = self._account_unusable()
+            if unusable is not None:
+                states = dict.fromkeys(TELEGRAM_CAPABILITIES, unusable)
+        else:
+            states.update(self._bot_states(int(destination.identity)))
         return CapabilitySnapshot(
             ACTOR, destination.destination_ref, states, timeutil.iso(self._clock())
         )
 
-    def _bot_states(self, chat_id: int) -> dict[C, S]:
+    def _account_unusable(self) -> S | None:
+        """None when the bot answers ``getMe``; else why it cannot act at all."""
         if self._api is None:
-            return dict.fromkeys(_BOT, S.NOT_CONFIGURED)
+            return S.NOT_CONFIGURED
         try:
             if self._me is None:
                 me = _object(self._api, "getMe", {}).get("id")
                 if type(me) is not int:
                     raise LookupFailed(ResultKind.OUTCOME_UNKNOWN)
                 self._me = me
+        except LookupFailed as failed:
+            return _FAILURE_STATE.get(failed.kind, S.UNKNOWN)
+        return None
+
+    def _bot_states(self, chat_id: int) -> dict[C, S]:
+        unusable = self._account_unusable()
+        if unusable is not None:
+            return dict.fromkeys(_BOT, unusable)
+        assert self._api is not None
+        try:
             chat = _object(self._api, "getChat", {"chat_id": chat_id})
             member = _object(self._api, "getChatMember", {"chat_id": chat_id, "user_id": self._me})
         except LookupFailed as failed:

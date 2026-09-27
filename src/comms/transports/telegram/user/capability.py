@@ -18,7 +18,7 @@ from comms.core import timeutil
 from comms.core.providers.capability import Capability as C
 from comms.core.providers.capability import CapabilityState as S
 from comms.core.providers.protocols import CapabilitySnapshot, ProviderTarget
-from comms.transports.telegram.capabilities import TELEGRAM_CAPABILITIES
+from comms.transports.telegram.capabilities import ACCOUNT_TARGET, TELEGRAM_CAPABILITIES
 from comms.transports.telegram.peers import unmark_chat_id
 from comms.transports.telegram.telegram.errors import GatewayError
 from comms.transports.telegram.telegram.rights import SelfRights
@@ -26,7 +26,7 @@ from comms.transports.telegram.telegram.rights import SelfRights
 __all__ = ["UserCapability"]
 
 ACTOR = "telegram_user"
-ACCOUNT = "account"  # the account-level target (no group): group.create
+ACCOUNT = ACCOUNT_TARGET  # the account-level target (no group): group.create
 LOOKUP_TIMEOUT_S = 10.0
 _SESSION_STATE = {
     "AUTH_REQUIRED": S.NOT_CONFIGURED,

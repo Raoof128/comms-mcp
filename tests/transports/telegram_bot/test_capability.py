@@ -157,3 +157,24 @@ def test_the_conformance_capability_contract_passes():
         REGISTRY.subset("telegram_bot", "capability"), {"telegram_bot": frozenset({"capability"})}
     )
     assert report.ok and report.passed == 2, report.failures
+
+
+# -- found live (2026-09-28): the account-level target crashed the bot's snapshot -------------
+
+ACCOUNT = ProviderTarget("telegram", "telegram_bot", "account", "account")
+
+
+def test_the_account_target_is_answered_from_get_me_alone():
+    """``comms_account_status`` and ``comms_telegram_bot_status`` ask for the account itself;
+    ``int("account")`` raised, and both tools answered INTERNAL_ERROR."""
+    seen = []
+    api = BotApi(Secrets(), version=1, transport=routed({"getMe": "getMe_ok"}, seen))
+    states = BotCapability.from_api(api, clock=lambda: NOW).snapshot("telegram_bot", ACCOUNT).states
+    assert set(states) == set(TELEGRAM_CAPABILITIES)
+    assert set(states.values()) == {S.PROVIDER_UNSUPPORTED}  # a bot has no account-level right
+    assert [r.url.path.rsplit("/", 1)[-1] for r in seen] == ["getMe"]
+
+
+def test_the_account_target_without_a_token_is_not_configured():
+    states = BotCapability(None, clock=lambda: NOW).snapshot("telegram_bot", ACCOUNT).states
+    assert set(states.values()) == {S.NOT_CONFIGURED}
