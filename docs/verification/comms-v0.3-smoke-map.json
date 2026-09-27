@@ -109,6 +109,7 @@
     "phase_v03_daemon::a signed webhook for a WhatsApp group is read by its grp_",
     "phase_v03_daemon::comms_context_person serves the person's WhatsApp direct message",
     "phase_v03_daemon::a staged photo is sent to a Telegram group by the bot, once, and replays",
-    "phase_v03_daemon::a retained Telegram document pages back whole with its SHA-256"
+    "phase_v03_daemon::a retained Telegram document pages back whole with its SHA-256",
+    "phase_v03_daemon::every catalog tool answers over HTTP: a schema-valid success or its pinned refusal"
   ]
 }

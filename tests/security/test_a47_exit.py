@@ -103,3 +103,12 @@ def test_the_real_daemon_media_checks_are_pinned_and_the_catalog_is_130():
     added = json.loads(SMOKE_MAP.read_text(encoding="utf-8"))["added_in_v0_3"]
     assert all(f"phase_v03_daemon::{c}" in added for c in MEDIA_CHECKS)
     assert len(TOOL_CATALOG) == 130
+
+
+def test_a_tool_that_can_answer_ambiguous_declares_it():
+    """Found by the real-daemon sweep: with WhatsApp and the user account both configured, a
+    create or an upload naming no actor answers AMBIGUOUS_TARGET (R-G8b, R-H5); the tool's
+    declared failures must say so."""
+    by = {spec.name: spec for spec in TOOL_CATALOG}
+    for name in ("comms_group_create", "comms_media_upload"):
+        assert "AMBIGUOUS_TARGET" in by[name].failure_modes, name

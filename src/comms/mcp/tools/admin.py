@@ -390,6 +390,7 @@ ADMIN_TOOLS: tuple[ToolSpec, ...] = (
             ["result", "code", "actor", "op_ref", "replayed", "group"],
         ),
         capability=C.GROUP_CREATE,
+        failures=("AMBIGUOUS_TARGET",),  # both platforms configured and no actor named
     ),
     _admin(
         "group_delete",

@@ -119,8 +119,8 @@ Nothing here has ever touched Telegram; the Test DC harness is owner-run.
 ```bash
 uv sync --locked
 uv run python scripts/extract_contracts.py --check
-uv run pytest -q                                  # 5505 passed, 4 skipped
-uv run python scripts/e2e_smoke.py                # 105 checks, end to end (31 against a real daemon)
+uv run pytest -q                                  # 5506 passed, 4 skipped
+uv run python scripts/e2e_smoke.py                # 106 checks, end to end (32 against a real daemon; every tool swept)
 uv run pytest tests/formal -q -s                  # 57 passed: 544 states/22 assertions; campaign 96,528/11; operations 4,728
 uv run ruff check src tests scripts
 uv run ruff format --check src tests scripts

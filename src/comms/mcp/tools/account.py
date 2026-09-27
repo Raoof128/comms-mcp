@@ -189,6 +189,7 @@ ACCOUNT_TOOLS: tuple[ToolSpec, ...] = (
         [],
         provider_result(media=nullable(ref("media"))),
         capability=C.MEDIA_UPLOAD,
+        failures=("AMBIGUOUS_TARGET",),  # A47: WhatsApp and the user account, no actor named
     ),
     read(
         "comms_media_download",

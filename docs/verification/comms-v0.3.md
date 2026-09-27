@@ -728,3 +728,25 @@ R-G9b, R-A47-docs, R-A47-docs2, and R-H1 to R-H6 are in `docs/verification/comms
 `comms-v0.3-a47-media` is an annotated tag (the branch is named `comms-v0.3-a47`), pushed with the owner's approval on 2026-09-27 together with the merge that lands it on `main` (`f60a46f`): tag object `f3a2eeab67ab3d2d12618faed5c7a6ecac34a9b5` → commit `2a864bef8d8e2a3df0fd2d6651f72142b38e2832`.
 
 No production claim.
+
+## The whole catalog against the real daemon (R-E2E)
+
+`scripts/smoke_sweep.py`, the 32nd `phase_v03_daemon` check, calls every one of the 130 tools over HTTP `/mcp` against `comms selftest-daemon`: the production daemon with local providers, driven through the installed binary. Each answer must be a success whose output validates against the tool's schema, or exactly its pinned refusal.
+
+**Result: 112 succeed and 18 refuse as pinned.** The 18 are:
+- user-account-only reads, since no user is logged in;
+- the bot's documented gaps;
+- no Graph API in the selftest;
+- no job in an unknown outcome.
+
+The in-process actor-matrix behaviour test and the Meta-oracle tests drive each of those 18 against scripted providers.
+
+The sweep also found two tools that could answer an error they didn't declare (`AMBIGUOUS_TARGET` on group create and media upload), fixed and pinned.
+
+| Check | Result |
+|---|---|
+| `uv run pytest -q` | **5506 passed**, 4 skipped |
+| `scripts/e2e_smoke.py` | **106/106** (32 in `phase_v03_daemon`) |
+| `pytest tests/formal` | 57 passed |
+| ruff, format, mypy, build | clean |
+| WhatsVault | 450 passed |
