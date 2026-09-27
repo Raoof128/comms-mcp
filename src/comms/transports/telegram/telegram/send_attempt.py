@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-__all__ = ["SendAttempt"]
+__all__ = ["SendAttempt", "SendRefused"]
 
 
 @dataclass(frozen=True)
@@ -22,3 +22,12 @@ class SendAttempt:
     outcome: Literal["sent", "duplicate", "refused", "flood", "ambiguous", "failed"]
     message_id: int | None = None
     retry_after: int | None = None
+
+
+class SendRefused(Exception):
+    """A send Telegram refused outright (A47): nothing was sent, so it is never reissued and
+    never unknown. ``code`` is a service error code; the message is fixed."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__("send refused")
+        self.code = code

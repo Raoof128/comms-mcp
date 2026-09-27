@@ -159,7 +159,7 @@ def build_comms_runtime(
         ),
         handles=ContextHandles(conn, store, clock=clock),
         groups=GroupService(conn, capability, executor),
-        messages=MessageService(conn, capability, executor),
+        messages=MessageService(conn, capability, executor, clock=clock),
         campaigns=CampaignService(
             writer, executor, adapters.delivery, commit=lambda: commit_context(writer, store)
         ),
@@ -167,9 +167,10 @@ def build_comms_runtime(
         templates=None
         if adapters.templates is None
         else TemplateService(conn, capability, executor, adapters.templates),
-        media=None
-        if adapters.media is None
-        else MediaService(conn, capability, executor, adapters.media),
+        # A47 (H3): built whenever any actor can download; WhatsApp adds upload, inspect, delete
+        media=MediaService(
+            conn, capability, executor, adapters.media, downloads=adapters.downloads, clock=clock
+        ),
         account=AccountService(
             capability,
             webhooks=_InboxCounts(conn, adapters),

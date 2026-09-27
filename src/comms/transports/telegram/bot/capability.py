@@ -30,7 +30,7 @@ __all__ = ["TELEGRAM_CAPABILITIES", "BotCapability"]
 
 ACTOR = "telegram_bot"
 _BOT = frozenset(c for c in TELEGRAM_CAPABILITIES if ACTOR in SUPPORT[c])
-_MESSAGES = frozenset({C.MESSAGE_SEND, C.MESSAGE_EDIT, C.MESSAGE_FORWARD})
+_MESSAGES = frozenset({C.MESSAGE_SEND, C.MESSAGE_EDIT, C.MESSAGE_FORWARD, C.MESSAGE_SEND_MEDIA})
 _PRESENT = frozenset({C.MEMBER_GET, C.ADMIN_LIST})
 # The administrator right each bot capability needs (Bot API ChatMemberAdministrator).
 _RIGHT = {

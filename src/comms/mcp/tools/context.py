@@ -49,7 +49,9 @@ INCLUDES = (
     "linked_audiences",
     "campaigns",
 )
-_IDENTITY_KEYS = ("message_id", "sender_id", "from_id", "chat_id", "update_id", "user_id")
+_IDENTITY_KEYS = (
+    "message_id", "sender_id", "from_id", "chat_id", "update_id", "user_id", "media_key", "media"
+)  # fmt: skip
 _STOPS = ("results", "groups", "requests", "messages", "seconds")
 
 CURSOR = {"type": "string", "pattern": r"^cur_[a-z2-7]{26}\.[0-9a-f]{32}$"}
@@ -61,6 +63,7 @@ ITEM = {
         "observed_at": string(1, 64),
         "group_ref": SUBJECT,
         "message_ref": ref("message"),
+        "media_ref": ref("media"),  # A47 (H2): a Telegram photo or document
         "untrusted_text": nullable(string(0, 65536)),
         "untrusted": ANY_OBJECT,
     },

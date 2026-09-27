@@ -120,6 +120,11 @@ SUPPORT: Mapping[C, tuple[str, ...]] = MappingProxyType(
         C.JOIN_REQUEST_REJECT: (*_TELEGRAM, CLOUD),
         C.GROUP_CREATE: (USER, CLOUD),  # G8: WhatsApp creates asynchronously
         C.GROUP_DELETE: (USER, CLOUD),
+        # A47: the user account marks a person's conversation read (messages.readHistory);
+        # the bot has no read state outside a business connection
+        C.MESSAGE_MARK_READ: (USER, CLOUD),
+        C.MESSAGE_SEND_MEDIA: (*_TELEGRAM, CLOUD),  # A47 (H4)
+        C.MEDIA_UPLOAD: (USER, CLOUD),  # A47 (H5): messages.uploadMedia to the account itself
     }
 )
 
@@ -154,6 +159,7 @@ _SENDS = frozenset(
         C.MESSAGE_SEND_INTERACTIVE,
         C.MESSAGE_SEND_TEMPLATE,
         C.GROUP_MESSAGE_SEND,
+        C.MESSAGE_SEND_MEDIA,  # A47: MTProto keys it by random_id; the bot and WhatsApp cannot
     }
 )
 _CREATES = frozenset(

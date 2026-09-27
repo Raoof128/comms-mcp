@@ -23,6 +23,12 @@ LEGACY_COMPOSITION = SRC / "runtime" / "legacy_composition.py"
 REVIEWED_RPCS: frozenset[str] = frozenset(
     {
         "messages.GetDialogsRequest",
+        "messages.ReadHistoryRequest",  # A47: under cap.message.mark_read only (the owner)
+        "upload.GetFileRequest",  # A47 (H3): media.download only
+        "upload.SaveBigFilePartRequest",  # A47 (H4): the one part upload above 10 MB
+        "messages.SendMediaRequest",  # A47 (H4): keyed by random_id
+        "messages.UploadMediaRequest",  # A47 (H5): to the account itself
+        "auth.ExportAuthorizationRequest",  # A47 (H3): a borrowed sender for another DC
         "messages.GetPeerDialogsRequest",
         "messages.GetHistoryRequest",
         "messages.GetMessagesRequest",
@@ -82,7 +88,12 @@ REVIEWED_RPCS: frozenset[str] = frozenset(
 )
 
 # comms v0.3 B14: the one administrative RPC, built only inside the adapter's admin.revoke path.
-SANCTIONED = {(ADAPTER, "LogOutRequest")}
+SANCTIONED = {
+    (ADAPTER, "LogOutRequest"),
+    # A47: the owner lifted one prohibition, for messages.readHistory under message.mark_read
+    # (tests/transports/test_mark_read.py pins it to that one operation)
+    (ADAPTER, "ReadHistoryRequest"),
+}
 PROHIBITED = {
     "send_message",
     "send_file",

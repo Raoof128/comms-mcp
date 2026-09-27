@@ -26,6 +26,7 @@ CAPABILITY = {
     "comms_message_pin": C.MESSAGE_PIN,
     "comms_message_unpin": C.MESSAGE_PIN,
     "comms_message_mark_read": C.MESSAGE_MARK_READ,
+    "comms_message_send_media": C.MESSAGE_SEND_MEDIA,  # A47 (H4)
 }
 WA_CONTACT = ProviderTarget("whatsapp", "whatsapp_cloud", "rct_w", "+61400000001")
 
@@ -87,6 +88,16 @@ def results(tmp_path_factory):
         "comms_message_forward": sent,  # never produced: the service answers PROVIDER_UNSUPPORTED
         "comms_message_pin": service.pin(CTX, grp, both, message, req()),
         "comms_message_unpin": service.pin(CTX, grp, both, message, req(), pinned=False),
+        "comms_message_send_media": service.send_media(
+            CTX,
+            grp,
+            both,
+            req(),
+            kind="photo",
+            data=b"\xff\xd8\xff\xe0jpeg",
+            mime="image/jpeg",
+            actor="telegram_user",
+        ),
         "comms_message_mark_read": service.mark_read(
             CTX, "rcp_" + "w" * 26, {"whatsapp_cloud": WA_CONTACT}, wa_message, req()
         ),
@@ -104,6 +115,12 @@ def results(tmp_path_factory):
         "comms_message_pin": {"group": grp, "message": message},
         "comms_message_unpin": {"group": grp, "message": message},
         "comms_message_mark_read": {"conversation": "rcp_" + "w" * 26, "message": wa_message},
+        "comms_message_send_media": {
+            "group": grp,
+            "kind": "photo",
+            "data_b64": "/9j/4A==",
+            "mime": "image/jpeg",
+        },
     }
     return {"results": produced, "examples": examples}
 
@@ -122,6 +139,7 @@ def test_the_family_is_p23():
         "pin",
         "unpin",
         "mark_read",
+        "send_media",  # A47 (H4)
     )
     assert NAMES == sorted(f"comms_message_{t}" for t in tools)
 

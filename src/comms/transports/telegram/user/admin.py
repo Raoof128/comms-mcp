@@ -25,15 +25,17 @@ from comms.core.providers.protocols import (
 from comms.core.providers.semantics import SEMANTICS
 from comms.transports.telegram.peers import unmark_chat_id
 from comms.transports.telegram.telegram.errors import GatewayError
+from comms.transports.telegram.telegram.send_attempt import SendRefused
 from comms.transports.telegram.user.admin_chat import CHAT_SPECS, group_create
 from comms.transports.telegram.user.admin_members import MEMBER_SPECS
-from comms.transports.telegram.user.admin_messages import MESSAGE_SPECS
+from comms.transports.telegram.user.admin_messages import MESSAGE_SPECS, media_upload
 from comms.transports.telegram.user.send import (
     Forwarder,
     TextSender,
     forward,
     random_id_for,
     send,
+    send_media,
 )
 
 __all__ = ["UserAdmin"]
@@ -65,6 +67,18 @@ class AdminSession(TextSender, Forwarder, Protocol):
         self, peer_type: str, peer_id: int, data: bytes, *, timeout: float
     ) -> ProviderResult: ...
 
+    async def upload_media_self(
+        self, spec: Mapping[str, Any], *, timeout: float
+    ) -> ProviderResult: ...
+
+    async def prepare_media(
+        self, spec: Mapping[str, Any], *, timeout: float
+    ) -> Any: ...  # A47: an InputMedia, or a ProviderResult refusal
+
+    async def send_media_once(
+        self, peer: Any, media: Any, caption: str, random_id: int, *, timeout: float
+    ) -> Any: ...
+
 
 Runner = Callable[[Coroutine[Any, Any, Any]], Any]
 
@@ -90,12 +104,17 @@ class UserAdmin:
             if target.identity != "account":
                 raise ValueError("a group is created from the account")
             return group_create(op.args), "none", 0
+        if op.capability is Capability.MEDIA_UPLOAD:  # A47 (H5): to the account itself
+            if target.identity != "account":
+                raise ValueError("media is uploaded to the account")
+            return media_upload(op.args), "none", 0
         build = _SPECS.get(op.capability)
         if build is None:
             raise NotImplementedError("the user actor does not perform this operation as one call")
         spec = build(op.args)
         peer_type, peer_id = unmark_chat_id(target.identity)
-        if peer_type == "user":
+        if (peer_type == "user") != (op.capability is Capability.MESSAGE_MARK_READ):
+            # A47: mark-read is a person's conversation, and every other write is a group's
             raise ValueError("a private chat is not a group")
         return spec, peer_type, peer_id
 
@@ -105,8 +124,14 @@ class UserAdmin:
             return self._send(spec, peer_type, peer_id, target.identity, op_key)
         if op.capability is Capability.MESSAGE_FORWARD:
             return self._forward(spec, peer_type, peer_id, target.identity, op_key)
+        if op.capability is Capability.MESSAGE_SEND_MEDIA:
+            return self._send_media(spec, peer_type, peer_id, target.identity, op_key)
         if op.capability is Capability.GROUP_CREATE:
             return self.create_group(op.args)
+        if op.capability is Capability.MEDIA_UPLOAD:
+            return self._run(  # type: ignore[no-any-return]
+                self._session.upload_media_self(spec, timeout=ADMIN_TIMEOUT_S)
+            )
         if op.capability is Capability.CHAT_SET_PHOTO:  # G8: uploaded in parts, then set
             return self._run(  # type: ignore[no-any-return]
                 self._session.set_chat_photo(
@@ -152,6 +177,28 @@ class UserAdmin:
                 self._session, from_peer, spec["message_id"], to_peer, chat, random_id_for(op_key)
             )
         )
+        return _sent(delivered)
+
+    def _send_media(
+        self, spec: Mapping[str, Any], peer_type: str, peer_id: int, chat: str, op_key: str
+    ) -> ProviderResult:
+        """A47 (H4): the file prepared once (parts, or its message fetched again), then one
+        keyed ``messages.sendMedia`` with its reconciliation."""
+        try:
+            peer = self._session.input_peer(peer_type, peer_id)
+        except GatewayError:
+            return ProviderResult("FAILED", "PROVIDER_UNAVAILABLE")  # provably unsent
+        prepared = self._run(self._session.prepare_media(spec, timeout=ADMIN_TIMEOUT_S))
+        if isinstance(prepared, ProviderResult):
+            return prepared
+        try:
+            delivered: DeliveryResult = self._run(
+                send_media(
+                    self._session, peer, chat, prepared, spec["caption"], random_id_for(op_key)
+                )
+            )
+        except SendRefused as refused:  # Telegram refused it outright: nothing was sent
+            return ProviderResult("FAILED", refused.code)
         return _sent(delivered)
 
     def create_group(self, args: Mapping[str, Any]) -> ProviderResult:

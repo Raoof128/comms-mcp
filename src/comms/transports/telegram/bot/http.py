@@ -20,13 +20,18 @@ from typing import Any, Literal
 import httpx
 
 from comms.core.keys.secrets import SecretStore
-from comms.transports.net import pinned_client
+from comms.transports.net import DownloadRefused, pinned_client, read_capped
 
 __all__ = ["BOT_METHODS", "BOT_ORIGIN", "BotApi", "BotRefused", "BotResponse", "BotTransportError"]
 
 BOT_ORIGIN = "https://api.telegram.org"
 TOKEN_ITEM = "telegram-bot-token"
 _TOKEN = re.compile(r"\A[0-9]{1,20}:[A-Za-z0-9_-]{1,128}\Z")
+# A47 (Gx13): a relative path of plain segments; the Bot API's own paths are like
+# ``documents/file_7.pdf`` or ``photos/file_12.jpg``
+_FILE_PATH = re.compile(
+    r"\A[A-Za-z0-9_-][A-Za-z0-9_.-]{0,127}(/[A-Za-z0-9_-][A-Za-z0-9_.-]{0,127}){0,3}\Z"
+)
 _TOKEN_IN_PATH = re.compile(r"/bot[0-9]{1,20}:[A-Za-z0-9_-]+")
 
 BOT_METHODS = frozenset(
@@ -58,6 +63,9 @@ BOT_METHODS = frozenset(
         "setChatMemberTag",  # A46 (Bot API 9.5)
         "deleteMessageReaction",  # A46 (Bot API 10.0)
         "deleteAllMessageReactions",
+        "getFile",  # A47 (H3): then one streamed GET on the file host
+        "sendPhoto",  # A47 (H4): multipart, or by file_id
+        "sendDocument",
         "approveChatJoinRequest",
         "declineChatJoinRequest",
         "createForumTopic",
@@ -164,6 +172,26 @@ class BotApi:
         except ValueError:
             envelope = None
         return BotResponse(response.status_code, envelope if isinstance(envelope, dict) else None)
+
+    def download_file(self, file_path: str, *, limit: int, deadline: float) -> bytes:
+        """A47 (H3): one streamed ``GET`` of ``/file/bot<token>/<file_path>`` on the pinned
+        origin, capped at ``limit`` bytes. ``file_path`` is checked first, since it joins a URL
+        that carries the token (Gx13); no error ever carries the URL."""
+        if not _FILE_PATH.match(file_path) or ".." in file_path.split("/"):
+            raise DownloadRefused("PROVIDER_UNAVAILABLE")
+        refused: DownloadRefused | None = None
+        try:
+            with self._client.stream(
+                "GET", f"{BOT_ORIGIN}/file/bot{self._token}/{file_path}"
+            ) as response:
+                if response.status_code != 200:
+                    raise DownloadRefused("PROVIDER_UNAVAILABLE")
+                return read_capped(response, limit=limit, deadline=deadline)
+        except DownloadRefused as exc:
+            refused = exc
+        except httpx.HTTPError:
+            refused = DownloadRefused("PROVIDER_UNAVAILABLE")
+        raise DownloadRefused(refused.code)  # outside the handler: no chained, URL-bearing error
 
     def close(self) -> None:
         self._client.close()

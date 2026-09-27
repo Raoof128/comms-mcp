@@ -2102,6 +2102,16 @@ def phase_v03_daemon(ledger: Ledger) -> None:
     )
     ledger.run(
         area,
+        "a staged photo is sent to a Telegram group by the bot, once, and replays",
+        lambda: verdict("media_send"),
+    )
+    ledger.run(
+        area,
+        "a retained Telegram document pages back whole with its SHA-256",
+        lambda: verdict("media_download"),
+    )
+    ledger.run(
+        area,
         "the directory over MCP: a person, a WhatsApp contact, a location with them, a Telegram and a WhatsApp group",
         lambda: verdict("catalog_directory"),
     )

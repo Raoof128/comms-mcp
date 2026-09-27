@@ -70,6 +70,7 @@ CAPABILITY_TOOLS = {
     C.MESSAGE_EDIT: "comms_message_edit",
     C.MESSAGE_FORWARD: "comms_message_forward",
     C.MESSAGE_MARK_READ: "comms_message_mark_read",
+    C.MESSAGE_SEND_MEDIA: "comms_message_send_media",  # A47 (H4)
     C.MESSAGE_PIN: "comms_message_pin",
     C.MESSAGE_REPLY: "comms_message_reply",
     C.MESSAGE_SEND: "comms_message_send",

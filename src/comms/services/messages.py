@@ -10,27 +10,34 @@ provider says nothing it is ``provider_defined``, and a delete that did not succ
 scope (P §72). Marking read is a write of its own, audited, and no read ever marks anything
 (P §77). The reads themselves (get, recent, search, context) are the context engine's.
 
+A47: the Telegram user account marks a person's conversation read too.
+
 WhatsApp: ``mark_read`` only. Free-form WhatsApp sends go through the campaign path, which
 enforces the customer-service window and templates; forwarding is not offered yet.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from comms.core import timeutil
 from comms.core.errors import CommsError
+from comms.core.objects import media_facts, resolve_object
+from comms.core.providers import media as media_rules
 from comms.core.providers.capability import Capability as C
 from comms.core.providers.protocols import ProviderTarget
 from comms.services.capability import CapabilityService
 from comms.services.mutations import CallContext, MutationExecutor, MutationOutcome
 from comms.services.writes import ProviderWrites, summary, transport_of
 
-__all__ = ["DELETE_SCOPES", "MessageService"]
+__all__ = ["DELETE_SCOPES", "MessageService", "check_send_media"]
 
 DELETE_SCOPES = ("local", "everyone", "provider_defined")
 _MESSAGE = ("message", "message_id")
 _TEXT_MAX = 4096
+WHATSAPP_MEDIA_LIFE = timedelta(days=30)  # an uploaded media id (A47 Gf10)
 # tool → the capability that performs it on each transport (P §23).
 _OPERATIONS: Mapping[str, Mapping[str, C]] = {
     "message.send": {"telegram": C.MESSAGE_SEND, "whatsapp": C.GROUP_MESSAGE_SEND},  # G8
@@ -39,8 +46,9 @@ _OPERATIONS: Mapping[str, Mapping[str, C]] = {
     "message.delete": {"telegram": C.MESSAGE_DELETE},
     "message.pin": {"telegram": C.MESSAGE_PIN, "whatsapp": C.MESSAGE_PIN},  # G8
     "message.unpin": {"telegram": C.MESSAGE_PIN, "whatsapp": C.MESSAGE_PIN},
-    "message.mark_read": {"whatsapp": C.MESSAGE_MARK_READ},
+    "message.mark_read": {"whatsapp": C.MESSAGE_MARK_READ, "telegram": C.MESSAGE_MARK_READ},
     "message.forward": {"telegram": C.MESSAGE_FORWARD},  # G7
+    "message.send_media": {"telegram": C.MESSAGE_SEND_MEDIA, "whatsapp": C.MESSAGE_SEND_MEDIA},
 }
 
 
@@ -52,9 +60,15 @@ def _text(text: object) -> str:
 
 class MessageService:
     def __init__(
-        self, conn: Any, capability: CapabilityService, executor: MutationExecutor
+        self,
+        conn: Any,
+        capability: CapabilityService,
+        executor: MutationExecutor,
+        *,
+        clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self._writes = ProviderWrites(conn, capability, executor)
+        self._clock = clock
 
     def send(
         self,
@@ -181,6 +195,54 @@ class MessageService:
         return {**self._head(to_group, "message.forward", chosen, outcome),
                 "message": _made(outcome)}  # fmt: skip
 
+    def send_media(
+        self,
+        ctx: CallContext,
+        group: str,
+        targets: Mapping[str, ProviderTarget],
+        request_id: str,
+        *,
+        kind: str,
+        caption: str | None = None,
+        data: bytes | None = None,
+        mime: str | None = None,
+        media: str | None = None,
+        actor: str | None = None,
+    ) -> dict[str, Any]:
+        """A47 (H4): a photo or a document to a group. A held ``med_`` is sent by the actor
+        that holds it and never as another kind (Gf5); bytes reach the adapter only, and the
+        request digest holds their SHA-256."""
+        check_send_media(kind, caption)
+        if (data is None) == (media is None):
+            raise CommsError("INVALID_ARGUMENT")
+        args: dict[str, Any] = {"kind": kind}
+        if caption:
+            args["caption"] = caption
+        objects: dict[tuple[str, str], object] = {}
+        if data is not None:
+            args.update(data=data, mime=mime)
+        else:
+            found = resolve_object(self._writes.conn, str(media), "media")
+            if found.actor not in targets or actor not in (None, "auto", found.actor):
+                raise CommsError("NOT_FOUND")  # another account's file is not this one's
+            if found.transport == "whatsapp" and self._expired(str(media)):
+                raise CommsError("NOT_FOUND")  # Meta keeps an uploaded id 30 days (Gf10)
+            facts = media_facts(self._writes.conn, str(media))
+            if facts is not None and facts["kind"] != kind:
+                raise CommsError("INVALID_ARGUMENT")  # a file never changes kind on resend
+            actor, objects = found.actor, {("media", "media_id"): media}
+        chosen, outcome = self._run(
+            ctx, "message.send_media", targets, args, request_id, actor, objects, "message"
+        )
+        return {**self._head(group, "message.send_media", chosen, outcome),
+                "message": _made(outcome)}  # fmt: skip
+
+    def _expired(self, media: str) -> bool:
+        row = self._writes.conn.execute(
+            "SELECT created_at FROM provider_objects WHERE ref = ?", (media,)
+        ).fetchone()
+        return row is None or self._clock() - timeutil.parse(row[0]) >= WHATSAPP_MEDIA_LIFE
+
     def _run(
         self,
         ctx: CallContext,
@@ -213,6 +275,16 @@ class MessageService:
     @staticmethod
     def _head(group: str, tool: str, actor: str, outcome: MutationOutcome) -> dict[str, Any]:
         return {"group": group, "operation": tool, **summary(actor, outcome)}
+
+
+def check_send_media(kind: object, caption: object) -> None:
+    """The shape rule (A47), before any staged file is taken: INVALID_ARGUMENT."""
+    if kind not in media_rules.KINDS:
+        raise CommsError("INVALID_ARGUMENT")
+    try:
+        media_rules.caption(caption or "")
+    except ValueError:
+        raise CommsError("INVALID_ARGUMENT") from None
 
 
 def _made(outcome: MutationOutcome) -> str | None:

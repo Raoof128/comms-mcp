@@ -107,6 +107,8 @@
     "phase_v03_daemon::the directory over MCP: a person, a WhatsApp contact, a location with them, a Telegram and a WhatsApp group",
     "phase_v03_daemon::a location campaign reaches the person added over MCP",
     "phase_v03_daemon::a signed webhook for a WhatsApp group is read by its grp_",
-    "phase_v03_daemon::comms_context_person serves the person's WhatsApp direct message"
+    "phase_v03_daemon::comms_context_person serves the person's WhatsApp direct message",
+    "phase_v03_daemon::a staged photo is sent to a Telegram group by the bot, once, and replays",
+    "phase_v03_daemon::a retained Telegram document pages back whole with its SHA-256"
   ]
 }

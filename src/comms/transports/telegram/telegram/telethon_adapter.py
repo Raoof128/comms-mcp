@@ -31,8 +31,11 @@ from telethon import password as srp
 from telethon.tl import functions, types
 
 from comms.core.providers.capability import Capability
+from comms.core.providers.media import neutral_name
 from comms.core.providers.protocols import ProviderResult
+from comms.transports.net import DownloadRefused
 from comms.transports.telegram.admin_profiles import MTPROTO_RIGHT, PROFILES
+from comms.transports.telegram.peers import unmark_chat_id
 from comms.transports.telegram.telegram.deadline import (
     Deadline,
     DeadlineExceeded,
@@ -42,7 +45,7 @@ from comms.transports.telegram.telegram.deadline import (
 )
 from comms.transports.telegram.telegram.errors import GatewayError
 from comms.transports.telegram.telegram.rights import SelfRights
-from comms.transports.telegram.telegram.send_attempt import SendAttempt
+from comms.transports.telegram.telegram.send_attempt import SendAttempt, SendRefused
 from comms.transports.telegram.telegram.updates_view import NeutralUpdate
 
 __all__ = [
@@ -94,6 +97,23 @@ OPERATIONS: dict[str, frozenset[str]] = {
             "messages.SearchRequest",  # 4c: per-peer search, never SearchGlobal
         }
     ),
+    # A47 (H3): a Telegram file, by its message. The message is fetched again for a fresh file
+    # reference, then upload.getFile in slices; a file on another DC is fetched over Telethon's
+    # borrowed sender, whose creation sends help.getConfig (an empty DC cache) and
+    # auth.exportAuthorization through this same allowlist (Gx1). auth.importAuthorization goes
+    # raw on the new sender inside InvokeWithLayer, pinned by tests/telegram/test_update_rpcs.py.
+    # A47 (Gf6): the one part upload, shared by a group's photo (G8) and a media send (H4);
+    # its own operation, so no write or admin set holds the other's requests
+    "file.upload": frozenset({"upload.SaveFilePartRequest", "upload.SaveBigFilePartRequest"}),
+    "media.download": frozenset(
+        {
+            "messages.GetMessagesRequest",
+            "channels.GetMessagesRequest",
+            "upload.GetFileRequest",
+            "auth.ExportAuthorizationRequest",
+            "help.GetConfigRequest",
+        }
+    ),
 }
 # comms v0.3 C14 (A21): the request classes each capability may put on the wire for the user
 # actor, in three disjoint sets. Each capability is its own operation, so the recorder allows
@@ -135,6 +155,14 @@ WRITE_RPCS: Mapping[Capability, frozenset[str]] = MappingProxyType(
         ),
         Capability.MESSAGE_FORWARD: frozenset({"messages.ForwardMessagesRequest"}),
         Capability.MESSAGE_PIN: frozenset({"messages.UpdatePinnedMessageRequest"}),
+        # A47 (the owner lifted one prohibition): a person's conversation, and nothing else;
+        # channels.readHistory and every other read-acknowledge request stay absent
+        Capability.MESSAGE_MARK_READ: frozenset({"messages.ReadHistoryRequest"}),
+        # A47 (H4): the file's parts, then the keyed send; a held file's message is fetched
+        # again under the read operation ``media.download`` (no write set holds a read)
+        Capability.MESSAGE_SEND_MEDIA: frozenset({"messages.SendMediaRequest"}),
+        # A47 (H5): a file the account keeps for later sends, uploaded to itself
+        Capability.MEDIA_UPLOAD: frozenset({"messages.UploadMediaRequest"}),
     }
 )
 _BAN = frozenset({"channels.EditBannedRequest"})
@@ -171,7 +199,6 @@ ADMIN_RPCS: Mapping[Capability, frozenset[str]] = MappingProxyType(
             {
                 "messages.EditChatPhotoRequest",
                 "channels.EditPhotoRequest",
-                "upload.SaveFilePartRequest",
             }
         ),
         Capability.CHAT_SET_PERMISSIONS: frozenset({"messages.EditChatDefaultBannedRightsRequest"}),
@@ -311,6 +338,25 @@ _SEND_REFUSED = (
     errors.MessageTooLongError,
 )
 
+
+# A47 (Gf15, Gf17): a media send's own final refusals, each with its service code
+_MEDIA_REFUSED: Mapping[type[BaseException], str] = MappingProxyType(
+    {
+        errors.FileReferenceExpiredError: "NOT_FOUND",  # an uploaded file: upload it again
+        errors.FileReferenceInvalidError: "NOT_FOUND",
+        errors.ChatSendMediaForbiddenError: "NOT_AUTHORIZED",
+        errors.PhotoInvalidDimensionsError: "INVALID_ARGUMENT",
+        errors.PhotoInvalidError: "INVALID_ARGUMENT",
+        errors.PhotoExtInvalidError: "INVALID_ARGUMENT",
+        errors.PhotoSaveFileInvalidError: "INVALID_ARGUMENT",
+        errors.ImageProcessFailedError: "INVALID_ARGUMENT",
+        errors.MediaEmptyError: "INVALID_ARGUMENT",
+        errors.MediaInvalidError: "INVALID_ARGUMENT",
+        errors.MediaCaptionTooLongError: "INVALID_ARGUMENT",
+        errors.FilePartsInvalidError: "INVALID_ARGUMENT",
+        errors.FilePartMissingError: "INVALID_ARGUMENT",
+    }
+)
 
 _ALL_ADMIN_RIGHTS = frozenset(
     name for name in inspect.signature(types.ChatAdminRights.__init__).parameters if name != "self"
@@ -740,6 +786,17 @@ def _message_pin(
     )
 
 
+def _mark_read(
+    session: TelethonSession, peer_type: str, peer_id: int, spec: Mapping[str, Any]
+) -> Any:
+    """A47: ``messages.readHistory`` on a person's peer, up to one message."""
+    try:
+        peer = session.input_peer("user", peer_id)  # from the entity cache only
+    except GatewayError:
+        raise _PeerMissing("DESTINATION_NOT_FOUND") from None
+    return functions.messages.ReadHistoryRequest(peer, max_id=spec["message_id"])
+
+
 def _delete_scope(peer_type: str, spec: Mapping[str, Any]) -> str:
     """The scope a delete actually had (P §72): a basic-group delete without revoke is local."""
     return "everyone" if peer_type == "channel" or spec.get("revoke") else "local"
@@ -806,6 +863,7 @@ _ADMIN_BUILDERS: Mapping[Capability, Callable[..., Any]] = MappingProxyType(
         Capability.MESSAGE_EDIT: _message_edit,
         Capability.MESSAGE_DELETE: _message_delete,
         Capability.MESSAGE_PIN: _message_pin,
+        Capability.MESSAGE_MARK_READ: _mark_read,
     }
 )
 
@@ -822,6 +880,8 @@ _ROLE: Mapping[type, str] = MappingProxyType(
 
 
 PHOTO_PART = 512 * 1024  # upload.saveFilePart's part size (G8)
+BIG_FILE_BYTES = 10 * 1024 * 1024  # above it, saveBigFilePart and inputFileBig (A47 Gf6)
+DOWNLOAD_SLICE = 512 * 1024  # A47: upload.getFile's slice; 1 MiB is divisible by it (Gf9)
 MAX_ADMINS = 200  # a channel's administrators (Telegram caps them at 50; one page holds all)
 
 
@@ -1040,11 +1100,14 @@ class TelethonSession:
         deadline: Deadline,
         budget: WorkBudget,
         passthrough: tuple[type[BaseException], ...] = (errors.SessionPasswordNeededError,),
+        dc_id: int | None = None,
     ) -> Any:
         """Send one reviewed request for ``operation``. Refused before the client otherwise.
 
         ``passthrough`` names Telegram errors a login step handles itself
-        (2FA needed, a phone migrate); everything else is translated.
+        (2FA needed, a phone migrate); everything else is translated. ``dc_id`` (A47) sends it
+        on that DC's borrowed sender when it is not the home DC; the allowlist, the budget and
+        the deadline hold there too, and the sender is always returned.
         """
         if qualified(request) not in OPERATIONS[operation]:
             raise GatewayError("INTERNAL_ERROR")  # a programming error, never a network call
@@ -1063,7 +1126,14 @@ class TelethonSession:
                     with _operation(operation, budget) as current:
                         budget.spend()  # the session charges its own request, always
                         current.precharged.add(id(request))
-                        return await self._client(request)
+                        home = getattr(self._client.session, "dc_id", None)
+                        if dc_id is None or dc_id == home:
+                            return await self._client(request)
+                        sender = await self._client._borrow_exported_sender(dc_id)
+                        try:
+                            return await self._client._call(sender, request)
+                        finally:
+                            await self._client._return_exported_sender(sender)
         except (asyncio.CancelledError, KeyboardInterrupt):
             raise
         except passthrough:
@@ -1096,6 +1166,78 @@ class TelethonSession:
             raise UpdateStreamTaken
         self._update_sink = sink
 
+    async def download_media(
+        self, peer_type: str, peer_id: int, message_id: int, *, max_bytes: int, timeout: float
+    ) -> bytes:
+        """A47 (H3): one message's photo or document, whole, at most ``max_bytes``.
+
+        The message is fetched for a fresh file reference, then ``upload.getFile`` runs in
+        512 KiB slices at 512 KiB offsets with ``precise`` and ``cdn_supported`` unset (Gf2,
+        Gf9), on the file's own DC (Gf1). An expired reference is fetched again once and a
+        migrate followed once, never looped (Gx3); the Premium throttle stays ``FLOOD_WAIT``.
+        """
+        deadline = Deadline(max(0.001, timeout))
+        budget = WorkBudget(max_rpcs=max_bytes // DOWNLOAD_SLICE + 12)
+        dc_id, location, size = await self._download_source(
+            peer_type, peer_id, message_id, deadline, budget
+        )
+        data, refreshed, moved = bytearray(), False, None
+        while True:
+            if size is not None and size > max_bytes:
+                raise DownloadRefused("PROVIDER_UNSUPPORTED")  # before any slice
+            request = functions.upload.GetFileRequest(location, len(data), DOWNLOAD_SLICE)
+            try:
+                part = await self._call_reviewed(
+                    request, operation="media.download", client_ref="comms", deadline=deadline,
+                    budget=budget, dc_id=moved or dc_id,
+                    passthrough=(errors.FileMigrateError, errors.FileReferenceExpiredError),
+                )  # fmt: skip
+            except errors.FileReferenceExpiredError:
+                if refreshed:
+                    raise DownloadRefused("PROVIDER_UNAVAILABLE") from None
+                refreshed = True
+                dc_id, location, size = await self._download_source(
+                    peer_type, peer_id, message_id, deadline, budget
+                )
+                continue
+            except errors.FileMigrateError as migrate:
+                if moved is not None:
+                    raise DownloadRefused("PROVIDER_UNAVAILABLE") from None
+                moved = int(migrate.new_dc)
+                continue
+            if not isinstance(part, types.upload.File):
+                raise DownloadRefused("PROVIDER_UNSUPPORTED")  # a CDN was never asked for
+            data += part.bytes
+            if len(data) > max_bytes:
+                raise DownloadRefused("PROVIDER_UNSUPPORTED")
+            if len(part.bytes) < DOWNLOAD_SLICE:
+                return bytes(data)
+
+    async def _download_source(
+        self, peer_type: str, peer_id: int, message_id: int, deadline: Deadline, budget: WorkBudget
+    ) -> tuple[int, Any, int | None]:
+        peer = self.input_peer(peer_type, peer_id)  # the entity cache only; a miss is refused
+        wanted = [types.InputMessageID(int(message_id))]
+        request = (
+            functions.channels.GetMessagesRequest(peer, wanted)
+            if peer_type == "channel"
+            else functions.messages.GetMessagesRequest(wanted)
+        )
+        result = await self._call_reviewed(
+            request, operation="media.download", client_ref="comms", deadline=deadline,
+            budget=budget,
+        )  # fmt: skip
+        message = next(
+            (m for m in getattr(result, "messages", None) or ()
+             if isinstance(m, types.Message) and m.id == message_id),
+            None,
+        )  # fmt: skip
+        facts = _media_facts(message.media) if message is not None else None
+        if message is None or facts is None:
+            raise DownloadRefused("NOT_FOUND")
+        dc_id, location = utils.get_input_location(message.media)
+        return int(dc_id), location, facts[2]
+
     async def call_capability(
         self,
         capability: Capability,
@@ -1124,26 +1266,137 @@ class TelethonSession:
         )
         return await self._keyed_send(Capability.MESSAGE_SEND, request, random_id, timeout)
 
+    async def upload_parts(self, data: bytes, *, timeout: float) -> Any | None:
+        """The one part upload (A47 Gf6; G8): 512 KiB parts, ``upload.saveFilePart`` and
+        ``inputFile`` up to 10 MB, ``upload.saveBigFilePart`` and ``inputFileBig`` above (no
+        MD5 then). None when a part fails: nothing was sent that names the file."""
+        file_id = secrets.randbits(63)
+        parts = [data[i : i + PHOTO_PART] for i in range(0, len(data), PHOTO_PART)]
+        big = len(data) > BIG_FILE_BYTES
+        for index, part in enumerate(parts):
+            request = (
+                functions.upload.SaveBigFilePartRequest(file_id, index, len(parts), part)
+                if big
+                else functions.upload.SaveFilePartRequest(file_id, index, part)
+            )
+            try:
+                await self._call_reviewed(
+                    request, operation="file.upload", client_ref="comms",
+                    deadline=Deadline(max(0.001, timeout)), budget=WorkBudget(max_rpcs=1),
+                )  # fmt: skip
+            except GatewayError:
+                return None
+        if big:
+            return types.InputFileBig(file_id, len(parts), "file")
+        return types.InputFile(file_id, len(parts), "file", md5_checksum="")
+
     async def set_chat_photo(
         self, peer_type: str, peer_id: int, data: bytes, *, timeout: float
     ) -> ProviderResult:
-        """A group's photo (G8): the bytes in ``upload.saveFilePart`` parts of 512 KiB, then
+        """A group's photo (G8): the bytes through the one part upload, then
         ``channels.editPhoto`` / ``messages.editChatPhoto``, classified as every admin call.
         A part that fails means nothing was set: the photo is provably unchanged."""
-        file_id = secrets.randbits(63)
-        parts = [data[i : i + PHOTO_PART] for i in range(0, len(data), PHOTO_PART)]
-        for index, part in enumerate(parts):
-            try:
-                await self.call_capability(
-                    Capability.CHAT_SET_PHOTO,
-                    functions.upload.SaveFilePartRequest(file_id, index, part),
-                    timeout=timeout,
-                )
-            except GatewayError:
-                return ProviderResult("FAILED", "PROVIDER_UNAVAILABLE")
-        uploaded = types.InputFile(file_id, len(parts), "photo.jpg", md5_checksum="")
+        uploaded = await self.upload_parts(data, timeout=timeout)
+        if uploaded is None:
+            return ProviderResult("FAILED", "PROVIDER_UNAVAILABLE")
         return await self.admin_request(
             Capability.CHAT_SET_PHOTO, peer_type, peer_id, {"uploaded": uploaded}, timeout=timeout
+        )
+
+    async def prepare_media(
+        self, spec: Mapping[str, Any], *, timeout: float
+    ) -> Any | ProviderResult:
+        """A47 (H4): the ``InputMedia`` a send carries: staged bytes through the part upload, or
+        a held file fetched again from its message (a fresh file reference). A file never
+        changes kind on resend (Gf5). A ``ProviderResult`` is a refusal: nothing was sent."""
+        kind = spec["kind"]
+        if "data" in spec:
+            uploaded = await self.upload_parts(spec["data"], timeout=timeout)
+            if uploaded is None:
+                return ProviderResult("FAILED", "PROVIDER_UNAVAILABLE")
+            if kind == "photo":
+                return types.InputMediaUploadedPhoto(uploaded)
+            name = types.DocumentAttributeFilename(neutral_name(spec["mime"]))
+            return types.InputMediaUploadedDocument(uploaded, spec["mime"], [name], force_file=True)
+        if str(spec["media_id"]).startswith("upload:"):
+            return _uploaded_media(str(spec["media_id"]), kind)
+        chat, _sep, message_id = str(spec["media_id"]).rpartition(":")
+        try:
+            peer_type, peer_id = unmark_chat_id(chat)
+            peer = self.input_peer(peer_type, peer_id)
+        except (ValueError, GatewayError):
+            return ProviderResult("FAILED", "NOT_FOUND")
+        wanted = [types.InputMessageID(int(message_id))] if message_id.isdigit() else []
+        request = (
+            functions.channels.GetMessagesRequest(peer, wanted)
+            if peer_type == "channel"
+            else functions.messages.GetMessagesRequest(wanted)
+        )
+        try:
+            result = await self._call_reviewed(
+                request, operation="media.download", client_ref="comms",
+                deadline=Deadline(max(0.001, timeout)), budget=WorkBudget(max_rpcs=1),
+            )  # fmt: skip
+        except GatewayError:
+            return ProviderResult("FAILED", "PROVIDER_UNAVAILABLE")
+        held = next(
+            (m.media for m in getattr(result, "messages", None) or ()
+             if isinstance(m, types.Message) and str(m.id) == message_id),
+            None,
+        )  # fmt: skip
+        if isinstance(held, types.MessageMediaPhoto) and isinstance(held.photo, types.Photo):
+            if kind != "photo":
+                return ProviderResult("FAILED", "INVALID_ARGUMENT")
+            return types.InputMediaPhoto(utils.get_input_photo(held.photo))
+        if isinstance(held, types.MessageMediaDocument) and isinstance(
+            held.document, types.Document
+        ):
+            if kind != "document":
+                return ProviderResult("FAILED", "INVALID_ARGUMENT")
+            return types.InputMediaDocument(utils.get_input_document(held.document))
+        return ProviderResult("FAILED", "NOT_FOUND")
+
+    async def upload_media_self(self, spec: Mapping[str, Any], *, timeout: float) -> ProviderResult:
+        """A47 (H5): the part upload, then ``messages.uploadMedia(peer=inputPeerSelf)`` (Gf16).
+        The ref is ``upload:<kind>:<id>:<access_hash>:<file reference hex>``, kept only in the
+        encrypted store; nothing refreshes it, so an expired one is refused at send (Gf15)."""
+        uploaded = await self.upload_parts(spec["data"], timeout=timeout)
+        if uploaded is None:
+            return ProviderResult("FAILED", "PROVIDER_UNAVAILABLE")
+        if spec["kind"] == "photo":
+            media: Any = types.InputMediaUploadedPhoto(uploaded)
+        else:
+            name = types.DocumentAttributeFilename(neutral_name(spec["mime"]))
+            media = types.InputMediaUploadedDocument(
+                uploaded, spec["mime"], [name], force_file=True
+            )
+        request = functions.messages.UploadMediaRequest(types.InputPeerSelf(), media)
+        try:
+            result = await self.call_capability(Capability.MEDIA_UPLOAD, request, timeout=timeout)
+        except GatewayError as exc:
+            if exc.code == "FLOOD_WAIT" and exc.retry_after:
+                return ProviderResult(
+                    "FAILED", "RATE_LIMITED", detail={"retry_after": exc.retry_after}
+                )
+            return ProviderResult("OUTCOME_UNKNOWN", None)
+        held: Any = None
+        if spec["kind"] == "photo" and isinstance(result, types.MessageMediaPhoto):
+            held = result.photo if isinstance(result.photo, types.Photo) else None
+        elif spec["kind"] == "document" and isinstance(result, types.MessageMediaDocument):
+            held = result.document if isinstance(result.document, types.Document) else None
+        if held is None:
+            return ProviderResult("OUTCOME_UNKNOWN", None)  # uploaded, but nothing names it
+        reference = bytes(held.file_reference).hex()
+        ref = f"upload:{spec['kind']}:{held.id}:{held.access_hash}:{reference}"
+        return ProviderResult("SUCCEEDED", None, provider_ref=ref)
+
+    async def send_media_once(
+        self, peer: Any, media: Any, caption: str, random_id: int, *, timeout: float
+    ) -> SendAttempt:
+        """One ``messages.sendMedia`` carrying ``random_id`` (A47; A20), classified as a send."""
+        request = functions.messages.SendMediaRequest(peer, media, caption, random_id=random_id)
+        return await self._keyed_send(
+            Capability.MESSAGE_SEND_MEDIA, request, random_id, timeout, _MEDIA_REFUSED
         )
 
     async def forward_once(
@@ -1157,16 +1410,26 @@ class TelethonSession:
         return await self._keyed_send(Capability.MESSAGE_FORWARD, request, random_id, timeout)
 
     async def _keyed_send(
-        self, capability: Capability, request: Any, random_id: int, timeout: float
+        self,
+        capability: Capability,
+        request: Any,
+        random_id: int,
+        timeout: float,
+        refusals: Mapping[type[BaseException], str] = MappingProxyType({}),
     ) -> SendAttempt:
-        """One keyed send-shaped call, classified (A20): the one copy for send and forward."""
+        """One keyed send-shaped call, classified (A20): the one copy for send and forward.
+        ``refusals`` (A47) name a send's own final refusals: they raise ``SendRefused`` with
+        their code, since Telegram refused the request and nothing was sent."""
         try:
             result = await self.call_capability(
                 capability,
                 request,
                 timeout=timeout,
-                passthrough=(errors.RandomIdDuplicateError, *_SEND_REFUSED),
+                passthrough=(errors.RandomIdDuplicateError, *_SEND_REFUSED, *refusals),
             )
+        except tuple(refusals) as exc:  # a named refusal: final, never reissued
+            code = next(c for kind, c in refusals.items() if isinstance(exc, kind))
+            raise SendRefused(code) from None
         except errors.RandomIdDuplicateError:
             return SendAttempt("duplicate")
         except _SEND_REFUSED:
@@ -2031,6 +2294,49 @@ class MessageView:
     # contract carries only forum_topic, and raw topic ids must not leave.
     reply_to_top_id: int | None = None
     topic_root: bool = False
+    # A47 (H2): ``(kind, mime, size)`` of a photo or a document, the facts its ``med_`` records
+    media_facts: tuple[str, str, int | None] | None = None
+
+
+def _photo_bytes(size: Any) -> int | None:
+    if isinstance(size, types.PhotoSizeProgressive):
+        return max(size.sizes) if size.sizes else None
+    if isinstance(size, types.PhotoCachedSize):
+        return len(size.bytes)
+    return int(size.size) if isinstance(size, types.PhotoSize) else None
+
+
+def _media_facts(media: Any) -> tuple[str, str, int | None] | None:
+    """A photo (always a JPEG; its largest size, the one ``utils.get_input_location`` picks) or
+    any document, with its declared MIME type; anything else has no ``med_`` (A47)."""
+    if isinstance(media, types.MessageMediaPhoto) and isinstance(media.photo, types.Photo):
+        full = [s for s in media.photo.sizes if _photo_bytes(s) is not None]
+        if not full:
+            return None
+        largest = max(full, key=lambda s: s.w * s.h)
+        return "photo", "image/jpeg", _photo_bytes(largest)
+    if isinstance(media, types.MessageMediaDocument) and isinstance(media.document, types.Document):
+        mime = media.document.mime_type if 3 <= len(media.document.mime_type or "") <= 128 else None
+        return "document", mime or "application/octet-stream", int(media.document.size)
+    return None
+
+
+def _uploaded_media(identity: str, kind: str) -> Any:
+    """A47 (H5): an uploaded file's ``InputMedia`` from its stored ref, or a refusal."""
+    parts = identity.split(":")
+    numbers = len(parts) == 5 and all(p.lstrip("-").isdigit() for p in parts[2:4])
+    if not numbers:
+        return ProviderResult("FAILED", "NOT_FOUND")
+    _tag, held_kind, file_id, access_hash, reference = parts
+    if held_kind != kind:
+        return ProviderResult("FAILED", "INVALID_ARGUMENT")  # a file never changes kind (Gf5)
+    try:
+        ref = bytes.fromhex(reference)
+    except ValueError:
+        return ProviderResult("FAILED", "NOT_FOUND")
+    if kind == "photo":
+        return types.InputMediaPhoto(types.InputPhoto(int(file_id), int(access_hash), ref))
+    return types.InputMediaDocument(types.InputDocument(int(file_id), int(access_hash), ref))
 
 
 def _media_kind(media: Any) -> str | None:
@@ -2098,6 +2404,7 @@ def _message_view(
         edited=bool(getattr(message, "edit_date", None)) and not bool(message.edit_hide),
         reply_to_top_id=reply_to_top_id,
         topic_root=topic_root,
+        media_facts=None if service else _media_facts(getattr(message, "media", None)),
     )
 
 

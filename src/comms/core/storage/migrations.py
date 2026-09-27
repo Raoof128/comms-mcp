@@ -596,6 +596,19 @@ CREATE TRIGGER pending_group_creations_kept BEFORE DELETE ON pending_group_creat
 """
 SCHEMA_V7: tuple[str, ...] = _statements(_SCHEMA_V7_SQL)
 
+# Spec A47 (H2, Gx8): what a ``med_`` is — its kind, MIME type and size, and where it came from.
+# ``provider_objects`` binds a ref to its identity immutably and has no room for these; no file
+# id or file reference is kept here (Gx9): the source that holds one is read when it is used.
+_SCHEMA_V8_SQL = """
+CREATE TABLE media_facts (object_id INTEGER PRIMARY KEY REFERENCES provider_objects(id) ON DELETE CASCADE,
+  media_kind TEXT NOT NULL CHECK (media_kind IN ('photo', 'document')),
+  mime TEXT NOT NULL CHECK (length(mime) BETWEEN 3 AND 128),
+  size INTEGER CHECK (size IS NULL OR size >= 0),
+  origin TEXT NOT NULL CHECK (origin IN ('telegram_message', 'telegram_bot_update', 'telegram_upload')),
+  recorded_at TEXT NOT NULL);
+"""
+SCHEMA_V8: tuple[str, ...] = _statements(_SCHEMA_V8_SQL)
+
 MIGRATIONS: tuple[Migration, ...] = (
     Migration(1, SCHEMA_V1),
     Migration(2, SCHEMA_V2),
@@ -604,6 +617,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(5, SCHEMA_V5),
     Migration(6, SCHEMA_V6, rebuild=True),
     Migration(7, SCHEMA_V7),
+    Migration(8, SCHEMA_V8),
 )
 
 

@@ -95,6 +95,7 @@ def test_the_group_capabilities_are_p16s():
         C.GROUP_INVITE_RESET,
         C.GROUP_SETTINGS_UPDATE,
         C.GROUP_MESSAGE_SEND,
+        C.MESSAGE_SEND_MEDIA,  # A47 (H4): an image or document message to the group
         # G8: the Groups API's pins and join requests are gated by the same discovery
         C.MESSAGE_PIN,
         C.JOIN_REQUEST_LIST,

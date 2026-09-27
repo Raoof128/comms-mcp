@@ -84,7 +84,14 @@ Evidence: `docs/verification/comms-v0.3.md` (D39-PRE); rulings R-E1 to R-E17.
 none `NOT_OFFERED`. The directory is managed over MCP (`comms_directory_*`, identities input only);
 WhatsApp groups are `grp_` destinations; `comms_context_person`; full admin on both Telegram APIs,
 pinned by `docs/verification/comms-v0.3-actor-matrix.md`; staged media (`upl_`, memory only); Graph
-v26.0. Exit: `tests/security/test_catalog_amendment_exit.py`. Next: D39-B (owner-run, live).
+v26.0. Exit: `tests/security/test_catalog_amendment_exit.py`.
+**A47** (branch `comms-v0.3-a47`; plan `docs/superpowers/plans/2026-09-26-comms-v0.3-a47.md`): the
+user account marks a person's conversation read (`messages.readHistory`, the one lifted
+prohibition); Telegram media is first class: `med_` refs from context items (schema v8
+`media_facts`), download on both APIs (a borrowed sender off the home DC), `comms_message_send_media`
+on all three actors, and the user account's upload. 130 tools. A file-carrying call fits one 64 KiB
+request or frame (32 KiB raw per chunk, slice or inline file). Exit: `tests/security/test_a47_exit.py`.
+Next: D39-B (owner-run, live).
 Nothing here has ever touched Telegram; the Test DC harness is owner-run.
 
 ## Non-negotiables
@@ -112,8 +119,8 @@ Nothing here has ever touched Telegram; the Test DC harness is owner-run.
 ```bash
 uv sync --locked
 uv run python scripts/extract_contracts.py --check
-uv run pytest -q                                  # 5420 passed, 4 skipped
-uv run python scripts/e2e_smoke.py                # 103 checks, end to end (29 against a real daemon)
+uv run pytest -q                                  # 5505 passed, 4 skipped
+uv run python scripts/e2e_smoke.py                # 105 checks, end to end (31 against a real daemon)
 uv run pytest tests/formal -q -s                  # 57 passed: 544 states/22 assertions; campaign 96,528/11; operations 4,728
 uv run ruff check src tests scripts
 uv run ruff format --check src tests scripts

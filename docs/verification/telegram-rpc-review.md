@@ -69,6 +69,12 @@ dropped link fails the in-flight call and only the daemon's keeper reconnects.
 | `cap.message.delete` | `messages.DeleteMessagesRequest` | https://core.telegram.org/method/messages.deleteMessages | destroys or converts an object | `DESTRUCTIVE_NONIDEMPOTENT`, `resolve_only` |
 | `cap.message.forward` | `messages.ForwardMessagesRequest` | https://core.telegram.org/method/messages.forwardMessages | posts a message | `MESSAGE_SEND`, `retry_same_key` |
 | `cap.message.pin` | `messages.UpdatePinnedMessageRequest` | https://core.telegram.org/method/messages.updatePinnedMessage | sets a chat or member state | `SET_STATE`, `retry_same_key` |
+| `cap.message.mark_read` | `messages.ReadHistoryRequest` | https://core.telegram.org/method/messages.readHistory | marks a person's conversation read up to `max_id` (users only; bots cannot call it) | `SET_STATE`, `retry_same_key`; spec A47: the owner lifted this one prohibition (2026-09-26, R-G9b). A person's peer only (`UserAdmin` refuses a group); never under `mcp.retrieval` or any read |
+| `media.download` | `messages.GetMessagesRequest` | https://core.telegram.org/method/messages.getMessages | none | `READ`; spec A47 H3: the message fetched again for a fresh file reference |
+| `media.download` | `channels.GetMessagesRequest` | https://core.telegram.org/method/channels.getMessages | none | `READ`; the same, in a supergroup or channel |
+| `media.download` | `upload.GetFileRequest` | https://core.telegram.org/method/upload.getFile | none | `READ`; 512 KiB slices at 512 KiB offsets, `precise` and `cdn_supported` unset (no CDN redirect is ever offered); on the file's own DC |
+| `media.download` | `auth.ExportAuthorizationRequest` | https://core.telegram.org/method/auth.exportAuthorization | exports a one-time authorization for another DC, held by Telethon's borrowed sender and never kept or logged | sent by Telethon's `_create_exported_sender` through our `_call`, only for a file on another DC; `auth.importAuthorization` goes raw on the new sender (pinned by `tests/telegram/test_update_rpcs.py`) |
+| `media.download` | `help.GetConfigRequest` | https://core.telegram.org/method/help.getConfig | none | sent by Telethon's `_get_dc` when its class-level DC list is empty |
 | `cap.member.add` | `channels.InviteToChannelRequest` | https://core.telegram.org/method/channels.inviteToChannel | sets a chat or member state | `SET_STATE`, `retry_same_key` |
 | `cap.member.add` | `messages.AddChatUserRequest` | https://core.telegram.org/method/messages.addChatUser | sets a chat or member state | `SET_STATE`, `retry_same_key` |
 | `cap.member.remove` | `channels.EditBannedRequest` | https://core.telegram.org/method/channels.editBanned | sets a chat or member state | `SET_STATE`, `retry_same_key`; a saga of `member.ban`, `member.unban` |
@@ -94,7 +100,10 @@ dropped link fails the in-flight call and only the daemon's keeper reconnects.
 | `cap.chat.set_title` | `messages.EditChatTitleRequest` | https://core.telegram.org/method/messages.editChatTitle | sets a chat or member state | `SET_STATE`, `retry_same_key` |
 | `cap.chat.set_description` | `messages.EditChatAboutRequest` | https://core.telegram.org/method/messages.editChatAbout | sets a chat or member state | `SET_STATE`, `retry_same_key` |
 | `cap.chat.set_photo` | `channels.EditPhotoRequest` | https://core.telegram.org/method/channels.editPhoto | creates an object | `CREATE`, `resolve_only` |
-| `cap.chat.set_photo` | `upload.SaveFilePartRequest` | https://core.telegram.org/method/upload.saveFilePart | uploads a file part to the account's temporary storage; nothing is visible until the photo is set | `CREATE`, `resolve_only`; catalog amendment G8: the new group photo, in 512 KiB parts (reviewed 2026-09-26) |
+| `file.upload` | `upload.SaveFilePartRequest` | https://core.telegram.org/method/upload.saveFilePart | uploads a file part to the account's temporary storage; nothing is visible until the photo is set | `CREATE`, `resolve_only`; catalog amendment G8 (a group's photo) and spec A47 H4 (a media send): the one part upload, its own operation since A47 so no write or admin set holds it (reviewed 2026-09-26) |
+| `file.upload` | `upload.SaveBigFilePartRequest` | https://core.telegram.org/method/upload.saveBigFilePart | uploads a part of a file above 10 MB to temporary storage; nothing is visible until it is sent | the same; above 10 MB with `inputFileBig`, no MD5 (Gf6) |
+| `cap.message.send_media` | `messages.SendMediaRequest` | https://core.telegram.org/method/messages.sendMedia | posts a message | `MESSAGE_SEND`, `retry_same_key` (keyed by `random_id`); spec A47 H4: `inputMediaUploaded*` from the part upload, or `inputMediaPhoto`/`inputMediaDocument` from a held message fetched again under `media.download` |
+| `cap.media.upload` | `messages.UploadMediaRequest` | https://core.telegram.org/method/messages.uploadMedia | stores an uploaded file for the account, sending nothing to any chat | `CREATE`, `resolve_only`; spec A47 H5: `peer=inputPeerSelf` (Gf16); the ref keeps the file's id, access hash and reference in the encrypted store only; nothing refreshes it, so an expired one is `NOT_FOUND` at send (Gf15) |
 | `cap.chat.set_photo` | `messages.EditChatPhotoRequest` | https://core.telegram.org/method/messages.editChatPhoto | creates an object | `CREATE`, `resolve_only` |
 | `cap.chat.set_permissions` | `messages.EditChatDefaultBannedRightsRequest` | https://core.telegram.org/method/messages.editChatDefaultBannedRights | sets a chat or member state | `SET_STATE`, `retry_same_key` |
 | `cap.topic.create` | `messages.CreateForumTopicRequest` | https://core.telegram.org/method/messages.createForumTopic | creates an object | `CREATE`, `resolve_only` |
@@ -114,7 +123,7 @@ dropped link fails the in-flight call and only the daemon's keeper reconnects.
 - `contacts.ResolveUsernameRequest`, `channels.GetChannelsRequest`.
 - Every takeout request.
 - `messages.SearchGlobalRequest`.
-- `messages.ReadHistoryRequest` and the other read-acknowledge methods.
+- `channels.ReadHistoryRequest`, `messages.ReadMessageContentsRequest`, `messages.ReadMentionsRequest`, `messages.ReadReactionsRequest` and every other read-acknowledge method. (`messages.ReadHistoryRequest` left this list under spec A47, by the owner's decision, for `cap.message.mark_read` on a person's conversation only.)
 - `messages.GetMessagesViewsRequest`.
 
 Transport requests Telethon issues on the sender directly (not through

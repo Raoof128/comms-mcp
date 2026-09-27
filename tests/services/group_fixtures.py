@@ -41,6 +41,7 @@ def _created(capability):
         C.MESSAGE_SEND: str(100 + n),
         C.TEMPLATE_CREATE: str(5_000_000 + n),
         C.MESSAGE_FORWARD: str(200 + n),  # G7
+        C.MESSAGE_SEND_MEDIA: str(300 + n),  # A47 (H4): the new message's id
         C.GROUP_CREATE: str(-(10**12 + 500 + n)),  # G7: the new supergroup's marked id
     }.get(capability)
 
@@ -49,6 +50,8 @@ def _created_for(capability, target):
     """What the real adapter names its creation by: WhatsApp answers a request id (G8)."""
     if capability is C.GROUP_CREATE and target.transport == "whatsapp":
         return f"request:REQ{next(_SERIAL)}"
+    if capability is C.MEDIA_UPLOAD and target.transport == "telegram":  # A47 (H5)
+        return f"upload:photo:{next(_SERIAL)}:1:00"
     return _created(capability)
 
 

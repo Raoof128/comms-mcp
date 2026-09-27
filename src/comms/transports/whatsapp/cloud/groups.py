@@ -16,6 +16,7 @@ import re
 from collections.abc import Callable, Mapping
 from typing import Any
 
+from comms.core.providers import media
 from comms.core.providers.capability import Capability as C
 from comms.core.providers.capability import CapabilityState as S
 from comms.core.providers.protocols import ProviderResult, ProviderTarget, SemanticOperation
@@ -42,6 +43,7 @@ GROUP_CAPABILITIES = (
     C.GROUP_INVITE_RESET,
     C.GROUP_SETTINGS_UPDATE,
     C.GROUP_MESSAGE_SEND,
+    C.MESSAGE_SEND_MEDIA,  # A47 (H4): a group message of type image or document
     C.MESSAGE_PIN,  # G8: pins, join requests and participants are the Groups API's too
     C.JOIN_REQUEST_LIST,
     C.JOIN_REQUEST_APPROVE,
@@ -236,6 +238,52 @@ def _send(api: GraphApi, group_id: str, args: Mapping[str, Any]) -> ProviderResu
     return _sent_wamid(admin_call(lambda: api.send_message(body)))
 
 
+IMAGE_MAX = 5 * 1024 * 1024  # Meta: an image is JPEG or PNG, at most 5 MB (A47 Gf10)
+_MEDIA_FIELDS = frozenset({"kind", "caption", "data", "mime", "media_id"})
+
+
+def _send_media_args(args: Mapping[str, Any]) -> None:
+    """A47 (H4): a photo or document from bytes or a held media id, checked before any call;
+    an image is a JPEG or PNG by its own bytes, not by the type a client declared (Gx11)."""
+    kind = args.get("kind")
+    if (
+        kind not in media.KINDS
+        or set(args) - _MEDIA_FIELDS
+        or ("data" in args) == ("media_id" in args)
+    ):
+        raise ValueError("operation arguments are malformed")
+    media.caption(args.get("caption", ""))
+    if "data" not in args:
+        held = args["media_id"]
+        if not isinstance(held, str) or not held.isascii() or not held.isdigit():
+            raise ValueError("operation arguments are malformed")
+        return
+    data, mime = args["data"], args.get("mime")
+    check_upload(data, mime)
+    if kind == "photo" and (media.image_type(data) != mime or len(data) > IMAGE_MAX):
+        raise ValueError("image refused")
+
+
+def _send_media(api: GraphApi, group_id: str, args: Mapping[str, Any]) -> ProviderResult:
+    """The file uploaded (``POST /{phone}/media``), then one group message by its id. An
+    upload that did not certainly succeed sent nothing to the group."""
+    media_id = args.get("media_id")
+    if "data" in args:
+        uploaded = upload_media(api, args["data"], args["mime"])
+        if uploaded.outcome != "SUCCEEDED" or uploaded.provider_ref is None:
+            return ProviderResult("FAILED", uploaded.code or "PROVIDER_UNAVAILABLE")
+        media_id = uploaded.provider_ref
+    wa = "image" if args["kind"] == "photo" else "document"
+    body_media: dict[str, Any] = {"id": media_id}
+    if args.get("caption"):
+        body_media["caption"] = args["caption"]
+    if wa == "document" and isinstance(args.get("mime"), str):
+        body_media["filename"] = media.neutral_name(args["mime"])
+    body = {"messaging_product": "whatsapp", "recipient_type": "group", "to": group_id,
+            "type": wa, wa: body_media}  # fmt: skip
+    return _sent_wamid(admin_call(lambda: api.send_message(body)))
+
+
 def _pin_args(args: Mapping[str, Any]) -> None:
     days = args.get("expire_days", 30)
     if (
@@ -365,6 +413,7 @@ _OPERATIONS: Mapping[C, tuple[Check, Call, Where]] = {
     C.MEDIA_DELETE: (_media_delete_args, _media_delete, account_of),
     C.MEDIA_UPLOAD: (_media_upload_args, _media_upload, account_of),  # G8 (D3)
     C.GROUP_MESSAGE_SEND: (_send_args, _send, group_id_of),  # G8
+    C.MESSAGE_SEND_MEDIA: (_send_media_args, _send_media, group_id_of),  # A47 (H4)
     C.MESSAGE_PIN: (_pin_args, _pin, group_id_of),
     C.JOIN_REQUEST_APPROVE: (_join_args, _join(True), group_id_of),
     C.JOIN_REQUEST_REJECT: (_join_args, _join(False), group_id_of),

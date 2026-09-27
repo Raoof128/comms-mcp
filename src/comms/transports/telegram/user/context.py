@@ -325,7 +325,17 @@ def _message(view: Any, observed: str) -> dict[str, Any]:
         "media_kind": view.media_kind,
         "edited": view.edited,
         "untrusted": untrusted,
+        **_media(getattr(view, "media_facts", None)),
     }
+
+
+def _media(facts: Any) -> dict[str, Any]:
+    """A47 (H2): the facts the engine records under the message's ``med_``; the locator is
+    the message itself, so no file reference leaves the adapter."""
+    if facts is None:
+        return {}
+    kind, mime, size = facts
+    return {"media": {"kind": kind, "mime": mime, "size": size}}
 
 
 def _member(row: tuple[int, str, str | None], observed: str) -> dict[str, Any]:

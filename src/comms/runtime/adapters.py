@@ -31,11 +31,13 @@ from comms.transports.telegram.bot.capability import BotCapability
 from comms.transports.telegram.bot.context import BotContext
 from comms.transports.telegram.bot.delivery import BotDelivery
 from comms.transports.telegram.bot.http import BotApi
+from comms.transports.telegram.bot.media import BotMedia
 from comms.transports.telegram.bot.updates import BotPoller
 from comms.transports.telegram.user.admin import UserAdmin
 from comms.transports.telegram.user.capability import UserCapability
 from comms.transports.telegram.user.context import UserContext
 from comms.transports.telegram.user.delivery import UserDelivery
+from comms.transports.telegram.user.media import UserMedia
 from comms.transports.telegram.user.updates import UserUpdateConsumer
 from comms.transports.whatsapp.cloud.account import WhatsAppCapability, health_of
 from comms.transports.whatsapp.cloud.context import WhatsAppContext
@@ -84,6 +86,8 @@ class Adapters:
     templates: TemplateOps | None = None
     media: MediaOps | None = None
     account: ProviderTarget | None = None
+    # A47 (H3): each Telegram actor's download of its own ``med_`` (WhatsApp's is ``media``)
+    downloads: dict[str, Any] = field(default_factory=dict)
 
     def __repr__(self) -> str:
         return (
@@ -155,10 +159,12 @@ def _telegram_bot(
         return None
     api = BotApi(secrets, version=version)
     adapters.capability["telegram_bot"] = BotCapability.from_api(api, clock=clock)
-    adapters.admin["telegram_bot"] = BotAdmin(api)
+    files = BotMedia(api, conn)  # A47: downloads and resends read the retained file_id
+    adapters.admin["telegram_bot"] = BotAdmin(api, files=files.file_id)
     adapters.context["telegram_bot"] = BotContext(api, conn, clock=clock)
     adapters.poller = BotPoller(api, conn, clock=clock)
     adapters.profiles["telegram_bot"] = bot_profile(api)
+    adapters.downloads["telegram_bot"] = files  # A47
     return BotDelivery(api)
 
 
@@ -173,6 +179,7 @@ def _telegram_user(
     adapters.admin["telegram_user"] = UserAdmin(session, run=run, clock=clock)
     adapters.profiles["telegram_user"] = user_profile(session, run)
     adapters.context["telegram_user"] = UserContext(session, run=run, clock=clock)
+    adapters.downloads["telegram_user"] = UserMedia(session, run=run)  # A47
     adapters.updates = UserUpdateConsumer(conn, clock=clock)
     return UserDelivery(session, run=run)
 

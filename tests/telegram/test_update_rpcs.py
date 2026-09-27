@@ -61,3 +61,63 @@ def test_no_self_sent_request_writes():
     assert not UPDATE_RPCS & writes
     reads = {r for rpcs in READ_RPCS.values() for r in rpcs}
     assert all(r.split(".")[0] in {"help", "users", "updates"} for r in UPDATE_RPCS - reads)
+
+
+# A47 (H3, Gx1/Gx2): the borrowed-sender surface a cross-DC download relies on. Telethon's
+# private helpers send these requests themselves; the first two go through our ``_call`` (and
+# so ``media.download``'s allowlist), and ImportAuthorization goes raw on the new sender.
+BORROW = {
+    "client/telegrambaseclient.py": {
+        "_borrow_exported_sender",
+        "_create_exported_sender",
+        "_get_dc",
+        "_return_exported_sender",
+    },
+}
+
+
+def _borrow_requests():
+    found = set()
+    tree = ast.parse((ROOT / "client/telegrambaseclient.py").read_text(encoding="utf-8"))
+    for fn in ast.walk(tree):
+        if isinstance(fn, ast.FunctionDef | ast.AsyncFunctionDef) and (
+            fn.name in BORROW["client/telegrambaseclient.py"]
+        ):
+            for node in ast.walk(fn):
+                if (
+                    isinstance(node, ast.Attribute)
+                    and node.attr.endswith("Request")
+                    and node.attr not in WRAPPERS
+                    and isinstance(node.value, ast.Attribute)
+                ):
+                    found.add(f"{node.value.attr}.{node.attr}")
+    return found
+
+
+def test_the_borrowed_sender_sends_exactly_the_reviewed_requests():
+    from comms.transports.telegram.telegram.telethon_adapter import OPERATIONS
+
+    assert _borrow_requests() == {
+        "auth.ExportAuthorizationRequest",
+        "auth.ImportAuthorizationRequest",
+        "help.GetConfigRequest",
+        "help.GetCdnConfigRequest",  # only with cdn=True, which the adapter never asks for
+    }
+    allowed = OPERATIONS["media.download"]
+    assert {"auth.ExportAuthorizationRequest", "help.GetConfigRequest"} <= allowed
+    assert (
+        "help.GetCdnConfigRequest" not in allowed
+        and "auth.ImportAuthorizationRequest" not in allowed
+    )
+
+
+def test_idle_borrowed_senders_are_closed_by_the_keepalive_loop_every_connect_starts():
+    def fn(rel, name):
+        tree = ast.parse((ROOT / rel).read_text(encoding="utf-8"))
+        return next(
+            f for f in ast.walk(tree)
+            if isinstance(f, ast.AsyncFunctionDef | ast.FunctionDef) and f.name == name
+        )  # fmt: skip
+
+    assert "_clean_exported_senders" in ast.unparse(fn("client/updates.py", "_keepalive_loop"))
+    assert "_keepalive_loop()" in ast.unparse(fn("client/telegrambaseclient.py", "connect"))

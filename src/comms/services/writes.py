@@ -44,6 +44,15 @@ def summary(actor: str, outcome: MutationOutcome) -> dict[str, Any]:
     }
 
 
+def _shared_ids(target: ProviderTarget, minted_by: str) -> bool:
+    """Whether a message id one actor read is valid for the acting one (A47, Gx6). Telegram
+    numbers a private chat's and a basic group's messages per account; a supergroup or channel
+    (a ``-100`` marked id) shares one sequence, and WhatsApp has one account."""
+    if target.transport != "telegram" or minted_by == target.actor:
+        return True
+    return target.identity.startswith("-100")
+
+
 class ProviderWrites:
     def __init__(
         self, conn: Any, capability: CapabilityService, executor: MutationExecutor
@@ -93,14 +102,18 @@ class ProviderWrites:
         if not isinstance(ref, str):
             raise CommsError("INVALID_ARGUMENT")
         found = resolve_object(self.conn, ref, kind)
-        if found.transport != target.transport or found.destination_id != destination_id(
-            self.conn, target.destination_ref
-        ):
+        if found.transport != target.transport:
+            raise CommsError("NOT_FOUND")
+        if kind == "media":  # A47 (H4): a file is its holder's, in any chat, never another's
+            if found.actor != target.actor:
+                raise CommsError("NOT_FOUND")
+            return found.provider_identity
+        if found.destination_id != destination_id(self.conn, target.destination_ref):
             raise CommsError("NOT_FOUND")  # another group's object is not this group's
         identity = found.provider_identity
         if kind == "message":
             chat, _sep, message_id = identity.rpartition(":")
-            if chat != target.identity:
+            if chat != target.identity or not _shared_ids(target, found.actor):
                 raise CommsError("NOT_FOUND")
             telegram = target.transport == "telegram"  # a Telegram message id is an integer
             return int(message_id) if telegram and message_id.isdigit() else message_id

@@ -22,8 +22,10 @@ __all__ = [
     "KIND_PREFIX",
     "ProviderObject",
     "latest_object",
+    "media_facts",
     "message_identity",
     "object_ref",
+    "record_media",
     "resolve_object",
 ]
 
@@ -125,3 +127,32 @@ def latest_object(conn: Any, kind: str, transport: str, destination_id: int | No
         (kind, transport, destination_id),
     ).fetchone()
     return None if row is None else str(row[0])
+
+
+MEDIA_ORIGINS = frozenset({"telegram_message", "telegram_bot_update", "telegram_upload"})
+
+
+def record_media(
+    conn: Any, ref: str, kind: str, mime: str, size: int | None, origin: str, *, now: datetime
+) -> None:
+    """A47 (H2): a ``med_``'s facts, recorded once; a file's kind, type and size do not change."""
+    if kind not in ("photo", "document") or origin not in MEDIA_ORIGINS:
+        raise CommsError("INVALID_ARGUMENT")
+    with write_tx(conn):
+        conn.execute(
+            "INSERT OR IGNORE INTO media_facts (object_id, media_kind, mime, size, origin,"
+            " recorded_at) SELECT id, ?, ?, ?, ?, ? FROM provider_objects WHERE ref = ?",
+            (kind, mime, size, origin, timeutil.iso(now), ref),
+        )
+
+
+def media_facts(conn: Any, ref: str) -> dict[str, Any] | None:
+    """A ``med_``'s recorded facts, or None when none were recorded (read-only)."""
+    row = conn.execute(
+        "SELECT f.media_kind, f.mime, f.size, f.origin FROM media_facts f"
+        " JOIN provider_objects o ON o.id = f.object_id WHERE o.ref = ?",
+        (ref,),
+    ).fetchone()
+    if row is None:
+        return None
+    return {"kind": row[0], "mime": row[1], "size": row[2], "origin": row[3]}

@@ -42,7 +42,7 @@ def _run(tmp_path, script, act):
             sent.append(request)
             if isinstance(answer, BaseException):
                 raise answer
-            return answer
+            return answer(request) if callable(answer) else answer  # A47: ordered outcomes
 
         return respond
 

@@ -13,14 +13,21 @@ from __future__ import annotations
 
 import hashlib
 import time
-from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urljoin
 
 import httpx
 
 from comms.core.providers.protocols import ProviderResult
-from comms.transports.net import EgressRefused, host_allowed, suffix_pinned_client
+from comms.transports.net import (
+    MAX_DOWNLOAD_BYTES,
+    DownloadRefused,
+    EgressRefused,
+    MediaBlob,
+    host_allowed,
+    read_capped,
+    suffix_pinned_client,
+)
 from comms.transports.whatsapp.cloud.classify import admin_call
 from comms.transports.whatsapp.cloud.http import GraphApi
 
@@ -35,7 +42,7 @@ __all__ = [
 ]
 
 META_MEDIA_HOST_SUFFIXES = ("fbsbx.com", "fbcdn.net", "whatsapp.net")
-MAX_MEDIA_BYTES = 16 * 1024 * 1024
+MAX_MEDIA_BYTES = MAX_DOWNLOAD_BYTES  # the one download cap (transports/net.py)
 MAX_REDIRECTS = 2
 DOWNLOAD_DEADLINE_S = 30.0
 MEDIA_TYPES = frozenset(
@@ -75,15 +82,12 @@ def upload_media(api: GraphApi, data: bytes, mime: str) -> ProviderResult:
     return ProviderResult("SUCCEEDED", None, provider_ref=media_id)
 
 
-class MediaRefused(Exception):
+class MediaRefused(DownloadRefused):
     """A media fetch the downloader will not make or finish. Fixed messages, never a URL."""
 
-
-@dataclass(frozen=True)
-class MediaBlob:
-    data: bytes = field(repr=False)
-    mime: str
-    sha256: str
+    def __init__(self, message: str, code: str = "PROVIDER_UNAVAILABLE") -> None:
+        super().__init__(code)
+        self.args = (message,)
 
 
 class MediaOps:
@@ -156,13 +160,8 @@ def _bounded(response: httpx.Response, deadline: float) -> MediaBlob:
     mime = response.headers.get("content-type", "").split(";")[0].strip().lower()
     if mime not in MEDIA_TYPES:
         raise MediaRefused("media type refused")
-    chunks, size = [], 0
-    for chunk in response.iter_bytes():
-        size += len(chunk)
-        if size > MAX_MEDIA_BYTES:
-            raise MediaRefused("media too large")
-        if time.monotonic() > deadline:
-            raise MediaRefused("media download too slow")
-        chunks.append(chunk)
-    data = b"".join(chunks)
+    try:
+        data = read_capped(response, limit=MAX_MEDIA_BYTES, deadline=deadline)
+    except DownloadRefused as refused:
+        raise MediaRefused("media too large or too slow", refused.code) from None
     return MediaBlob(data, mime, hashlib.sha256(data).hexdigest())

@@ -724,3 +724,51 @@
 - **Files changed:** `docs/superpowers/plans/2026-09-26-comms-v0.3-a47.md`, `docs/comms-spec-v0.3.md` (A47 corrected), `docs/verification/comms-v0.3-rulings.md` (re-pin, R-A47-docs2), `AGENT.md`, `CHANGELOG.md`.
 - **Verification:** each finding was produced by running Telethon 1.45.0 or our code (a temporary probe test, not committed); the full gate (GATE ok=1).
 - **Follow-ups:** the owner approves the A47 plan before H1.
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** A47 H1: the Telegram user account marks a person's conversation read (branch `comms-v0.3-a47`).
+- **Summary:** `messages.readHistory` on a person's peer, reviewed under `cap.message.mark_read` only; every other read-acknowledge request stays absent. The facade routes by the `cmg_`'s actor. The write path now refuses another actor's message id outside a supergroup or channel, which fixes a latent cross-actor defect for edit, delete and pin as well.
+- **Files changed:** `src/comms/core/providers/semantics.py`, `src/comms/transports/telegram/user/{capability,admin,admin_messages}.py`, `src/comms/transports/telegram/telegram/telethon_adapter.py`, `src/comms/services/{messages,writes}.py`, `src/comms/runtime/facades.py`, `tests/transports/test_mark_read.py` (new), `tests/security/test_phase4_architecture.py`, `tests/integration/test_actor_matrix_behaviour.py`, `docs/verification/{telegram-rpc-review.md,comms-v0.3-actor-matrix.md,comms-v0.3-rulings.md}`, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 10 new tests, written first and seen failing; the full gate (GATE ok=1).
+- **Follow-ups:** H2 (Telegram `med_` refs and schema v8).
+
+### 2026-09-26 (Australia/Sydney)
+**Raouf:**
+- **Scope:** A47 H2: Telegram media as `med_` refs (branch `comms-v0.3-a47`).
+- **Summary:** Schema v8 `media_facts`. A photo or document in a context item gets a `media_ref`: the user account's is keyed by the message locator, the bot's by `file_unique_id`. Kind, MIME type and size are recorded; no file id or file reference is stored a second time or output.
+- **Files changed:** `src/comms/core/storage/migrations.py`, `src/comms/core/objects.py`, `src/comms/services/context.py`, `src/comms/mcp/tools/context.py`, `src/comms/transports/telegram/telegram/telethon_adapter.py`, `src/comms/transports/telegram/{user,bot}/context.py`, `tests/runtime/test_telegram_media_refs.py` (new), `tests/mcp/catalog_pin.json` (14 context tools gain `media_ref`), the rulings, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 6 new tests, written first and seen failing; the full gate (GATE ok=1).
+- **Follow-ups:** H3 (Telegram download).
+
+### 2026-09-27 (Australia/Sydney)
+**Raouf:**
+- **Scope:** A47 H3: downloading a Telegram `med_` on both APIs (branch `comms-v0.3-a47`).
+- **Summary:** Bot: `getFile`, then a streamed and capped GET, with the path checked and the token never reaching an error. User account: the message is fetched again, then `upload.getFile` in aligned slices, on the file's own DC through a reviewed borrowed sender (new `media.download` operation). One capped reader and one `DownloadRefused` in `transports/net.py`. This also fixes a latent defect: a refused WhatsApp download escaped as an internal error. The media service is built even without WhatsApp.
+- **Files changed:** `src/comms/transports/net.py`, `src/comms/transports/whatsapp/cloud/media.py`, `src/comms/transports/telegram/bot/{http,media}.py` (`media.py` new), `src/comms/transports/telegram/user/media.py` (new), `src/comms/transports/telegram/telegram/telethon_adapter.py`, `src/comms/services/media.py`, `src/comms/runtime/{adapters,comms_runtime,facades}.py`, tests (`test_telegram_download.py` new, the fake client, the admin harness, the matrix, update-RPC and phase-4 guards), `docs/verification/{telegram-rpc-review.md,comms-v0.3-actor-matrix.md,comms-v0.3-rulings.md}`, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 24 new tests, written first and seen failing, plus 2 Telethon pins; the full gate (GATE ok=1).
+- **Follow-ups:** H4 (`comms_message_send_media`).
+
+### 2026-09-27 (Australia/Sydney)
+**Raouf:**
+- **Scope:** A47 H4: `comms_message_send_media` on the bot, the user account and WhatsApp (branch `comms-v0.3-a47`).
+- **Summary:** A photo or document from a staged upload, inline bytes or a held `med_`, with a caption of at most 1024 UTF-16 units. Bot: multipart or by the retained `file_id`. User account: the one part upload (its own `file.upload` operation, `saveBigFilePart` above 10 MB, now shared with G8's group photo), then a keyed `messages.sendMedia`. WhatsApp: upload, then a group image or document message. Limits, kind mismatches, another account's file and a WhatsApp id older than 30 days are refused before any call.
+- **Files changed:** `src/comms/core/providers/{capability,semantics,media}.py` (`media.py` new), `src/comms/services/{messages,writes}.py`, `src/comms/runtime/{facades,comms_runtime,adapters}.py`, `src/comms/mcp/tools/messages.py`, `src/comms/transports/telegram/{bot/admin,bot/admin_messages,bot/http,bot/media,bot/capability,user/admin,user/admin_messages,user/send,user/capability,telegram/telethon_adapter}.py`, `src/comms/transports/whatsapp/cloud/groups.py`, `.claude/settings.json`, tests (`test_send_media.py` new, and the catalog, pin, matrix, RPC-set and phase-4 guards), `tests/mcp/catalog_pin.json` (130 tools), `docs/verification/{telegram-rpc-review.md,comms-v0.3-actor-matrix.md,comms-v0.3-rulings.md}`, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 20 new tests, written first and seen failing; the full gate (GATE ok=1).
+- **Follow-ups:** H5 (user upload and inspect), H6 (the guards, D39-A checks, the exit test and the evidence).
+
+### 2026-09-27 (Australia/Sydney)
+**Raouf:**
+- **Scope:** A47 H5: the user account's media upload, and a Telegram `med_`'s inspect and delete (branch `comms-v0.3-a47`).
+- **Summary:** `comms_media_upload` with `actor: telegram_user` uploads to the account itself (`messages.uploadMedia`, peer self) and returns a reusable `med_`, sent later without a fetch. A media send's documented refusals are now final and named (an expired reference is `NOT_FOUND`), not unknown. Inspect of a Telegram `med_` reads its recorded facts with no call; delete is unsupported (Telegram has none). An upload naming no actor with both platforms configured is ambiguous.
+- **Files changed:** `src/comms/core/providers/semantics.py`, `src/comms/services/media.py`, `src/comms/runtime/{facades,comms_runtime}.py`, `src/comms/mcp/tools/account.py`, `src/comms/transports/telegram/{user/admin,user/admin_messages,user/capability,telegram/telethon_adapter,telegram/send_attempt}.py`, tests (`test_telegram_upload.py` new; the fixtures and the phase-4 guard), `tests/mcp/catalog_pin.json`, `docs/verification/{telegram-rpc-review.md,comms-v0.3-actor-matrix.md,comms-v0.3-rulings.md}`, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** 9 new tests, written first and seen failing; the full gate (GATE ok=1).
+- **Follow-ups:** H6 (the guards, D39-A checks, the exit test and the evidence).
+
+### 2026-09-27 (Australia/Sydney)
+**Raouf:**
+- **Scope:** A47 H6: the guards, D39-A media checks against a real daemon, the exit gate, the evidence (branch `comms-v0.3-a47`).
+- **Summary:** Driving the real daemon found that G8's staged media never fit the wire (a 48 KiB chunk's base64 is already 64 KiB, the request and frame cap); chunks, slices and inline files are now 32 KiB raw, and a guard test proves every file-carrying call fits on both routes. Two new real-daemon checks: a staged photo sent once by the bot with its replay, and a retained document paged back whole with its SHA-256. The A47 exit test re-runs H0–H6. Evidence and CLAUDE.md updated.
+- **Files changed:** `src/comms/services/uploads.py`, `src/comms/mcp/tools/{account,admin,messages}.py`, `src/comms/runtime/{selftest,facades}.py`, `scripts/{smoke_daemon,e2e_smoke}.py`, `tests/security/{test_media_fits_the_wire,test_a47_exit}.py` (new), `tests/security/test_d39_pre_exit.py`, `tests/transports/test_telegram_download.py`, `tests/mcp/catalog_pin.json`, `docs/verification/{comms-v0.3.md,comms-v0.3-rulings.md,comms-v0.3-smoke-map.json}`, `CLAUDE.md`, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** the full gate (GATE ok=1): 5505 passed, 4 skipped; smoke 105/105 (31 against the daemon); formal 57; WhatsVault 450.
+- **Follow-ups:** the owner merges and pushes `comms-v0.3-catalog` then `comms-v0.3-a47`; D39-B live media checks.

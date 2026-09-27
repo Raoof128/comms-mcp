@@ -29,6 +29,7 @@ from comms.core.errors import CommsError
 from comms.core.groups import GroupError, enabled_groups, group_identity
 from comms.core.objects import resolve_object
 from comms.core.providers.capability import Capability
+from comms.core.providers.media import KINDS
 from comms.core.providers.protocols import ProviderTarget
 from comms.mcp.catalog import TOOL_CATALOG
 from comms.mcp.dispatch import AuthenticatedClient
@@ -42,7 +43,7 @@ from comms.services.groups import GroupService
 from comms.services.handles import ContextHandles
 from comms.services.identity import IdentityService
 from comms.services.media import MediaService
-from comms.services.messages import MessageService
+from comms.services.messages import MessageService, check_send_media
 from comms.services.mutations import CallContext
 from comms.services.registry import ServiceRegistry
 from comms.services.templates import TemplateService
@@ -182,7 +183,7 @@ class _Facades:
         }  # fmt: skip
 
     def staged_bytes(self, client: AuthenticatedClient, a: dict[str, Any]) -> tuple[bytes, str]:
-        """A file given as a staged ``upl_`` ref, or inline as ``data_b64`` (at most 512 KiB)
+        """A file given as a staged ``upl_`` ref, or inline as ``data_b64`` (at most 32 KiB, A47)
         with its ``mime``: exactly one (G8, D3)."""
         if ("upload" in a) == ("data_b64" in a):
             raise CommsError("INVALID_ARGUMENT")
@@ -201,10 +202,48 @@ class _Facades:
             {"photo": photo, "mime": mime}, a["request_id"], actor=a.get("actor"),
         )  # fmt: skip
 
+    def send_media(self, client: AuthenticatedClient, a: dict[str, Any]) -> dict[str, Any]:
+        """A47 (H4): the shape is checked before a staged file is taken, so a refused call
+        leaves the upload usable."""
+        targets = self.targets(a["group"])  # NOT_FOUND before a staged file is taken
+        check_send_media(a.get("kind"), a.get("caption"))
+        data = mime = None
+        if "media" in a:
+            if "upload" in a or "data_b64" in a:
+                raise CommsError("INVALID_ARGUMENT")  # exactly one source
+        else:
+            data, mime = self.staged_bytes(client, a)
+        return self.s.messages.send_media(
+            _ctx(client), a["group"], targets, a["request_id"], kind=a["kind"],
+            caption=a.get("caption"), data=data, mime=mime, media=a.get("media"),
+            actor=a.get("actor"),
+        )  # fmt: skip
+
     def media_upload(self, client: AuthenticatedClient, a: dict[str, Any]) -> dict[str, Any]:
-        media = self.media()  # NOT_CONFIGURED before a staged file is taken
+        """WhatsApp's media store (G8), or, A47 (H5), a file the Telegram user account uploads
+        to itself; with both configured the caller says which (as a group create does)."""
+        actor = a.get("actor") or self._upload_actor()
+        if actor == "telegram_user":  # NOT_CONFIGURED before a staged file is taken
+            if actor not in self.s.actors:
+                raise CommsError("NOT_CONFIGURED")
+            media, target = (
+                self.downloads(),
+                ProviderTarget("telegram", actor, "account", "account"),
+            )
+        else:
+            media, target = self.media(), self.account_target()
+        if a.get("kind") not in (None, *KINDS):
+            raise CommsError("INVALID_ARGUMENT")
         data, mime = self.staged_bytes(client, a)
-        return media.upload(_ctx(client), self.account_target(), data, mime, a["request_id"])
+        return media.upload(_ctx(client), target, data, mime, a["request_id"], kind=a.get("kind"))
+
+    def _upload_actor(self) -> str:
+        able = [actor for actor in (_WHATSAPP, "telegram_user") if actor in self.s.actors]
+        if not able:
+            raise CommsError("NOT_CONFIGURED")
+        if len(able) > 1:
+            raise CommsError("AMBIGUOUS_TARGET")  # a WhatsApp or a Telegram file: say which
+        return able[0]
 
     # -- forward (catalog amendment G7) -------------------------------------------------
 
@@ -473,11 +512,15 @@ class _Facades:
         return call
 
     def mark_read(self, client: AuthenticatedClient, a: dict[str, Any]) -> dict[str, Any]:
-        identity = member_identity(self.s.conn, a["conversation"], "whatsapp")
+        """The conversation is the person's; the transport and the actor are the message's
+        (A47, Gx7): a message id belongs to the actor that read it, so a ``cmg_`` from the
+        bot's retained updates names the bot, which has no read state to set."""
+        found = resolve_object(self.s.conn, a["message"], "message")
+        identity = member_identity(self.s.conn, a["conversation"], found.transport)
         if identity is None:
             raise CommsError("NOT_FOUND")
-        target = ProviderTarget("whatsapp", "whatsapp_cloud", a["conversation"], identity)
-        return self.s.messages.mark_read(_ctx(client), a["conversation"], {"whatsapp_cloud": target},
+        target = ProviderTarget(found.transport, found.actor, a["conversation"], identity)
+        return self.s.messages.mark_read(_ctx(client), a["conversation"], {found.actor: target},
                                          a["message"], a["request_id"])  # fmt: skip
 
     # -- the rest --------------------------------------------------------------------------
@@ -502,6 +545,12 @@ class _Facades:
 
     def media(self) -> MediaService:
         if self.s.media is None or self.s.account_target is None:
+            raise CommsError("NOT_CONFIGURED")
+        return self.s.media
+
+    def downloads(self) -> MediaService:
+        """A47 (H3): downloads need no WhatsApp account; each actor fetches its own refs."""
+        if self.s.media is None:
             raise CommsError("NOT_CONFIGURED")
         return self.s.media
 
@@ -535,6 +584,7 @@ class _Facades:
             "message.pin": self.pin(True),
             "message.unpin": self.pin(False),
             "message.mark_read": self.mark_read,
+            "message.send_media": self.send_media,  # A47 (H4)
             "group.list": lambda cl, a: s.groups.list(limit=a.get("limit", 50), cursor=a.get("cursor")),
             "group.get": lambda cl, a: s.groups.get(a["group"]),
             "group.context": lambda cl, a: self.context_get(cl, {**a, "include": ["messages", "members", "admins"]}),
@@ -618,9 +668,9 @@ class _Facades:
                 c(cl), self.account_target(), {k: a[k] for k in ("name", "language", "category", "components")}, a["request_id"]),
             "whatsapp.template_edit": lambda cl, a: self.templates().edit(c(cl), self.account_target(), a["template"], a["components"], a["request_id"]),
             "whatsapp.template_delete": lambda cl, a: self.templates().delete(c(cl), self.account_target(), a["name"], a["request_id"]),
-            "media.inspect": lambda cl, a: self.media().inspect(a["media"]),
+            "media.inspect": lambda cl, a: self.downloads().inspect(a["media"]),  # A47: any ref
             "media.upload": self.media_upload,  # G8 (D3)
-            "media.download": lambda cl, a: self.media().download(
+            "media.download": lambda cl, a: self.downloads().download(
                 self.staged, cl.client_ref, a["media"], a.get("offset", 0), a.get("length", CHUNK_MAX)
             ),
             "media.stage_begin": lambda cl, a: self.staged.replayed(
@@ -631,7 +681,7 @@ class _Facades:
                 cl.client_ref, a["request_id"],
                 lambda: self.staged.chunk(cl.client_ref, a["upload"], a["seq"], a["data_b64"]),
             ),
-            "media.delete": lambda cl, a: self.media().delete(c(cl), self.account_target(), a["media"], a["request_id"]),
+            "media.delete": lambda cl, a: self.downloads().delete(c(cl), self.s.account_target, a["media"], a["request_id"]),
             "account.status": self.account_status(None),
             "account.capabilities": lambda cl, a: {"actors": s.capability.list()},
             "telegram.bot_status": self.account_status(("telegram_bot",)),

@@ -21,13 +21,14 @@ from comms.core import refs
 from comms.core.campaigns import directory as d
 from comms.core.groups import group_ref
 from comms.core.keys import rotate as rot
-from comms.core.objects import object_ref
+from comms.core.objects import object_ref, record_media
 from comms.core.providers.capability import CapabilityState as S
 from comms.core.providers.protocols import ProviderTarget
 from comms.mcp.dispatch import AuthenticatedClient
 from comms.runtime.adapters import Adapters
 from comms.runtime.comms_runtime import build_comms_runtime
 from comms.runtime.selftest import _OneSecret
+from comms.transports.net import blob
 from comms.transports.telegram.bot.context import BotContext
 from comms.transports.telegram.bot.http import BotApi
 from comms.transports.telegram.bot.updates import BotPoller
@@ -98,6 +99,13 @@ def _group_webhook() -> bytes:
             "messages": messages}}]}]}).encode()  # fmt: skip
 
 
+class _TelegramFile:
+    """A47 (H3): a Telegram actor's download, scripted (the adapters' own tests drive the wire)."""
+
+    def retrieve(self, identity):
+        return blob(b"%PDF", "application/octet-stream")
+
+
 def _world(actor, tmp_path):
     from comms.mcp.catalog import TOOL_CATALOG
 
@@ -138,6 +146,8 @@ def _world(actor, tmp_path):
         context={actor: source},
     )
     adapters.profiles[actor] = lambda: {"reachable": True, "untrusted": {"name": "N"}}  # G8
+    if actor != "whatsapp_cloud":
+        adapters.downloads[actor] = _TelegramFile()  # A47 (H3)
     if actor == "whatsapp_cloud":  # the account tools run through the real services too
         adapters.templates, adapters.media, adapters.account = Templates(), Media(), ACCOUNT
         adapters.phone = lambda: {"quality_rating": "GREEN", "status": "CONNECTED"}
@@ -155,6 +165,14 @@ def _world(actor, tmp_path):
         dm = ProviderTarget("whatsapp", "whatsapp_cloud", w["rcp"], WA_PHONE)
         page = built.services.context.archive(w["rcp"], dm, limit=1)
         w["dm_message"] = page["items"][0]["message_ref"]
+    else:  # A47 (H3): a Telegram file this actor minted, and its download
+        w["media"] = object_ref(conn, "media", "telegram", actor, None, "file-key", now=NOW)
+        record_media(conn, w["media"], "document", "application/pdf", 4, "telegram_message",
+                     now=NOW)  # fmt: skip
+    if actor == "telegram_user":  # A47: the account's own message in the person's chat
+        person = d.member_identity(conn, w["rcp"], "telegram")
+        w["dm_message"] = object_ref(conn, "message", "telegram", actor, None,
+                                     f"{person}:55", now=NOW)  # fmt: skip
     dispatcher = built.dispatcher
     specs = {spec.name: spec for spec in TOOL_CATALOG}
     return w, dispatcher, admins[actor], specs
@@ -183,12 +201,12 @@ def _arguments(spec, w, actor, dispatcher, message, cursor):
         "capability": "member.ban", "tag": "vip", "language": "en", "category": "MARKETING",
         "components": [{"type": "BODY", "text": "Hi"}],
     }  # fmt: skip
-    if actor == "whatsapp_cloud":
+    if spec.name == "comms_message_mark_read" and "dm_message" in w:
+        values.update(message=w["dm_message"])  # conversation-addressed: a direct message
+    if "media" in w:
         values.update(media=w["media"])
-        if spec.name == "comms_message_mark_read":  # conversation-addressed: a direct message
-            values.update(message=w["dm_message"])
-        if spec.name.startswith("comms_whatsapp_template_"):
-            values.update(name="spring")  # the one template the source double holds
+    if actor == "whatsapp_cloud" and spec.name.startswith("comms_whatsapp_template_"):
+        values.update(name="spring")  # the one template the source double holds
     required = set(spec.input_schema.get("required", ()))
     properties = spec.input_schema.get("properties", {})
     # revoke takes an invite optionally: Telegram revokes the one it names (with none: G6's
@@ -210,6 +228,8 @@ def _arguments(spec, w, actor, dispatcher, message, cursor):
         arguments["name"] = "renamed"  # an edit must change something
     if spec.name in ("comms_group_info_set_photo", "comms_media_upload"):  # G8: staged bytes
         arguments.update(data_b64="/9j/4AAQ", mime="image/jpeg")
+    if spec.name == "comms_message_send_media":  # A47 (H4): a real JPEG, inline
+        arguments.update(kind="photo", data_b64="/9j/4AAQ", mime="image/jpeg")
     if spec.requires_request_id:
         arguments["request_id"] = refs.mint("request")
     return arguments
