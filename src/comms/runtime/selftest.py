@@ -93,6 +93,9 @@ def _created(capability: C) -> str | None:
         C.TOPIC_CREATE: str(n),
         C.MESSAGE_SEND: str(1000 + n),
         C.MESSAGE_SEND_MEDIA: str(2000 + n),  # A47: a media send names its new message too
+        C.MESSAGE_FORWARD: str(3000 + n),
+        C.GROUP_CREATE: str(-(10**12 + n)),  # a new supergroup's marked id
+        C.MEDIA_UPLOAD: f"upload:photo:{n}:1:00",  # the user account's uploaded file
         C.TEMPLATE_CREATE: str(9_000_000 + n),
     }.get(capability)
 
@@ -213,6 +216,18 @@ def _bot_transport() -> Any:
             result = [u for u in _bot_updates() if u["update_id"] >= offset]
         elif method == "getMe":
             result = {"id": 1, "is_bot": True, "first_name": "selftest"}
+        elif method == "getChat":  # the group's own reads, in the Bot API's shapes (A47 H6)
+            result = {"id": SELFTEST_CHAT, "type": "supergroup", "title": "MQ Society",
+                      "permissions": {"can_send_messages": True, "can_pin_messages": False}}  # fmt: skip
+        elif method == "getChatAdministrators":
+            result = [{"status": "creator",
+                       "user": {"id": 42, "is_bot": False, "first_name": "Sara"}}]  # fmt: skip
+        elif method == "getChatMember":
+            asked = (json.loads(request.content or b"{}") or {}).get("user_id")
+            result = {"status": "member",
+                      "user": {"id": asked, "is_bot": False, "first_name": "Member"}}  # fmt: skip
+        elif method == "getChatMemberCount":
+            result = 3
         else:
             result = True
         return httpx.Response(200, json={"ok": True, "result": result})

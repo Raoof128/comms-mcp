@@ -2112,6 +2112,11 @@ def phase_v03_daemon(ledger: Ledger) -> None:
     )
     ledger.run(
         area,
+        "every catalog tool answers over HTTP: a schema-valid success or its pinned refusal",
+        lambda: verdict("catalog_sweep"),
+    )
+    ledger.run(
+        area,
         "the directory over MCP: a person, a WhatsApp contact, a location with them, a Telegram and a WhatsApp group",
         lambda: verdict("catalog_directory"),
     )

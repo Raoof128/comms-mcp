@@ -780,3 +780,11 @@
 - **Files changed:** `docs/verification/comms-v0.3.md`, `AGENT.md`, `CHANGELOG.md`.
 - **Verification:** the gate on `2a864be` (GATE ok=1: 5505 passed, smoke 105/105); `main^{tree}` equals `comms-v0.3-a47^{tree}`; `origin/main` equals `main` after the push; the evidence-reading exit tests pass.
 - **Follow-ups:** D39-B (owner-run, live).
+
+### 2026-09-27 (Australia/Sydney)
+**Raouf:**
+- **Scope:** A full end-to-end test of every function: the whole catalog swept against the real daemon (branch `comms-v0.3-sweep`).
+- **Summary:** `scripts/smoke_sweep.py` calls all 130 tools over HTTP `/mcp` on `comms selftest-daemon`: 112 succeed with schema-valid output, and 18 give their pinned refusal (each with its reason). It found two tools that could answer `AMBIGUOUS_TARGET` without declaring it (fixed) and a selftest Bot API that could not serve any chat read (fixed).
+- **Files changed:** `scripts/smoke_sweep.py` (new), `scripts/{smoke_daemon,e2e_smoke}.py`, `src/comms/runtime/selftest.py`, `src/comms/mcp/tools/{admin,account}.py`, `tests/mcp/catalog_pin.json`, `tests/security/{test_a47_exit,test_d39_pre_exit}.py`, `docs/verification/{comms-v0.3.md,comms-v0.3-rulings.md,comms-v0.3-smoke-map.json}`, `CLAUDE.md`, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** the full gate (GATE ok=1): 5506 passed, 4 skipped; smoke 106/106; formal 57; WhatsVault 450.
+- **Follow-ups:** the owner merges and pushes `comms-v0.3-sweep`; D39-B live.

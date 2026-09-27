@@ -392,6 +392,7 @@ def drive_directory_and_campaigns(root: Path) -> dict[str, Any]:
         fresh = d.http(seed, "comms_context_recent", {"group": grp, "limit": 2})
         out["cursor_rotation"] = bool(cursor) and stale["isError"] and not fresh["isError"]
         out.update(_catalog_checks(d, seed, webhook_port))
+        out.update(_sweep_checks(d, seed, grp))
         out["verify_after"] = d.json("audit", "verify", "--all")["ok"] is True
         out.update(_webhook_checks(d, webhook_port))
     finally:
@@ -476,6 +477,21 @@ def _media_checks(d: Daemon, seed: Path, grp: str) -> dict[str, Any]:
         and page.get("sha256") == hashlib.sha256(SELFTEST_DOCUMENT).hexdigest()
     )  # fmt: skip
     return out
+
+
+SWEEP_REPORT: dict[str, Any] = {}
+
+
+def _sweep_checks(d: Daemon, seed: Path, grp: str) -> dict[str, Any]:
+    """Every catalog tool over HTTP /mcp against the real daemon (scripts/smoke_sweep.py): a
+    success valid against its output schema, or an error the tool declares; never another."""
+    from smoke_sweep import sweep
+
+    report = sweep(lambda name, arguments: d.http(seed, name, arguments), grp)
+    SWEEP_REPORT.clear()
+    SWEEP_REPORT.update(report)
+    wrong = {name: why for name, (kind, why) in report.items() if kind == "WRONG"}
+    return {"catalog_sweep": not wrong and len(report) == 130 or wrong}
 
 
 def _catalog_checks(d: Daemon, seed: Path, port: int) -> dict[str, Any]:
