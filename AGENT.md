@@ -1164,3 +1164,25 @@ Follow the user's engineering lifecycle: design/security analysis, implementatio
   - decide whether the owner may reverse an opt-out;
   - dialog discovery;
   - a person-addressed send tool.
+
+### 2026-09-28 (Australia/Sydney)
+**Raouf:**
+- **Scope:** A live end-to-end run of every Telegram group tool in a throwaway private supergroup, and the defects it found (branch `telegram-group-e2e-fixes`, ruling R-TG4).
+- **Summary:**
+  - **The run:** the owner's account created "comms e2e test" (a forum), added @raouf_comms_bot, restricted and unrestricted it, promoted it, updated its rights and tagged it. Then 83 calls covered 68 distinct tools as both actors: send, reply, edit, pin, forward, delete; photo and document sends (the R-TG3 fix held); reads, search, summary, media inspect and download; permissions, title, description and photo; invites and join requests; topics; demote, remove, ban, unban; migrate (refused, since only a basic group migrates); a broadcast channel created, posted to and deleted; then the group deleted. 78 passed first time, and two apparent failures were the test's own wrong expectations.
+  - **Defects fixed:**
+    1. `comms_group_permissions_get` answered NOT_AUTHORIZED: `default_permissions` still expected the channel in `getParticipant` (R-TG2's defect in a second function). One helper, `_channel_chats`, now serves both.
+    2. `comms_context_thread` was unsupported for the user account although the actor matrix serves it by `messages.getReplies`; the user context now reads threads through `fetch_replies`.
+    3. A too-small group photo (`PHOTO_CROP_SIZE_SMALL`) was reported OUTCOME_UNKNOWN; documented chat-photo refusals are now FAILED INVALID_ARGUMENT.
+  - **Rate limit:** after the morning's burst of group creation, photos and deletes, Telegram rate-limited the account for a while. comms answered RATE_LIMITED correctly, and the probe group's delete succeeded on retry an hour later.
+- **Files changed:** `src/comms/transports/telegram/telegram/telethon_adapter.py`, `src/comms/transports/telegram/user/context.py`; tests (`tests/transports/telegram_user/test_reads_g6.py`, `tests/transports/telegram_user/test_context.py`, `tests/runtime/test_media_staged.py`); the rulings (R-TG4); `AGENT.md`; `CHANGELOG.md`.
+- **Verification:**
+  - 6 new tests, seen failing first.
+  - Full gate GATE ok=1 (5628 passed; smoke 108/108).
+  - Live on the new code: `permissions_get` answers; `context_thread` returns the reply; a 96 px photo is FAILED INVALID_ARGUMENT, a 512 px photo SUCCEEDED; the probe group was deleted. No test group remains.
+- **Follow-ups:**
+  - a RATE_LIMITED write result carries no retry-after in its MCP output;
+  - the daemon exited between sessions and needs a keep-alive (launchd) under the owner user;
+  - dialog discovery;
+  - a person-addressed send;
+  - owner-reversible opt-out.

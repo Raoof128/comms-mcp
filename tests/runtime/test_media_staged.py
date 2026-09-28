@@ -277,3 +277,18 @@ def test_a_group_photo_is_uploaded_with_its_extension(tmp_path):
                                                "channels.EditPhotoRequest": ok},
                                     C.CHAT_SET_PHOTO, {"photo": JPEG, "mime": "image/jpeg"}, SUPER)  # fmt: skip
     assert sent[-1].photo.file.name == "file.jpg"
+
+
+@pytest.mark.parametrize("error", ["PhotoCropSizeSmallError", "PhotoInvalidDimensionsError",
+                                   "PhotoExtInvalidError", "ImageProcessFailedError"])  # fmt: skip
+def test_a_refused_group_photo_is_failed_not_unknown(tmp_path, error):
+    """Found live (2026-09-28, R-TG4): a 96 px photo was refused PHOTO_CROP_SIZE_SMALL and
+    reported OUTCOME_UNKNOWN; Telegram refused it, and the photo is unchanged."""
+    from telethon import errors
+
+    refusal = getattr(errors, error)(request=None)
+    result, _sent, calls = _invoke(tmp_path, {"upload.SaveFilePartRequest": True,
+                                              "channels.EditPhotoRequest": refusal},
+                                   C.CHAT_SET_PHOTO, {"photo": JPEG, "mime": "image/jpeg"}, SUPER)  # fmt: skip
+    assert (result.outcome, result.code) == ("FAILED", "INVALID_ARGUMENT")
+    assert calls.count("channels.EditPhotoRequest") == 1

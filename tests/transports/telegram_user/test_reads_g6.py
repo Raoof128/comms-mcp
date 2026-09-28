@@ -235,3 +235,19 @@ def test_one_senders_messages_narrow_the_same_search(tmp_path):
     assert calls == ["messages.SearchRequest"]
     assert seen[0].q == "" and isinstance(seen[0].from_id, types.InputPeerUser)
     assert seen[0].from_id.user_id == 42
+
+
+def test_default_permissions_when_the_participant_answer_omits_the_channel(tmp_path):
+    """Found live (2026-09-28, R-TG4): for the group's creator Telegram's getParticipant answer
+    carried no channel, so the read failed; the channel comes from one peer-dialog read."""
+    banned = types.ChatBannedRights(until_date=None, pin_messages=True)
+    bare = types.channels.ChannelParticipant(
+        participant=types.ChannelParticipantCreator(user_id=4242, admin_rights=types.ChatAdminRights()),
+        chats=[], users=[])  # fmt: skip
+    dialogs = types.messages.PeerDialogs(dialogs=[], messages=[], users=[],
+        chats=[_channel(default_banned_rights=banned)], state=types.updates.State(1, 0, None, 0, 0))  # fmt: skip
+    page, calls = _run(tmp_path, {"channels.GetParticipantRequest": bare,
+                                  "messages.GetPeerDialogsRequest": dialogs}, "permissions")  # fmt: skip
+    assert calls == ["channels.GetParticipantRequest", "messages.GetPeerDialogsRequest"]
+    permissions = page.items[0]["permissions"]
+    assert permissions["can_pin_messages"] is False and permissions["can_send_messages"] is True

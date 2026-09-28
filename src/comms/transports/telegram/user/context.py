@@ -43,6 +43,10 @@ class ReadSession(Protocol):
 
     async def search_peer(self, peer_type: str, peer_id: int, query: str, **kw: Any) -> Any: ...
 
+    async def fetch_replies(
+        self, peer_type: str, peer_id: int, topic_id: int, **kw: Any
+    ) -> list[Any]: ...  # R-TG4: a message's thread
+
     async def fetch_participants(
         self, peer_type: str, peer_id: int, *, offset: int, limit: int, timeout: float
     ) -> tuple[list[tuple[int, str, str | None]], int | None]: ...
@@ -99,6 +103,8 @@ class UserContext:
             fields = take(args, {}, {"limit": _limit, "cursor": _cursor})
         elif kind == "around":
             fields = take(args, {"message_id": _cursor_int}, {"before": _span, "after": _span})
+        elif kind == "thread":  # R-TG4: the replies to one message, by messages.getReplies
+            fields = take(args, {"message_id": _cursor_int}, {"limit": _limit})
         elif kind == "search":
             fields = take(args, {"query": text(1, 256)}, {"limit": _limit, "cursor": _cursor})
         elif kind == "members":
@@ -205,6 +211,14 @@ class UserContext:
         }
         if kind in ("invites", "join_requests", "topics", "topic", "admin_log"):
             return await self._list(kind, peer, fields, observed)
+        if kind == "thread":
+            if peer[0] == "user":
+                raise ContextRefused("PROVIDER_UNSUPPORTED")  # a private chat has no threads
+            views = await self._session.fetch_replies(
+                *peer, int(fields["message_id"]), offset_id=0, add_offset=0,
+                limit=fields.get("limit", 20), min_id=0, max_id=0, **common,
+            )  # fmt: skip
+            return _page([_message(view, observed) for view in views], None, cursor_of=None)
         if kind == "from":
             if peer[0] == "user":
                 raise ContextRefused("PROVIDER_UNSUPPORTED")

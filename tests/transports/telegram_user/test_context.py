@@ -239,3 +239,15 @@ def test_the_whole_telegram_user_conformance_suite_passes():
     registry = Registry({k: v for k, v in REGISTRY.cases.items() if k[0] == "telegram_user"})
     report = run_suite(registry, {"telegram_user": ADAPTER_CONTRACTS["telegram_user"]})
     assert report.ok and report.skipped == {}, report.failures
+
+
+def test_a_thread_is_the_replies_to_one_message(tmp_path):
+    """Found live (2026-09-28, R-TG4): the actor matrix served comms_context_thread for the user
+    account by messages.getReplies, but the user context had no thread read at all."""
+    page, seen = _read(
+        tmp_path,
+        {"messages.GetRepliesRequest": _slice([31, 30])},
+        ContextQuery(SUPER, "thread", {"message_id": 29, "limit": 3}),
+    )
+    assert (seen[0].msg_id, seen[0].limit) == (29, 3)
+    assert [i["message_id"] for i in page.items] == [31, 30]
