@@ -187,3 +187,15 @@ def test_a_refused_operator_command_prints_the_code_and_its_reason(monkeypatch, 
         cli.main(["cutover", "status"])
     err = capsys.readouterr().err
     assert "MALFORMED_REQUEST" in err and "unknown argument" in err
+
+
+@pytest.mark.parametrize("argv", [[], ["-h"], ["--help"]])
+def test_bare_comms_help_is_the_comms_parser(argv, capsys):
+    """``comms --help`` lists the comms commands, never the legacy ``telegram-mcp`` usage."""
+    with pytest.raises(SystemExit):
+        main(argv)
+    out = capsys.readouterr()
+    text = out.out + out.err
+    assert text.startswith("usage: comms ")
+    for command in ("mcp", "daemon", "doctor", "relay", "campaign", "status", "telegram-mcp"):
+        assert command in text

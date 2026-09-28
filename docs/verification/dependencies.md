@@ -39,3 +39,11 @@ secretstorage 3.5.0, sqlcipher3 0.6.2, tzlocal 5.4.4.
 Advisory review: `uvx pip-audit -r <the 12 pins> --no-deps` → **No known vulnerabilities found**
 (2026-09-24). `sqlcipher3` 0.6.2 ships a `cp312` macOS arm64 wheel bundling SQLCipher 4.12.0
 community; see `docs/provenance/whatsvault.md`.
+
+## 2026-09-28 — what changed since
+
+The sections above are records of their dates. Since then:
+- `httpx==0.28.1` is a **runtime** dependency (2026-09-25, `1ed921f`). It is the Bot API client, the Cloud API client, the relay client and the stdio proxy's transport; it also stays in the dev group.
+- Telethon 1.45.0 is used: `comms.transports.telegram.telegram.telethon_adapter` is its only importer.
+- The relay Worker (`relay/`) has its own npm pins in `package.json` and `package-lock.json`: `age-encryption` 0.3.1 at runtime, plus `wrangler`, `vitest`, `@cloudflare/vitest-plugin` and `typescript` for development. `allowScripts` refuses every install script.
+

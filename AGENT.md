@@ -1186,3 +1186,47 @@ Follow the user's engineering lifecycle: design/security analysis, implementatio
   - dialog discovery;
   - a person-addressed send;
   - owner-reversible opt-out.
+
+### 2026-09-28 (Australia/Sydney)
+**Raouf:**
+- **Scope:** A repository-wide documentation freshness audit: every document checked against the code, with the defects it exposed fixed (branch `docs-freshness-audit`, ruling R-DOC1). The logs and Zurvan were brought up to date first.
+- **Summary:**
+  - **Inventory:** 80 documents outside WhatsVault, plus its 34.
+    - **Kept as dated records:** 29 plans and specs, the provenance files, the phase evidence and AGENT.md and CHANGELOG.md.
+    - **Left frozen:** the hash-pinned v0.3 spec and design, and the frozen v0.1.10 specification.
+  - **Two code defects found by reading the docs against the code:**
+    1. `comms mcp --stdio` defaulted to the daemon at port 8765, while the daemon listens on `local_port`, default 8766. A client set up by the client runbooks (no `--daemon`) would have reached nothing. Every test passed `--daemon`, so the default was never exercised. Both parsers now use one `DEFAULT_DAEMON`, pinned equal to the runtime's `HOST` and `LOCAL_PORT`.
+    2. Bare `comms --help` printed the legacy `telegram-mcp` usage. It now prints the comms usage and names the verbs still forwarded to the legacy CLI.
+  - **Stale documents repaired:**
+    - `README.md` described the Phase 3 synthetic demo and was rewritten.
+    - `CLAUDE.md`: "nothing has touched Telegram", the relay "still to deploy", "no runtime provisioned", the WhatsVault "nothing edited" rule, and the test count.
+    - The client runbooks (130 tools, not 109; the proxy flags for a non-default install).
+    - `install.md` never said the user login needs `telegram_api_id` in `comms.json` and the `api_hash` in the Keychain.
+    - The relay runbook lacked Meta's webhook-field subscription and `CLOUDFLARE_ACCOUNT_ID`.
+    - `comms-v0.3.md`: three superseded statements annotated, and a live-operation section added.
+    - `comms-relay.md` now records the deployment.
+    - `formal/README.md` gains the missing campaign model.
+    - The Telegram RPC review named the pre-5b-1 adapter path.
+    - Ruling R-E2 cited a test file that never existed.
+    - WhatsVault's provenance and README.
+    - `dependencies.md`: `httpx` is now a runtime dependency, and the relay's npm pins are listed.
+    - Four plan and spec status lines that still read "draft" or "pending".
+    - The package description.
+- **Files changed:**
+  - `src/comms/cli.py`, `src/comms/mcp/stdio_proxy.py`, `pyproject.toml`;
+  - `README.md`, `CLAUDE.md`, `formal/README.md`;
+  - `docs/runbooks/{install,clients-claude-code,clients-codex,clients-chatgpt,whatsapp-relay,live-acceptance-whatsapp}.md`;
+  - `docs/verification/{comms-v0.3,comms-relay,comms-v0.3-rulings,dependencies,telegram-rpc-review}.md`;
+  - `docs/provenance/whatsvault.md`, `docs/comms-spec-v0.2.md`, and three `docs/superpowers/` status lines;
+  - `transports/whatsapp/README.md` (under R-DOC1);
+  - the tests `tests/mcp/test_stdio_proxy.py`, `tests/cli/test_cli_operator.py`, `tests/integration/test_comms_entry_points.py` and `tests/integration/test_whatsvault_provenance.py`;
+  - `AGENT.md`, `CHANGELOG.md`.
+- **Verification:**
+  - New tests seen failing first.
+  - The documented client configuration was driven against the live daemon: 130 tools listed, and a call answered.
+  - Every path the current docs name was checked to exist.
+  - Full gate GATE ok=1: 5632 passed, 4 skipped; smoke 108/108; formal 57; ruff, format, mypy and build clean; WhatsVault 450; relay 15.
+- **Follow-ups:**
+  - no Markdown linter or link checker is installed, so none was run;
+  - the P §88 acceptance rows stay PENDING OWNER until the runbooks' records are filled in;
+  - the service-account install is still not done, and nothing keeps the daemon running.

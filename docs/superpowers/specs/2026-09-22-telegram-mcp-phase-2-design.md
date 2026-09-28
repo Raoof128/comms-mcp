@@ -1,6 +1,6 @@
 # Telegram MCP Phase 2 Design — On-Demand Privileged Runtime, Identity, Consent, Authority
 
-**Status:** Revised for the on-demand requirement plus gauntlet fixes; pending re-review before the implementation plan.
+**Status:** Implemented as Phases 2a and 2b (evidence `docs/verification/phase-2a.md`, `phase-2b.md`); its consent parts were retired by comms spec v0.2. The original status follows. Revised for the on-demand requirement plus gauntlet fixes; pending re-review before the implementation plan.
 **Date:** 2026-09-22 (Australia/Sydney)
 **Spec:** `telegram-mcp-v0.1.10-final-engineering-spec.md` (SHA-256 `36b67f488415f2ab1c44b8d906de7f192fbe0dc562a2aeac76938b24c4a61b0a`)
 **Roadmap:** `docs/superpowers/plans/2026-09-22-telegram-mcp-release-roadmap.md` (Phase 2)

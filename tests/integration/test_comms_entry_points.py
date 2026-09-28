@@ -18,7 +18,9 @@ def test_python_dash_m_legacy_cli_still_works():
 
 
 def test_console_scripts_resolve_to_comms():
-    """Review Focus #3: both scripts regenerated from pyproject, same main."""
+    """Review Focus #3: both scripts regenerated from pyproject. Since comms v0.3 ``comms`` has its
+    own main, which forwards the legacy runtime verbs (``status`` among them) and says so in its help
+    (R-DOC1)."""
     for script in ("telegram-mcp", "comms"):
         done = _run(str(BIN / script), "--help")
         assert done.returncode == 0, (script, done.stderr)

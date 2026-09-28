@@ -11,7 +11,8 @@ and asserts nothing.
    components.
 3. Put the access token (`meta-access-token`), the app secret (`meta-app-secret`) and the
    webhook verify token (`meta-webhook-secret`) in the secret store.
-4. Point the app's webhook at the comms webhook listener (`POST /webhooks/meta`, HTTPS).
+4. Point the app's webhook at the comms webhook listener (`POST /webhooks/meta`, HTTPS), or at the
+   relay if you use one (`whatsapp-relay.md`: `/webhooks/meta/<path token>` on the Worker).
 5. Describe the accounts, identifiers only, in a JSON file outside the repository:
 
    ```json

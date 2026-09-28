@@ -1,6 +1,7 @@
 # Comms spec v0.2 — owner-direct authority
 
-**Status:** normative. Adopted 2026-09-24 (5b-3). This document is a clause-by-clause
+**Status:** normative. Adopted 2026-09-24 (5b-3). Since comms v0.3 it is normative only where
+`docs/comms-spec-v0.3.md` (its Precedence table) says so. This document is a clause-by-clause
 delta. Where it is silent, the frozen Telegram specification
 `telegram-mcp-v0.1.10-final-engineering-spec.md`
 (SHA-256 `36b67f488415f2ab1c44b8d906de7f192fbe0dc562a2aeac76938b24c4a61b0a`) and

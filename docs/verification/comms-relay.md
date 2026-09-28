@@ -50,6 +50,8 @@ A refused row is quarantined on the Mac with its ciphertext.
   - setting Meta's callback URL.
 
   No secret passes through an AI transcript: the pull key and the path token go only into pipes.
+
+  **Done on 2026-09-27**, with the owner's authorisation. The Worker is deployed at `https://comms-relay.raoof-r12.workers.dev`, and Meta's callback is verified with the `messages` and `group_*` fields subscribed. The pull key and recipient went through a transient 0600 file, removed at once, and no secret entered the transcript. On 2026-09-28 the Meta test webhook the relay held was pulled, verified and archived (`AGENT.md`).
 - **Live acceptance (D39-B, owner-run):** a real WhatsApp message sent while the Mac is off is present once it is back.
 - **What a Cloudflare-account holder can do:** delay or delete messages. Deletions show as `RELAY_GAP` unless they fake `purged_through`. They can never read or forge a message.
 - **Rotating the `age` key** is refused in this version.
