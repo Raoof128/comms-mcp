@@ -19,7 +19,12 @@ Then add the server to the project's `.mcp.json` (or the user-scope equivalent):
   "args": ["mcp", "--stdio", "--client-seed", "/Users/<you>/.config/comms/claude-code.seed"]}}}
 ```
 
-and set the host permissions by R-A20 (owner, 2026-09-25): host confirmation is defence in
+The proxy's defaults match a service-account install: the daemon at `http://127.0.0.1:8766`
+and its admin socket under `/private/var/run/telegram-mcp`. If `comms.json` sets `local_port`,
+or the daemon runs with its own `--runtime-dir`, add `"--daemon", "http://127.0.0.1:<local_port>"`
+and `"--runtime-dir", "<runtime dir>"` to the args.
+
+Then set the host permissions by R-A20 (owner, 2026-09-25): host confirmation is defence in
 depth, never part of Comms authorization. Do **not** allow the whole server (`mcp__comms`).
 Read-only tools may be allowed by name; every consequential write (one that reaches a provider
 or cannot be undone) goes under `permissions.ask`. This repository's `.claude/settings.json` is
@@ -47,7 +52,7 @@ filled, into `docs/verification/comms-v0.3-acceptance/<date>-claude-code.md` (D3
 | Catalog digest the client saw | PENDING OWNER |
 | Catalog digest of the artifact | PENDING OWNER |
 | Auth | local stdio proxy with a `cml1` lease (`comms mcp --stdio`) |
-| Visible tools (count; all 109 listed?) | PENDING OWNER |
+| Visible tools (count; every catalog tool listed? 130 since A47) | PENDING OWNER |
 | A read: `comms_group_list`, then `comms_context_recent` on a disposable group | PENDING OWNER |
 | A write: `comms_message_send` from the bot into the disposable group | PENDING OWNER |
 | A destructive call: `comms_message_delete` of that message (the client must mark it destructive and confirm) | PENDING OWNER |

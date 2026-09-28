@@ -1,70 +1,86 @@
-# Telegram MCP Gateway (development foundation)
+# comms: a Telegram and WhatsApp MCP gateway for one owner
 
-Read-only Telegram MCP gateway — **Phases 1, 2 and 3 complete**. This build serves a disconnected synthetic
-`telegram_status`, advertises the exact ten-tool contracts, and refuses all
-nine sensitive calls. Phase 2a adds the privileged-runtime machinery behind
-that surface — lifecycle and lock, key store and pairing pins, the consent
-broker and its frozen challenge wire, the central authority engine, cursors
-and epochs, the 19-table metadata schema, the admin socket, bearer leases, the
-RV-1 consent rendezvous, tunnel pins, `doctor` and the install plans — all
-exercised headlessly against fakes and a stub signer.
+comms lets an AI assistant (Claude Code, Codex, ChatGPT) read and act on one person's Telegram
+and WhatsApp through a single MCP server, with every write audited. It runs on the owner's Mac.
 
-It performs no Telegram login and holds no session. No service account,
-LaunchAgent, certificate or socket has been installed on any host, and the
-Phase-2J join gate against the real signed consent agent has not run.
-Production deployment requires Gates A–R (see the engineering specification).
+- **Telegram:** a bot (Bot API) and the owner's own account (MTProto, through Telethon).
+- **WhatsApp:** the Cloud API for sending. Meta's webhooks reach the Mac through a Cloudflare
+  Worker relay that holds them encrypted while the Mac is off (`relay/`).
+- **One MCP catalog of 130 tools:** messages, media, groups and their admin, a directory of
+  people, locations and audiences, campaigns, context reads, and account status.
+- **Authority:** an owner command is the authorization (comms spec v0.3, `owner_full_admin`).
+  The MCP host's own permission prompts are the only confirmation layer. Every consequential
+  write goes on a signed, anchored audit chain, and a repeated `request_id` never repeats an
+  effect.
 
-## Setup
+**Status.** Comms v0.3 is built and gated: the suite, the end-to-end smoke against a real
+daemon and the bounded formal models all pass (see `CLAUDE.md`, Verify). Since 2026-09-27 it
+runs live on the owner's Mac, under the owner's user: the bot and the user account are logged
+in, and the relay is deployed. Owner-run live acceptance (D39-B) is still open, and there is no
+production claim until Gates A–R pass for the exact artifact.
+
+## Requirements
+
+- macOS (the Keychain and the service installers are macOS-specific).
+- Python 3.12 and [uv](https://docs.astral.sh/uv/).
+- Node.js, only for the relay Worker (developed on Node 24).
+
+## Set up
 
 ```bash
 uv sync --locked
 ```
 
-## Run the synthetic demo
+Then follow `docs/runbooks/install.md`, in order:
+1. provision the keys (`comms keys provision`);
+2. start the daemon (`comms daemon`);
+3. run the one-time cutover (`comms cutover run`);
+4. add provider credentials;
+5. log in to Telegram;
+6. add each MCP client with `comms client add`.
 
-```bash
-uv run telegram-mcp demo
-# listening on 127.0.0.1:8766/mcp (synthetic build)
-```
+`comms doctor` checks the result read-only, and `comms --help` lists every command.
 
-Expected: `telegram_status` returns `connected=false`, `authorised=false` with
-gateway metadata and no disclosure. The nine sensitive tools return bounded
-errors (`POLICY_UNCONFIGURED` for valid inputs). Stop with Ctrl-C.
-
-Only `safe_demo` on a literal loopback address is accepted. Any Telegram
-credential environment, non-loopback bind or telemetry-exporter configuration
-fails startup with a fixed message.
-
-## Phase-2a verbs
-
-```bash
-uv run telegram-mcp status                       # works while OFF
-uv run telegram-mcp doctor                       # add --production for the release gate
-uv run telegram-mcp keys provision --store-dir <dir>
-uv run telegram-mcp admin lock status            # proxied to the admin socket
-```
-
-`start` and `stop` drive the three launchd jobs through interactive
-escalation and need the one-time install (`scripts/install_service_users.sh`,
-`scripts/install_paths.sh`); both installers are idempotent and print their
-plan with `--dry-run`. `doctor --production` fails by design in this phase and
-names which gate checks cannot yet be verified.
+Connecting a client: `docs/runbooks/clients-claude-code.md`, `clients-codex.md` and
+`clients-chatgpt.md`. The WhatsApp relay: `docs/runbooks/whatsapp-relay.md`.
 
 ## Verify
 
+The full gate is listed in `CLAUDE.md` under Verify. At minimum:
+
 ```bash
-uv run python scripts/extract_contracts.py --check
-uv run pytest tests/unit tests/contract tests/integration tests/security -q
-uv run pytest -q --run-platform-gated            # opt-in host probes (macOS + admin)
-uv run python scripts/e2e_smoke.py               # end-to-end across Phase 1 + Phase 2
+uv run pytest -q
+uv run python scripts/e2e_smoke.py     # drives the installed CLI and a real daemon end to end
+uv run pytest tests/formal -q -s       # the bounded formal models
+(cd relay && npm ci && npm run check)  # the relay Worker in workerd
 ```
 
-The smoke is not the suite. It drives the shipped artifacts in one run — the
-real demo server over a real TCP socket, the real schema on disk, real Unix
-sockets, the installed CLI, and the real agent binary against the real
-broker — and prints one ledger. It mutates nothing outside its sandbox: no
-service accounts, no keychain writes, no Telegram, no host paths.
+## Layout
 
-Evidence: `docs/verification/phase-1.md` and
-`docs/verification/phase-2a.md`. Reviewed pins: `mcp==2.2.0`,
-`Telethon==1.45.0` (pinned but unused in these phases).
+| Path | What |
+|---|---|
+| `src/comms/core/` | Transport-neutral core: `comms.db` (SQLCipher), the directory, campaigns, the audit chain, keys, backup, retention |
+| `src/comms/services/` | Every read and write the tools perform |
+| `src/comms/mcp/` | The tool catalog, dispatch, HTTP `/mcp`, the stdio proxy (`comms mcp --stdio`), OAuth for remote clients |
+| `src/comms/runtime/` | The daemon's composition, listeners, workers, settings (`comms.json`) and operator commands |
+| `src/comms/transports/telegram/` | The Telegram bot and user adapters; the only Telethon importer |
+| `src/comms/transports/whatsapp/` | The WhatsApp Cloud API, webhooks and relay client |
+| `transports/whatsapp/` | WhatsVault, imported with its history (`docs/provenance/whatsvault.md`) |
+| `relay/` | The Cloudflare Worker relay (TypeScript) |
+| `formal/` | Bounded executable models of the safety rules (`formal/README.md`) |
+| `site/` | The public W-Vault pages (privacy policy), published by `.github/workflows/pages.yml` |
+| `src/telegram_mcp/` | The legacy `telegram-mcp` CLI forwarder |
+
+## Documents
+
+- **Specifications:** `docs/comms-spec-v0.3.md` (current). It says which parts of
+  `docs/comms-spec-v0.2.md` and the frozen `telegram-mcp-v0.1.10-final-engineering-spec.md`
+  still apply.
+- **Evidence and rulings:** `docs/verification/` (`comms-v0.3.md`, `comms-v0.3-rulings.md`,
+  `comms-relay.md`, the actor matrix and the Telegram RPC review).
+- **Runbooks:** `docs/runbooks/`.
+- **Designs and plans,** kept as they were approved: `docs/superpowers/`.
+- **The audit trail of every change:** `AGENT.md` and `CHANGELOG.md`.
+
+Never commit credentials, session files or keys. `.gitignore` carries the baseline, and secrets
+live in the daemon's secret store and the macOS Keychain only.

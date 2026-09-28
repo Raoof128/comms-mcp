@@ -2,7 +2,7 @@
 
 Every request class the gateway can put on the wire, per operation. This is
 the reviewer's record behind `OPERATIONS` in
-`src/telegram_mcp/telegram/telethon_adapter.py`. The same set is pinned
+`src/comms/transports/telegram/telegram/telethon_adapter.py` (moved there in comms 5b-1). The same set is pinned
 independently by `REVIEWED_RPCS` in `tests/security/test_phase4_architecture.py`
 and `ALLOWED` in `tests/telegram/recorder.py`. Pinned library:
 `telethon==1.45.0`.

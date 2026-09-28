@@ -28,8 +28,20 @@ from mcp.server.stdio import stdio_server
 
 from comms.core.auth.lease_format import HelperFileError, mint, read_helper
 
-__all__ = ["EPOCH_TTL_S", "Proxy", "ProxyError", "build_server", "http_post", "parse_args", "serve"]
+__all__ = [
+    "DEFAULT_DAEMON",
+    "EPOCH_TTL_S",
+    "Proxy",
+    "ProxyError",
+    "build_server",
+    "http_post",
+    "parse_args",
+    "serve",
+]
 
+# The daemon's default local /mcp origin: comms.runtime.settings HOST and LOCAL_PORT (this layer
+# never imports the runtime; tests/mcp/test_stdio_proxy.py pins the two equal).
+DEFAULT_DAEMON = "http://127.0.0.1:8766"
 EPOCH_TTL_S = 5.0
 PROTOCOL_VERSION = "2026-07-28"
 _TIMEOUT_S = 30.0
@@ -126,7 +138,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     """``--client-seed <path>`` is the only way to name the seed; there is no seed-value flag."""
     parser = argparse.ArgumentParser(prog="comms mcp --stdio", allow_abbrev=False)
     parser.add_argument("--client-seed", type=Path, required=True)
-    parser.add_argument("--daemon", default="http://127.0.0.1:8765")
+    parser.add_argument("--daemon", default=DEFAULT_DAEMON)
     return parser.parse_args(argv)
 
 

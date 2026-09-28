@@ -2,6 +2,12 @@
 
 **A local-first, encrypted archive of your own WhatsApp messages — searchable by an AI assistant, but never sendable by one.**
 
+> **Imported into comms.** This README describes WhatsVault as it stood when comms imported it
+> on 2026-09-24 (`docs/provenance/whatsvault.md`). Inside comms, its standalone MCP server is
+> retired (R-A16): the comms MCP server serves WhatsApp and Telegram. Its suite runs 450 tests
+> there, and its console scripts are not installed. For the current system, start from the comms
+> README (`../../README.md`).
+
 [![CI](https://github.com/Raoof128/whatsvault/actions/workflows/ci.yml/badge.svg)](https://github.com/Raoof128/whatsvault/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)

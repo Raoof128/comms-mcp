@@ -82,6 +82,20 @@ in the model source and requires the search to report that invariant.
   Python implementation line by line; the crash-injection suite does that.
 
 
+## The campaign model (comms 5b-4)
+
+`formal/campaign_model.py`, same checker style. It restates the campaign core's rules without
+importing `src`: two jobs, a retry cap of 2 and at most two generations. It explores campaigns,
+jobs, retries, unknown outcomes, their resolution and provider updates.
+
+| Parameter | Value |
+|---|---|
+| Bounds | `N_JOBS = 2`, `MODEL_RETRY_CAP = 2`, `MAX_GENERATIONS = 2` |
+| Properties | 11 (`PROPERTIES` in the model) — among them, never below DELIVERED once there; an unknown outcome gains an attempt only after "not sent"; nothing runs before its send time; SENT only if every job succeeded |
+| Reachable states | 96,528 |
+| Mutations | one per property, each caught (`tests/formal/test_campaign_model_mutations.py`) |
+| Differential walk | 300 seeded sequences against the real library (`tests/core/test_differential_walk.py`) |
+
 ## The audit-chain model (comms v0.3, Task B31)
 
 `formal/audit_model.py`, same checker style: exhaustive BFS over a finite state machine.

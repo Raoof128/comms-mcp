@@ -2,6 +2,11 @@
 
 Owner-run. Nothing here touches a provider until the credential steps.
 
+The steps below are the service-account install. To run under your own user instead (this Mac
+since 2026-09-27), skip step 1 and give every command the same directories:
+`comms daemon --state-dir <state> --runtime-dir <run>`, and `TELEGRAM_MCP_RUNTIME_DIR=<run>` (plus
+`TELEGRAM_MCP_STATE_DIR=<state>` for the local commands) for the rest. Keep both directories 0700.
+
 1. Create the service accounts and the runtime paths. Both installers are idempotent; read the plan first.
 
    ```bash
@@ -35,6 +40,19 @@ Owner-run. Nothing here touches a provider until the credential steps.
    comms credential set meta-access-token
    comms transport telegram login
    ```
+
+   The user login needs a Telegram app from my.telegram.org first. Put its public
+   `telegram_api_id` in `comms.json`, and its `api_hash` in the login Keychain (service
+   `telegram-mcp`, account `api_hash`). The daemon reads the hash once at start: without it the
+   user account stays `AUTH_REQUIRED`, and everything else still runs. Restart the daemon after
+   adding it. `security` prompts for the value, so it never enters argv or your shell history.
+
+   ```bash
+   security add-generic-password -s telegram-mcp -a api_hash -U -w
+   ```
+
+   WhatsApp needs `meta.phone_number_id` and `meta.waba_id` in `comms.json` before
+   `meta-access-token` can be proved. For Meta's webhooks, see `whatsapp-relay.md`.
 
 5. Add each MCP client. Its `cml1` seed goes to that client's helper only.
 

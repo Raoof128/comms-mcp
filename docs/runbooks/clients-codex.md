@@ -20,6 +20,11 @@ command = "comms"
 args = ["mcp", "--stdio", "--client-seed", "/Users/<you>/.config/comms/codex.seed"]
 ```
 
+The proxy's defaults match a service-account install: the daemon at `http://127.0.0.1:8766`
+and its admin socket under `/private/var/run/telegram-mcp`. If `comms.json` sets `local_port`,
+or the daemon runs with its own `--runtime-dir`, add `"--daemon", "http://127.0.0.1:<local_port>"`
+and `"--runtime-dir", "<runtime dir>"` to the args.
+
 Restart Codex; its MCP listing shows `comms` with its tools. The seed file stays 0600 and never
 enters a repository.
 
@@ -35,7 +40,7 @@ filled, into `docs/verification/comms-v0.3-acceptance/<date>-codex.md` (D39).
 | Catalog digest the client saw | PENDING OWNER |
 | Catalog digest of the artifact | PENDING OWNER |
 | Auth | local stdio proxy with a `cml1` lease (`comms mcp --stdio`) |
-| Visible tools (count; all 109 listed?) | PENDING OWNER |
+| Visible tools (count; every catalog tool listed? 130 since A47) | PENDING OWNER |
 | A read: `comms_group_list`, then `comms_context_recent` on a disposable group | PENDING OWNER |
 | A write: `comms_message_send` from the bot into the disposable group | PENDING OWNER |
 | A destructive call: `comms_message_delete` of that message (the client must mark it destructive and confirm) | PENDING OWNER |

@@ -50,6 +50,8 @@ RULED_MODIFIED = {
     },
     # comms v0.3 C27: FakeGraph appended beside the unchanged FakeMeta (the Meta contract oracle).
     "R-C27": {"src/whatsvault/providers/fake_meta.py"},
+    # The 2026-09-28 documentation audit: a banner saying what the imported README still describes.
+    "R-DOC1": {"README.md"},
 }
 RULED_ADDED: dict[str, set[str]] = {}
 

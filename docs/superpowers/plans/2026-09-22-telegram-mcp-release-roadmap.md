@@ -1,6 +1,6 @@
 # Telegram MCP V0.1.10 Release Roadmap
 
-**Status:** Draft for review; authorizes no implementation or production deployment.
+**Status:** Historical. Phases 1 to 5a followed this roadmap; comms (`docs/comms-spec-v0.3.md`) superseded it, and `CLAUDE.md` records where the work stands. The original status follows. Draft for review; authorizes no implementation or production deployment.
 
 **Goal:** Deliver the supplied ten-tool, single-owner Telegram gateway with project isolation, human consent and accountable disclosure, then qualify the exact release artifact against Gates A–R.
 

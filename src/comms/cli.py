@@ -24,6 +24,7 @@ from comms.cli_commands.operator import (
     operator_request,
 )
 from comms.cli_commands.tools import FAMILIES, add_tool_parsers, command_request
+from comms.mcp.stdio_proxy import DEFAULT_DAEMON
 
 __all__ = ["build_parser", "main"]
 
@@ -31,12 +32,17 @@ EXIT_USAGE = 2
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="comms", allow_abbrev=False)
+    parser = argparse.ArgumentParser(
+        prog="comms",
+        allow_abbrev=False,
+        epilog="status, start, stop, admin and rotate are forwarded to the legacy runtime CLI"
+        " (telegram-mcp --help).",
+    )
     sub = parser.add_subparsers(dest="verb", required=True)
     mcp = sub.add_parser("mcp", help="serve MCP to one local client", allow_abbrev=False)
     mcp.add_argument("--stdio", action="store_true", required=True, help="speak MCP over stdio")
     mcp.add_argument("--client-seed", type=Path, required=True, help="this client's 0600 seed file")
-    mcp.add_argument("--daemon", default="http://127.0.0.1:8765", help="the daemon's /mcp origin")
+    mcp.add_argument("--daemon", default=DEFAULT_DAEMON, help="the daemon's /mcp origin")
     mcp.add_argument("--runtime-dir", default=None, help="where the daemon's admin socket lives")
     selftest = sub.add_parser(
         "selftest-daemon",
@@ -424,6 +430,8 @@ def _mcp(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> None:
     argv = sys.argv[1:] if argv is None else argv
+    if argv in ([], ["-h"], ["--help"]):
+        build_parser().parse_args(argv or ["--help"])  # prints the comms usage and exits
     if argv[:1] and argv[0] in FAMILIES:
         code = _tool(build_parser().parse_args(argv))
         if code:

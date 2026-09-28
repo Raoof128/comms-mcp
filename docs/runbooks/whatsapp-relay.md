@@ -23,6 +23,8 @@ comms relay setup
    cd relay && npm ci && npx wrangler login
    ```
 
+   If your Cloudflare login can see more than one account, prefix every `wrangler` command below with `CLOUDFLARE_ACCOUNT_ID=<your account id>`. A piped `secret put` cannot answer Wrangler's account prompt.
+
 2. **Give the Worker its four values.** The path token is shown once on your own terminal (`tee /dev/tty`), because it ends Meta's callback URL. Type a new random value for the verify token.
 
    ```bash
@@ -38,6 +40,8 @@ comms relay setup
    - the verify token to the value from step 2.
 
    Meta verifies the callback with a handshake the Worker answers.
+
+   Then, under Webhook fields, subscribe to `messages` (and the `group_*` fields if you use WhatsApp groups). Meta sends nothing for a field you have not subscribed to.
 
 4. **Point the daemon at the relay.** In `comms.json`, add `"relay": {"url": "https://comms-relay.<your-subdomain>.workers.dev"}` and remove `webhook_port`. With a relay, the local listener is not served. Restart the daemon.
 

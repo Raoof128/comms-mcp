@@ -232,3 +232,15 @@ def test_the_proxy_forwards_only_to_a_loopback_daemon(origin):
     with pytest.raises(ProxyError):
         http_post(origin)
     assert http_post("http://127.0.0.1:8765") and http_post("http://[::1]:8765")
+
+
+def test_the_default_daemon_origin_is_where_the_daemon_listens():
+    """With no ``--daemon``, the proxy must reach the daemon's default ``local_port``."""
+    from comms.cli import build_parser
+    from comms.mcp.stdio_proxy import DEFAULT_DAEMON, parse_args
+    from comms.runtime.settings import HOST, LOCAL_PORT
+
+    assert DEFAULT_DAEMON == f"http://{HOST}:{LOCAL_PORT}"
+    assert parse_args(["--client-seed", "seed"]).daemon == DEFAULT_DAEMON
+    cli = build_parser().parse_args(["mcp", "--stdio", "--client-seed", "seed"])
+    assert cli.daemon == DEFAULT_DAEMON

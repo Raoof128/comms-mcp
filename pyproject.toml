@@ -1,7 +1,7 @@
 [project]
 name = "telegram-mcp"
 version = "0.1.10"
-description = "Read-only Telegram MCP gateway; development foundation"
+description = "comms: a Telegram and WhatsApp MCP gateway for one owner"
 requires-python = ">=3.12"
 dependencies = [
     "apscheduler==3.11.3",

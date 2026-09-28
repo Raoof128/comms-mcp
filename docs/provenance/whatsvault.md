@@ -20,6 +20,13 @@ returns `4.12.0 community`. The wheel is hash-pinned in `uv.lock`, so the native
 pinned by the lock itself — stronger than recording a Homebrew formula. No Homebrew SQLCipher is
 installed or used. Python 3.12.2, arm64.
 
+## Since the import
+
+The tree proof above held until comms v0.3. Deliberate changes since then are each made under a
+ruling: R-A16 retired the MCP app (539 tests became 450), R-C27 added the Meta contract oracle,
+and R-DOC1 added a banner to the README. `tests/integration/test_whatsvault_provenance.py` lists
+every divergence from the measured tree under its ruling, so an unruled edit still fails.
+
 ## What 5b-2 did not do
 
 Nothing inside the prefix was edited. WhatsVault's `apps/` is not installed into the root

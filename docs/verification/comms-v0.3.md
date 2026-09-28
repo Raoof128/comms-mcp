@@ -6,7 +6,7 @@ pins live in `docs/verification/comms-v0.3-rulings.md`, and `tests/security/test
 fails on any edit that is not pinned there. Plan: `docs/superpowers/plans/2026-09-24-comms-v0.3.md`
 rev 2, executed inline and test-first. A fail-fast full gate runs before every commit.
 
-Nothing here has touched Telegram or Meta. Live acceptance is owner-run and counts as evidence only.
+Each part below records the state at its own head; later parts supersede earlier ones where they differ. Until 2026-09-27 nothing here had touched Telegram or Meta; the live runs since are summarised under "Live operation" at the end. Live acceptance is owner-run and counts as evidence only.
 
 ## Part A: the constitutional cutover
 
@@ -316,7 +316,7 @@ The Part C adapter canaries (`tests/security/test_adapter_canaries.py`) still pa
 
 The smoke's comms phase runs the cutover when it builds its world. It then drives every surface: stdio, local HTTP, remote OAuth, the CLI over the admin socket, a campaign, an admin operation, a WhatsApp write and a replay. After that it runs `verify_all` over the legacy chain, the lineage and the comms chain. The check "audit verify --all is clean after every surface wrote" passes, with all three parts `ok`.
 
-The operator command `comms audit verify --all` parses, but it is not yet wired to a handler. See the follow-ups.
+The operator command `comms audit verify --all` parses, but it is not yet wired to a handler. See the follow-ups. (Wired in D39-PRE, Task E7: `runtime/operator/audit.py`.)
 
 ### Release gate (P §88)
 
@@ -341,7 +341,7 @@ Every row is owner-run acceptance (Task D39). None has run, and the gate proves 
 | Privacy | PENDING OWNER |
 | WhatsApp Groups (optional; may be `UNAVAILABLE`) | PENDING OWNER |
 
-**Blocker for every row.** The daemon does not yet open `comms.db` and serve the comms composition. The smoke assembles the composition in process. Until the daemon does this, no client can connect to a running daemon.
+**Blocker for every row.** The daemon does not yet open `comms.db` and serve the comms composition. The smoke assembles the composition in process. Until the daemon does this, no client can connect to a running daemon. (Lifted by D39-PRE below: `comms daemon` holds `comms.db` and serves everything.)
 
 ### Claim boundary (D5, verbatim from `docs/comms-spec-v0.3.md`)
 
@@ -751,3 +751,11 @@ The sweep also found two tools that could answer an error they didn't declare (`
 | `pytest tests/formal` | 57 passed |
 | ruff, format, mypy, build | clean |
 | WhatsVault | 450 passed |
+
+## Live operation (2026-09-27 to 2026-09-28)
+
+The owner's Mac runs comms under the owner's own user: no service accounts (see `CLAUDE.md`, Host state). Each step and its evidence is in `AGENT.md`:
+- **WhatsApp:** the relay is deployed (`https://comms-relay.raoof-r12.workers.dev`), Meta's callback verification passed, and a Meta test webhook was pulled, verified and archived. The W-Vault app is published, with its privacy policy at `https://raoof128.github.io/telegram-mcp/privacy/` (`site/`).
+- **Telegram:** the bot and the owner's account are logged in. Two live end-to-end runs drove the tools over HTTP `/mcp`: 49 tools in the owner's Saved Messages, and 68 tools as both actors in a throwaway group, deleted afterwards. Four sets of defects that no fake could show were fixed under rulings R-TG1 to R-TG4.
+
+These runs are evidence, not the D39-B records: the P §88 rows above stay `PENDING OWNER` until the runbooks' records are filled in.

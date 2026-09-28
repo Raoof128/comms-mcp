@@ -10,7 +10,7 @@
 
 **Spec:** [V0.1.10 engineering specification](../../../telegram-mcp-v0.1.10-final-engineering-spec.md), original SHA-256 `36b67f488415f2ab1c44b8d906de7f192fbe0dc562a2aeac76938b24c4a61b0a`. Read with the [release roadmap](2026-09-22-telegram-mcp-release-roadmap.md), particularly C1–C7.
 
-**Status:** Draft for review. No implementation has started. Commands and Python blocks below are instructions for the implementation stage, not evidence of completed tests.
+**Status:** Executed (Phase 1 complete; evidence `docs/verification/phase-1.md`). The original status follows. Draft for review. No implementation has started. Commands and Python blocks below are instructions for the implementation stage, not evidence of completed tests.
 
 ## Global Constraints
 

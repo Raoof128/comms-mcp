@@ -45,7 +45,8 @@ on-host identifier is unchanged. Evidence: `docs/verification/comms-5b1.md`.
 **Comms 5b-2** (branch `comms-5b2`): WhatsVault is imported intact at `b6fd51a` under
 `transports/whatsapp/` with full history (tree-hash proven; `docs/provenance/whatsvault.md`),
 importable as `whatsvault` in the one Python 3.12 environment. Its suite runs under its own
-pytest config (command above). Nothing in the subtree is edited until design §3.4 seams begin.
+pytest config (command above). The subtree is edited only under a ruling: every divergence from the
+imported tree is listed per ruling in `tests/integration/test_whatsvault_provenance.py`.
 **Comms 5b-3** (branch `comms-5b3`): owner-direct authority. The consent
 subsystem is deleted; receipts are v2 `owner_direct` (v1 kept byte-identical,
 verified by `proof_version`); admin authority is peer credentials; retired
@@ -96,8 +97,9 @@ request or frame (32 KiB raw per chunk, slice or inline file). Exit: `tests/secu
 - **The daemon side.** The daemon's `relay` loop pulls with signed requests, verifies, stores through the inbox, and acks. `comms relay setup` prints the owner's deploy steps. Runbook: `docs/runbooks/whatsapp-relay.md`.
 - **Evidence:** `docs/verification/comms-relay.md`.
 - **Exit test:** `tests/security/test_relay_exit.py`.
-Next: D39-B (owner-run, live), and deploying the relay (owner-run).
-Nothing here has ever touched Telegram; the Test DC harness is owner-run.
+**Live** (under the owner's user; see Host state): the relay was deployed on 2026-09-27 and a
+Meta test webhook went through it to the archive; the Telegram bot and user account have been
+logged in since 2026-09-28 and were driven live (rulings R-TG1 to R-TG4). Next: D39-B, the owner-run live acceptance records.
 
 ## Non-negotiables
 
@@ -124,7 +126,7 @@ Nothing here has ever touched Telegram; the Test DC harness is owner-run.
 ```bash
 uv sync --locked
 uv run python scripts/extract_contracts.py --check
-uv run pytest -q                                  # 5596 passed, 4 skipped
+uv run pytest -q                                  # 5632 passed, 4 skipped
 uv run python scripts/e2e_smoke.py                # 108 checks, end to end (34 against a real daemon; every tool swept; the relay under wrangler dev)
 uv run pytest tests/formal -q -s                  # 57 passed: 544 states/22 assertions; campaign 96,528/11; operations 4,728
 uv run ruff check src tests scripts
@@ -213,7 +215,12 @@ and `test_comms_protocol_frozen.py` pin that.
 A real Secure Enclave approval key and a transport key are still paired to the
 old certificate-signed consent bundle. Comms v0.2 retired both; deleting them
 and uninstalling the bundle is an owner-approved runbook step
-(`docs/comms-spec-v0.2.md`), never automated. No daemon pin is present,
-because no runtime has been provisioned. Service accounts, `/private/var/run/telegram-mcp` and the
-tunnel certificates have **not** been installed — both installers are
-idempotent and print their plan with `--dry-run`.
+(`docs/comms-spec-v0.2.md`), never automated. Service accounts, `/private/var/run/telegram-mcp`
+and the tunnel certificates have **not** been installed — both installers are idempotent and
+print their plan with `--dry-run`.
+
+The live runtime runs under the owner's own user instead: state in
+`~/Library/Application Support/comms/state`, the runtime directory beside it in `…/comms/run`,
+and the daemon on `local_port` 8866 (8766 and 8767 stay free for the gate's host probes). Nothing
+restarts the daemon yet, so check it is listening before live work, and stop it before the full
+gate. The WhatsApp relay is `https://comms-relay.raoof-r12.workers.dev`.
