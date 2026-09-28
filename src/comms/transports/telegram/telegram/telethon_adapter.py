@@ -488,6 +488,12 @@ class _PeerMissing(Exception):
 _AdminOutcome = Literal["SUCCEEDED", "FAILED"]
 _ADMIN_OUTCOMES: dict[type[BaseException], tuple[_AdminOutcome, str | None]] = {
     errors.ChatNotModifiedError: ("SUCCEEDED", None),
+    # R-TG4: a chat photo Telegram refused (live: PHOTO_CROP_SIZE_SMALL); nothing changed
+    errors.PhotoCropSizeSmallError: ("FAILED", "INVALID_ARGUMENT"),
+    errors.PhotoInvalidDimensionsError: ("FAILED", "INVALID_ARGUMENT"),
+    errors.PhotoExtInvalidError: ("FAILED", "INVALID_ARGUMENT"),
+    errors.PhotoInvalidError: ("FAILED", "INVALID_ARGUMENT"),
+    errors.ImageProcessFailedError: ("FAILED", "INVALID_ARGUMENT"),
     errors.UserAlreadyParticipantError: ("SUCCEEDED", None),
     errors.ChatAdminRequiredError: ("FAILED", "NOT_AUTHORIZED"),
     errors.RightForbiddenError: ("FAILED", "NOT_AUTHORIZED"),
@@ -1480,6 +1486,22 @@ class TelethonSession:
             return SendAttempt("ambiguous" if ambiguous else "failed")
         return SendAttempt("sent", message_id=_sent_message_id(result, random_id))
 
+    async def _channel_chats(self, result: Any, peer_id: int, timeout: float) -> list[Any]:
+        """The chats of a ``channels.getParticipant`` answer, with the channel in them: Telegram
+        can omit it (a creator's own answer did, live; R-TG2, R-TG4), and then one
+        ``messages.getPeerDialogs`` read carries it. ``channels.getChannels`` stays absent."""
+        chats = list(result.chats)
+        if any(getattr(c, "id", None) == peer_id for c in chats):
+            return chats
+        dialogs = await self.call_capability(
+            Capability.MEMBER_GET,
+            functions.messages.GetPeerDialogsRequest(
+                [types.InputDialogPeer(self.input_peer("channel", peer_id))]
+            ),
+            timeout=timeout,
+        )
+        return list(dialogs.chats)
+
     async def self_rights(self, peer_type: str, peer_id: int, *, timeout: float) -> SelfRights:
         """The account's own standing in a group (C17), one read RPC: ``channels.getParticipant
         (self)`` for a channel or supergroup, ``messages.getFullChat`` for a basic group."""
@@ -1496,17 +1518,9 @@ class TelethonSession:
                 )
             except errors.UserNotParticipantError:
                 return SelfRights("megagroup", "left")
-            chats = list(result.chats)
-            if not any(getattr(c, "id", None) == peer_id for c in chats):
-                dialogs = await self.call_capability(
-                    Capability.MEMBER_GET,
-                    functions.messages.GetPeerDialogsRequest(
-                        [types.InputDialogPeer(self.input_peer("channel", peer_id))]
-                    ),
-                    timeout=timeout,
-                )
-                chats = list(dialogs.chats)
-            return _channel_rights(result, peer_id, chats)
+            return _channel_rights(
+                result, peer_id, await self._channel_chats(result, peer_id, timeout)
+            )
         if peer_type == "chat":
             result = await self.call_capability(
                 Capability.MEMBER_GET,
@@ -1696,15 +1710,17 @@ class TelethonSession:
                 self.input_peer("channel", peer_id), types.InputUserSelf()
             )
             result = await self.call_capability(Capability.MEMBER_GET, request, timeout=timeout)
+            chats = await self._channel_chats(result, peer_id, timeout)
         elif peer_type == "chat":
             result = await self.call_capability(
                 Capability.MEMBER_GET,
                 functions.messages.GetFullChatRequest(peer_id),
                 timeout=timeout,
             )
+            chats = list(result.chats)
         else:
             raise GatewayError("NOT_ACCESSIBLE")
-        chat = next((c for c in result.chats if getattr(c, "id", None) == peer_id), None)
+        chat = next((c for c in chats if getattr(c, "id", None) == peer_id), None)
         if chat is None:
             raise GatewayError("NOT_ACCESSIBLE")
         banned = _flags(getattr(chat, "default_banned_rights", None))
