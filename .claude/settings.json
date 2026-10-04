@@ -53,7 +53,12 @@
       "mcp__comms__comms_message_unpin",
       "mcp__comms__comms_whatsapp_template_create",
       "mcp__comms__comms_whatsapp_template_delete",
-      "mcp__comms__comms_whatsapp_template_edit"
+      "mcp__comms__comms_whatsapp_template_edit",
+      "mcp__comms__comms_instagram_comment_reply",
+      "mcp__comms__comms_instagram_comment_hide",
+      "mcp__comms__comms_instagram_comments_enabled_set",
+      "mcp__comms__comms_instagram_comment_delete",
+      "mcp__comms__comms_instagram_message_send"
     ]
   }
 }

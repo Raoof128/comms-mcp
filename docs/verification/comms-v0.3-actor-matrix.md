@@ -123,7 +123,7 @@ MTProto rows cover both a basic group (`messages.*`) and a supergroup or channel
 
 ## Instagram (proposed A49)
 
-The Instagram API with Instagram Login (`graph.instagram.com`, `docs/instagram-spec-v0.6.md`). One actor, `instagram`, addressed by account (`iga_`), never by group, so these rows have their own column and the group actors have none here. Each row is proved by `tests/runtime/test_instagram_reads.py` (IG-2) and the later Instagram service tests.
+The Instagram API with Instagram Login (`graph.instagram.com`, `docs/instagram-spec-v0.6.md`). One actor, `instagram`, addressed by account (`iga_`), never by group, so these rows have their own column and the group actors have none here. Each row is proved by `tests/runtime/test_instagram_reads.py` (IG-2), `tests/runtime/test_instagram_writes.py` (IG-3) and the later Instagram service tests.
 
 | Tool | instagram |
 |---|---|
@@ -134,6 +134,11 @@ The Instagram API with Instagram Login (`graph.instagram.com`, `docs/instagram-s
 | `comms_instagram_comment_list` / `comms_instagram_comment_replies` | A done [comment.list]: `GET /{media-id}/comments`, `GET /{comment-id}/replies` |
 | `comms_instagram_tag_list` | A done [tag.list]: `GET /{ig-id}/tags` |
 | `comms_instagram_conversation_list` / `comms_instagram_conversation_messages` | A done [history.read]: `GET /me/conversations`, `GET /{conversation-id}`, `GET /{message-id}` |
+| `comms_instagram_comment_reply` | A done [comment.reply]: `POST /{comment-id}/replies` |
+| `comms_instagram_comment_hide` | A done [comment.hide]: `POST /{comment-id}?hide=` |
+| `comms_instagram_comments_enabled_set` | A done [media.comments_toggle]: `POST /{media-id}?comment_enabled=` |
+| `comms_instagram_comment_delete` | A done [comment.delete]: `DELETE /{comment-id}` |
+| `comms_instagram_message_send` | A done [message.reply]: `POST /{ig-id}/messages` (inside the 24-hour window, read live first) |
 
 ## Local tools (no provider actor)
 

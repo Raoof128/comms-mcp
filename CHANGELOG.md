@@ -1184,3 +1184,18 @@
 - **Verification:** new tests seen failing first; 68 Instagram tests pass, including one through the real dispatcher; MCP, egress sweep, host permissions, AI boundary, layering, facades and matrix behaviour suites pass; ruff, format, mypy clean; full gate on the commit in the main checkout (ledger line).
 - **Follow-ups:** IG-3 (comment and DM writes).
 
+
+### 2026-10-04 (Australia/Sydney), IG-3
+**Raouf:**
+- **Scope:** Plan task IG-3, proposed A49: the explicit outcome table, comment moderation and DM replies through the real mutation executor.
+- **Summary:**
+  - **Tools (147 in the catalog):** `comms_instagram_comment_reply` (CREATE; records the reply's `igc_`), `comment_hide`, `comments_enabled_set`, `comment_delete` and `message_send`. Each needs `account` (no default for a write), a `request_id`, the account's identity check, the capability (the `comms.json` ceiling: `writes`, or `dms` for a DM) and one Graph call, classified by `IG_CODES`. All five are in the ask list and the egress classes.
+  - **Classifier:** `transports/instagram/classify.py` holds section 8's table; an undocumented pair, a 5xx, a non-JSON body or an ambiguous transport error is `OUTCOME_UNKNOWN`, never retried; a connection never made is `PROVIDER_UNAVAILABLE`.
+  - **Adapter:** `InstagramAdmin` resolves each ref inside the target account (another account's ref is `NOT_FOUND` and sends nothing); `register()` lets IG-4's publishing join the same adapter.
+  - **DMs:** a pre-check reads the newest messages; a closed 24-hour window is `WINDOW_CLOSED` with nothing sent or recorded; `dm_disclosure` is appended; at most 1000 UTF-8 bytes.
+  - **Conformance:** `ADAPTER_CONTRACTS["instagram"]` now grows with the code (R-IG3 (8)): `capability` cases in IG-1, `context` in IG-2, `admin` here. The IG-1 and IG-2 commits were amended before landing, after the IG-1 gate found the gap.
+  - **Ruling R-IG5:** the reply argument is `text`; DM message ids are base64url; the catalog pin is regenerated (`c6eb7dee1cd3eb70…` to `afe1a371d3e0aa65…`).
+- **Files changed:** `src/comms/transports/instagram/{admin,classify}.py`; `src/comms/runtime/{instagram,adapters,facades}.py`; `src/comms/mcp/{egress,tools/instagram}.py`; `src/comms/core/providers/protocols.py`; `.claude/settings.json`; `docs/verification/comms-v0.3-{actor-matrix,rulings}.md`; tests (`tests/runtime/test_instagram_writes.py`, `tests/transports/instagram/test_classify.py`, `tests/conformance/instagram.py`, `test_protocols.py`, `test_catalog_pin.py`, the catalog pin).
+- **Verification:** new tests seen failing first; 162 Instagram tests pass, including crash at every executor point, replay, cross-account refs and the injected-comment case; MCP, conformance, egress sweep, host permissions, AI boundary, layering, facades, ambiguity and matrix suites pass; ruff, format, mypy clean; full gate on the commit in the main checkout (ledger line).
+- **Follow-ups:** IG-4 (publishing).
+

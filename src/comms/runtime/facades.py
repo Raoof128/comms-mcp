@@ -715,6 +715,11 @@ class _Facades:
             "instagram.tag_list": lambda cl, a: self.instagram().tag_list(cl.client_ref, a),
             "instagram.conversation_list": lambda cl, a: self.instagram().conversation_list(cl.client_ref, a),
             "instagram.conversation_messages": lambda cl, a: self.instagram().conversation_messages(a),
+            "instagram.comment_reply": lambda cl, a: self.instagram().comment_reply(cl.client_ref, a),
+            "instagram.comment_hide": lambda cl, a: self.instagram().comment_hide(cl.client_ref, a),
+            "instagram.comments_enabled_set": lambda cl, a: self.instagram().comments_enabled_set(cl.client_ref, a),
+            "instagram.comment_delete": lambda cl, a: self.instagram().comment_delete(cl.client_ref, a),
+            "instagram.message_send": lambda cl, a: self.instagram().message_send(cl.client_ref, a),
         }  # fmt: skip
 
 

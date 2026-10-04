@@ -65,6 +65,11 @@ CAPABILITY_TOOLS = {
     C.INSIGHTS_READ: "comms_instagram_media_insights",
     C.COMMENT_LIST: "comms_instagram_comment_list",
     C.TAG_LIST: "comms_instagram_tag_list",
+    # proposed A49 (IG-3): comment moderation
+    C.COMMENT_REPLY: "comms_instagram_comment_reply",
+    C.COMMENT_HIDE: "comms_instagram_comment_hide",
+    C.COMMENT_DELETE: "comms_instagram_comment_delete",
+    C.MEDIA_COMMENTS_TOGGLE: "comms_instagram_comments_enabled_set",
     C.REACTION_REMOVE: "comms_message_reaction_remove",
     C.REACTION_CLEAR: "comms_group_member_reactions_clear",
     C.PHONE_NUMBER_HEALTH: "comms_whatsapp_health_status",
@@ -170,10 +175,6 @@ PENDING_A49: dict[C, str] = {
     C.MEDIA_CONTAINER_CREATE: "IG-4",
     C.MEDIA_CAROUSEL_CREATE: "IG-4",
     C.MEDIA_PUBLISH: "IG-4",
-    C.COMMENT_REPLY: "IG-3",
-    C.COMMENT_HIDE: "IG-3",
-    C.COMMENT_DELETE: "IG-3",
-    C.MEDIA_COMMENTS_TOGGLE: "IG-3",
 }
 
 

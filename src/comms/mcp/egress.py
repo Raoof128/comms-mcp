@@ -71,6 +71,11 @@ _NAMES = frozenset(
         "comms_instagram_tag_list",  # proposed A49: usernames and labels
         "comms_instagram_conversation_list",  # proposed A49: usernames and labels
         "comms_instagram_conversation_messages",  # proposed A49: usernames and labels
+        "comms_instagram_comment_reply",  # proposed A49: the account's username
+        "comms_instagram_comment_hide",  # proposed A49: the account's username
+        "comms_instagram_comments_enabled_set",  # proposed A49: the account's username
+        "comms_instagram_comment_delete",  # proposed A49: the account's username
+        "comms_instagram_message_send",  # proposed A49: the account's username
     }
 )
 _IDENTITY = frozenset({"comms_admin_identity_inspect"})

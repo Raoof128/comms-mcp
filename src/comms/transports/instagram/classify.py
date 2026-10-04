@@ -13,6 +13,7 @@ fixed ``CommsError`` code.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Mapping
 from types import MappingProxyType
 from typing import Any
@@ -58,7 +59,8 @@ IG_CODES: Mapping[tuple[int, int | str | None], tuple[ResultKind, str | None]] =
         (613, None): (_T, "RATE_LIMITED"),
     }
 )
-_ID_KEYS = ("id",)
+# A created object's id (numeric) or a sent DM's message id (base64url-like): never path syntax.
+_REF = re.compile(r"\A(?:[0-9]{1,20}|[A-Za-z0-9_=-]{16,512})\Z")
 
 
 def _error(envelope: Mapping[str, Any] | None) -> tuple[Any, Any]:
@@ -95,7 +97,7 @@ def classify_write(
         ref = envelope.get(ref_key)
         if isinstance(ref, int) and not isinstance(ref, bool):
             ref = str(ref)
-        if isinstance(ref, str) and ref.isascii() and ref.isdigit() and len(ref) <= 20:
+        if isinstance(ref, str) and _REF.match(ref):
             return ProviderResult("SUCCEEDED", None, provider_ref=ref)
         return ProviderResult("OUTCOME_UNKNOWN", None)
     kind, name = _lookup(*_error(envelope))

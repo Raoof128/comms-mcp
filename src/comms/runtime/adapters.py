@@ -29,6 +29,7 @@ from comms.core.providers.protocols import ProviderTarget
 from comms.runtime.relay import Collector
 from comms.transports.instagram import store as instagram_store
 from comms.transports.instagram.accounts import AccountRuntime, InstagramAccounts
+from comms.transports.instagram.admin import InstagramAdmin
 from comms.transports.instagram.capability import InstagramCapability
 from comms.transports.instagram.config import InstagramSettings
 from comms.transports.instagram.http import GraphIgApi
@@ -268,6 +269,8 @@ def _instagram(
     accounts = InstagramAccounts(conn, settings, runtimes, clock=clock)
     adapters.instagram = accounts
     adapters.capability["instagram"] = InstagramCapability(accounts, clock=clock)
+    if runtimes:
+        adapters.admin["instagram"] = InstagramAdmin(accounts, conn, clock=clock)
 
 
 def _confirmer(conn: Any, versions: dict[str, int]) -> Callable[[str], None]:

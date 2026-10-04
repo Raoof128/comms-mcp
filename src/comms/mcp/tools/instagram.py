@@ -13,9 +13,12 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from comms.core.providers.capability import Capability as C
 from comms.core.providers.instagram_insights import ACCOUNT_METRICS, BREAKDOWNS, MEDIA_METRICS
 from comms.mcp.schemas import (
+    ACTOR,
     BOOL,
+    OUTCOMES,
     READ_FAILURES,
     array,
     enum,
@@ -25,6 +28,7 @@ from comms.mcp.schemas import (
     read,
     ref,
     string,
+    write,
 )
 from comms.mcp.spec import ToolSpec
 from comms.mcp.tools.context import CURSOR
@@ -302,4 +306,83 @@ READ_TOOLS: tuple[ToolSpec, ...] = (
     ),
 )
 
-INSTAGRAM_TOOLS: tuple[ToolSpec, ...] = READ_TOOLS
+_WRITE_FAILURES = ("IDENTITY_MISMATCH",)
+
+
+def _result(extra: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """A write's structured truth (P §73) on the account it named."""
+    return _out(
+        {
+            "actor": nullable(ACTOR),
+            "result": enum(OUTCOMES),
+            "code": nullable(string(1, 64)),
+            "op_ref": nullable(ref("operation")),
+            "replayed": BOOL,
+            **(extra or {}),
+        }
+    )
+
+
+def _write(
+    name: str, title: str, description: str, inputs: Mapping[str, Any], required: Sequence[str],
+    output: Mapping[str, Any], capability: C,
+) -> ToolSpec:  # fmt: skip
+    return write(
+        f"comms_instagram_{name}", title, description, f"instagram.{name}",
+        {"account": ALIAS, **inputs}, ["account", *required], output,
+        capability=capability, failures=_WRITE_FAILURES,
+    )  # fmt: skip
+
+
+COMMENT_WRITES: tuple[ToolSpec, ...] = (
+    _write(
+        "comment_reply",
+        "Reply to a comment",
+        "Publicly reply to one comment on the account's post. Name the account; the reply is "
+        "public and cannot be unsent by comms.",
+        {"comment": ref("instagram_comment"), "text": string(1, 2200)},
+        ["comment", "text"],
+        _result({"comment": nullable(ref("instagram_comment"))}),
+        C.COMMENT_REPLY,
+    ),
+    _write(
+        "comment_hide",
+        "Hide or unhide a comment",
+        "Hide (hide=true) or show again (hide=false) one comment. The owner's own comments "
+        "always show.",
+        {"comment": ref("instagram_comment"), "hide": BOOL},
+        ["comment", "hide"],
+        _result(),
+        C.COMMENT_HIDE,
+    ),
+    _write(
+        "comments_enabled_set",
+        "Turn comments on or off",
+        "Turn comments on (enabled=true) or off for one post. Not for live video.",
+        {"media": ref("instagram_media"), "enabled": BOOL},
+        ["media", "enabled"],
+        _result(),
+        C.MEDIA_COMMENTS_TOGGLE,
+    ),
+    _write(
+        "comment_delete",
+        "Delete a comment",
+        "Delete one comment on the account's own post. Irreversible.",
+        {"comment": ref("instagram_comment")},
+        ["comment"],
+        _result(),
+        C.COMMENT_DELETE,
+    ),
+    _write(
+        "message_send",
+        "Send a DM reply",
+        "Reply by DM to a person who wrote within 24 hours (else FAILED WINDOW_CLOSED, nothing "
+        "sent). Text is at most 1000 UTF-8 bytes.",
+        {"person": ref("instagram_person"), "text": string(1, 1000)},
+        ["person", "text"],
+        _result(),
+        C.MESSAGE_REPLY,
+    ),
+)
+
+INSTAGRAM_TOOLS: tuple[ToolSpec, ...] = (*READ_TOOLS, *COMMENT_WRITES)

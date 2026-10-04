@@ -22,9 +22,10 @@ from comms.core.canonical import jcs_dumps
 from comms.core.errors import CommsError
 from comms.core.providers.capability import Capability as C
 from comms.core.providers.capability import CapabilityState as S
+from comms.core.providers.protocols import SemanticOperation
 from comms.services.capability import STATE_CODE, CapabilityService
 from comms.services.handles import ContextHandles
-from comms.services.mutations import MutationExecutor
+from comms.services.mutations import CallContext, MutationExecutor
 from comms.transports.instagram import insights, store
 from comms.transports.instagram.accounts import ACTOR, AccountRuntime, InstagramAccounts
 from comms.transports.instagram.classify import graph_read
@@ -42,11 +43,13 @@ from comms.transports.instagram.messages import (
     conversation_id,
     conversation_items,
     message_items,
+    window_open,
 )
 
 __all__ = ["InstagramService"]
 
 _PAGE = 25
+_WINDOW_LOOKBACK = 5  # the newest messages the window check reads (D-I8)
 
 
 class InstagramService:
@@ -291,6 +294,109 @@ class InstagramService:
         thread = conversation_id(runtime, igsid, self._throttle)
         items = message_items(runtime, thread, igsid, int(args.get("limit", 10)), self._throttle)
         return {**self._head(runtime, username), "person": args["person"], "items": items}
+
+    # -- writes (IG-3) ----------------------------------------------------------------------------
+
+    def _write(
+        self,
+        client: str,
+        tool: str,
+        a: Mapping[str, Any],
+        capability: C,
+        args: Mapping[str, Any],
+        *,
+        on_created: Callable[[AccountRuntime], Callable[[Any, str], Mapping[str, Any]]]
+        | None = None,
+        prepare: Callable[[AccountRuntime], dict[str, Any] | None] | None = None,
+    ) -> dict[str, Any]:
+        """One write: the named account (never a default, D-I5), its identity, its ceiling
+        (``NOT_AUTHORIZED`` before anything is recorded), then the executor (A28, A41)."""
+        if self._executor is None:
+            raise CommsError("NOT_CONFIGURED")
+        runtime = self._accounts.resolve(a.get("account"), for_write=True)
+        username = self._accounts.username(runtime)
+        self._capability.require_for_write(ACTOR, runtime.target(), capability)
+        head = {**self._head(runtime, username), "actor": ACTOR}
+        if prepare is not None:
+            refused = prepare(runtime)  # a check that answers without a provider write
+            if refused is not None:
+                return {**head, **refused}
+        outcome = self._executor.provider(
+            CallContext(client), tool, runtime.target(), SemanticOperation(capability, dict(args)),
+            a["request_id"], on_created=None if on_created is None else on_created(runtime),
+        )  # fmt: skip
+        extra = {k: v for k, v in outcome.result.items() if k not in ("state", "code")}
+        return {**head, "result": outcome.state, "code": outcome.code, "op_ref": outcome.op_ref,
+                "replayed": outcome.replayed, **extra}  # fmt: skip
+
+    def _owned(self, runtime: AccountRuntime, ref: object, kind: str) -> None:
+        """``NOT_FOUND`` before anything is recorded for a ref of another account or kind."""
+        store.resolve_object(self._conn, ref, kind, runtime.account_id)
+
+    def _created(
+        self, kind: str, key: str
+    ) -> Callable[[AccountRuntime], Callable[[Any, str], Mapping[str, Any]]]:
+        def bind(runtime: AccountRuntime) -> Callable[[Any, str], Mapping[str, Any]]:
+            def made(conn: Any, provider_ref: str) -> Mapping[str, Any]:
+                return {
+                    key: store.object_ref(
+                        conn, runtime.account_id, kind, provider_ref, now=self._clock()
+                    )
+                }
+
+            return made
+
+        return bind
+
+    def comment_reply(self, client: str, a: Mapping[str, Any]) -> dict[str, Any]:
+        def prepare(runtime: AccountRuntime) -> None:
+            self._owned(runtime, a["comment"], "comment")
+
+        result = self._write(
+            client, "comms_instagram_comment_reply", a, C.COMMENT_REPLY,
+            {"comment": a["comment"], "text": a["text"]},
+            on_created=self._created("comment", "comment"), prepare=prepare,
+        )  # fmt: skip
+        return {"comment": None, **result}
+
+    def comment_hide(self, client: str, a: Mapping[str, Any]) -> dict[str, Any]:
+        return self._write(
+            client, "comms_instagram_comment_hide", a, C.COMMENT_HIDE,
+            {"comment": a["comment"], "hide": a["hide"]},
+            prepare=lambda runtime: self._owned(runtime, a["comment"], "comment"),
+        )  # fmt: skip
+
+    def comments_enabled_set(self, client: str, a: Mapping[str, Any]) -> dict[str, Any]:
+        return self._write(
+            client, "comms_instagram_comments_enabled_set", a, C.MEDIA_COMMENTS_TOGGLE,
+            {"media": a["media"], "enabled": a["enabled"]},
+            prepare=lambda runtime: self._owned(runtime, a["media"], "media"),
+        )  # fmt: skip
+
+    def comment_delete(self, client: str, a: Mapping[str, Any]) -> dict[str, Any]:
+        return self._write(
+            client, "comms_instagram_comment_delete", a, C.COMMENT_DELETE, {"comment": a["comment"]},
+            prepare=lambda runtime: self._owned(runtime, a["comment"], "comment"),
+        )  # fmt: skip
+
+    def message_send(self, client: str, a: Mapping[str, Any]) -> dict[str, Any]:
+        """A DM reply inside the 24-hour window (D-I8): the window is read live first, and a
+        closed window answers ``FAILED WINDOW_CLOSED`` with nothing recorded or sent."""
+        footer = self._accounts.settings.dm_disclosure
+        text = a["text"] if not footer else f"{a['text']}\n\n{footer}"
+
+        def prepare(runtime: AccountRuntime) -> dict[str, Any] | None:
+            igsid = store.resolve_object(self._conn, a["person"], "person", runtime.account_id)
+            thread = conversation_id(runtime, igsid, self._throttle)
+            recent = message_items(runtime, thread, igsid, _WINDOW_LOOKBACK, self._throttle)
+            if window_open(recent, timeutil.utc(self._clock())):
+                return None
+            return {"result": "FAILED", "code": "WINDOW_CLOSED", "op_ref": None, "replayed": False}
+
+        return self._write(
+            client, "comms_instagram_message_send", a, C.MESSAGE_REPLY,
+            {"person": a["person"], "text": text}, prepare=prepare,
+        )  # fmt: skip
 
 
 def _query(args: Mapping[str, Any]) -> dict[str, Any]:
