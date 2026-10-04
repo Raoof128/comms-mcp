@@ -161,8 +161,8 @@ def test_tools_list_payload_structurally_identical_ignoring_jsonrpc_framing():
     unframed = json.loads(json.dumps(framed))["result"]["tools"]
     assert unframed == payload == tools_list_payload()
     assert [t["name"] for t in payload] == PIN["names"]
-    for entry in payload:
-        assert set(entry) == {
+    for entry in payload:  # proposed A49: ``_meta`` only on a flagged tool (test_catalog_meta)
+        assert set(entry) - {"_meta"} == {
             "name",
             "title",
             "description",
@@ -170,6 +170,7 @@ def test_tools_list_payload_structurally_identical_ignoring_jsonrpc_framing():
             "outputSchema",
             "annotations",
         }
+        assert "_meta" not in entry or BY_NAME[entry["name"]].requires_user_interaction
 
 
 # Proposed A49: an Instagram capability whose tool a later plan task builds (as the actor

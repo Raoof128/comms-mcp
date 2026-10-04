@@ -325,12 +325,13 @@ def _result(extra: Mapping[str, Any] | None = None) -> dict[str, Any]:
 
 def _write(
     name: str, title: str, description: str, inputs: Mapping[str, Any], required: Sequence[str],
-    output: Mapping[str, Any], capability: C,
+    output: Mapping[str, Any], capability: C, *, prompt: bool = False,
 ) -> ToolSpec:  # fmt: skip
+    """``prompt``: public or irreversible, so the host asks on every call (D-I3, section 11)."""
     return write(
         f"comms_instagram_{name}", title, description, f"instagram.{name}",
         {"account": ALIAS, **inputs}, ["account", *required], output,
-        capability=capability, failures=_WRITE_FAILURES,
+        capability=capability, failures=_WRITE_FAILURES, requires_user_interaction=prompt,
     )  # fmt: skip
 
 
@@ -344,6 +345,7 @@ COMMENT_WRITES: tuple[ToolSpec, ...] = (
         ["comment", "text"],
         _result({"comment": nullable(ref("instagram_comment"))}),
         C.COMMENT_REPLY,
+        prompt=True,
     ),
     _write(
         "comment_hide",
@@ -372,6 +374,7 @@ COMMENT_WRITES: tuple[ToolSpec, ...] = (
         ["comment"],
         _result(),
         C.COMMENT_DELETE,
+        prompt=True,
     ),
     _write(
         "message_send",
@@ -382,6 +385,7 @@ COMMENT_WRITES: tuple[ToolSpec, ...] = (
         ["person", "text"],
         _result(),
         C.MESSAGE_REPLY,
+        prompt=True,
     ),
 )
 
@@ -486,6 +490,7 @@ PUBLISH_WRITES: tuple[ToolSpec, ...] = (
         ["container"],
         _result({"media": nullable(ref("instagram_media"))}),
         C.MEDIA_PUBLISH,
+        prompt=True,
     ),
 )
 

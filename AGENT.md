@@ -1340,3 +1340,15 @@ Follow the user's engineering lifecycle: design/security analysis, implementatio
 - **Verification:** new tests seen failing first, including the replay flaw against the unfixed service; 241 Instagram tests pass, including every crash point, replay, the budget, the quota and cross-account children; MCP, conformance, egress, host permissions, AI boundary, layering, wire-size, runtime, ambiguity and matrix suites pass (1427); ruff, format, mypy clean; full gate on the commit in the main checkout (ledger line).
 - **Follow-ups:** IG-5 (`requires_user_interaction` through the daemon).
 
+
+### 2026-10-04 (Australia/Sydney), IG-5
+**Raouf:**
+- **Scope:** Plan task IG-5, proposed A49: `requires_user_interaction` from the catalog through the daemon and the stdio proxy.
+- **Summary:**
+  - **Flag:** `ToolSpec.requires_user_interaction` (false by default); `write(..., requires_user_interaction=)`; set on `comms_instagram_publish`, `comment_reply`, `comment_delete` and `message_send`. Claude Code then prompts on every call to them, in every permission mode (D-I3); all four stay in the ask list too.
+  - **Wire:** `_entry` emits `"_meta": {"anthropic/requiresUserInteraction": true}` only for a flagged tool, so no other entry or digest changes; `mcp/http.py` `_tools()` passes it to `types.Tool`, which the daemon builds field by field; the stdio proxy's `ListToolsResult.model_validate` keeps it.
+  - **Ruling R-IG7:** the alias spelling `_meta=` (mypy); the structural `tools/list` test allows `_meta` on a flagged tool only; the pin is regenerated (`de8c9897d107510b…` to `e8d5da8e115a14a6…`, four digests).
+- **Files changed:** `src/comms/mcp/{spec,catalog,http,schemas,tools/instagram}.py`; `docs/verification/comms-v0.3-rulings.md`; tests (`tests/mcp/test_catalog_meta.py`, `test_stdio_proxy.py`, `test_catalog_pin.py`, the catalog pin).
+- **Verification:** the four new tests seen failing first; MCP, host permissions, AI boundary, wire-size and publishing suites pass (903); ruff, format, mypy clean; full gate on the commit in the main checkout (ledger line).
+- **Follow-ups:** IG-6 (doctor, smoke sweep, runbooks, exit test, CLAUDE.md).
+

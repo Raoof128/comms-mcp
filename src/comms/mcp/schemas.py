@@ -175,6 +175,7 @@ def write(
     idempotent: bool = False,
     open_world: bool = False,
     failures: Sequence[str] = (),
+    requires_user_interaction: bool = False,
 ) -> ToolSpec:
     """A write. With ``capability`` it is a provider write whose annotations come from
     ``SEMANTICS``; without, a local write whose annotations are given. ``destructive=True``
@@ -199,4 +200,5 @@ def write(
         requires_request_id=True,
         failure_modes=tuple(dict.fromkeys(failures)),
         service=service,
+        requires_user_interaction=requires_user_interaction,
     )

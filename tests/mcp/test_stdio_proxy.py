@@ -105,6 +105,19 @@ async def test_proxy_forwards_tools_list_and_calls(daemon):
     assert daemon["seen"] == [("capability.list", daemon["cli"])]
 
 
+async def test_a_proxied_tools_list_keeps_meta(daemon):
+    """Proposed A49 (IG-5): ``_meta`` crosses the daemon's ``/mcp`` and the proxy's
+    ``ListToolsResult.model_validate`` unchanged, so the host sees the prompt flag."""
+    from mcp import types
+
+    listed = await asyncio.to_thread(_proxy(daemon).list_tools)
+    raw = {t["name"]: t for t in listed["tools"]}
+    assert raw["comms_instagram_publish"]["_meta"] == {"anthropic/requiresUserInteraction": True}
+    assert "_meta" not in raw["comms_capability_list"]
+    tools = {t.name: t for t in types.ListToolsResult.model_validate(listed).tools}
+    assert tools["comms_instagram_message_send"].meta == {"anthropic/requiresUserInteraction": True}
+
+
 async def test_every_forwarded_request_carries_a_fresh_lease(daemon):
     tokens = []
     real = http_post(f"http://127.0.0.1:{daemon['port']}")

@@ -139,7 +139,13 @@ def _check(catalog: tuple[ToolSpec, ...]) -> None:
 _check(TOOL_CATALOG)
 
 
+_PROMPT = {"anthropic/requiresUserInteraction": True}
+
+
 def _entry(spec: ToolSpec) -> dict[str, Any]:
+    """One ``tools/list`` entry. ``_meta`` appears only on a flagged tool, so no other entry or
+    digest changes (proposed A49, section 11)."""
+    meta = {"_meta": dict(_PROMPT)} if spec.requires_user_interaction else {}
     return {
         "name": spec.name,
         "title": spec.title,
@@ -152,6 +158,7 @@ def _entry(spec: ToolSpec) -> dict[str, Any]:
             "idempotentHint": spec.idempotent,
             "openWorldHint": spec.open_world,
         },
+        **meta,
     }
 
 

@@ -83,6 +83,7 @@ def _tools() -> list[types.Tool]:
                 idempotent_hint=entry["annotations"]["idempotentHint"],
                 open_world_hint=entry["annotations"]["openWorldHint"],
             ),
+            _meta=entry.get("_meta"),  # built field by field: without this, _meta is dropped
         )
         for entry in tools_list_payload()
     ]

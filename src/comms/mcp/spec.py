@@ -23,3 +23,5 @@ class ToolSpec:
     requires_request_id: bool
     failure_modes: tuple[str, ...]
     service: str  # "<service>.<method>" in the ServiceRegistry
+    # proposed A49 (D-I3): the host prompts on every call, whatever its permission mode
+    requires_user_interaction: bool = False
