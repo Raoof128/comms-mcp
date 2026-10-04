@@ -17,7 +17,7 @@
 ## Global constraints
 
 - **Branch and approvals.** Work on branch `comms-instagram-spec` (this plan and the spec are already on it). Merge, push and the ruling R-IG0 only with the owner's approval.
-- **Commits.** Commit only when the full gate shows `GATE ok=1`. Write nothing in-tree while a gate runs.
+- **Commits.** Commit only when the full gate shows `GATE ok=1`. Write nothing in-tree while a gate runs. Executed with a development worktree (branch `ig-work`): each task is committed there, gated in the main checkout on that exact commit, and only then is `comms-instagram-spec` moved to it (R-IG1).
 - **Secrets.** A token reaches `comms instagram account add` only on a pipe. Never commit, log or print one. Tests use fake tokens of the documented shape.
 - **Fail closed.** `UNKNOWN` is never `AVAILABLE`; a rejected proof leaves the working slot active; a classifier miss is `OUTCOME_UNKNOWN`.
 - **One copy of each rule.** URL validation in `urls.py`; the error table in `classify.py`; the insight tables in `insights.py`; the alias grammar in `settings.py`.
@@ -59,10 +59,8 @@ Spec: sections 3, 4, 14 items 2, 3 (accounts part), 7, 8, 11.
 - `src/comms/mcp/schemas.py`: `ACTOR` enum gains `"instagram"`.
 - `src/comms/core/audit/specs.py`: `_ACTORS` gains `"instagram"`.
 - `src/comms/runtime/comms_runtime.py`, `src/comms/runtime/selftest.py`: `_ACTORS` gains `"instagram"`.
-- `src/comms/core/refs.py`: `"instagram_account": "iga_"`, `"instagram_container": "igk_"`, `"instagram_media": "igm_"`, `"instagram_comment": "igc_"`.
-- `src/comms/core/storage/migrations.py`: `Migration(10, SCHEMA_V10)`: `instagram_accounts(id, ref, alias UNIQUE, label, user_id, obtained_at, expires_at, last_identity_check_at, tombstoned_at)`, `instagram_containers(id, ref, account_id, kind CHECK IN (image, reel, carousel, child), creation_id, created_at, status, published_media_ref)`; `instagram` added to every `transport` CHECK; `igm_`, `igc_` in `provider_objects.kind` CHECK. `SCHEMA_VERSION = 10`.
-- `src/comms/core/objects.py`: `_TRANSPORTS`, `KIND_PREFIX`.
-- `src/comms/core/campaigns/directory.py`: `CONTACT_TRANSPORTS`, `DESTINATION_TRANSPORTS` gain `instagram`; an IGSID normaliser (`\A[0-9]{5,20}\Z`).
+- `src/comms/core/refs.py`: `"instagram_account": "iga_"`, `"instagram_container": "igk_"`, `"instagram_media": "igm_"`, `"instagram_comment": "igc_"`, `"instagram_person": "igp_"` (R-IG2).
+- `src/comms/core/storage/migrations.py`: `Migration(10, SCHEMA_V10)`: `instagram_accounts(id, ref, alias, user_id, obtained_at, expires_at, last_identity_check_at, created_at, removed_at)` with one live row per alias and per `user_id`; `instagram_containers(id, ref, account_id, kind CHECK IN (image, reel, carousel, child), creation_id, created_at, status, media_ref)`; `instagram_objects(id, ref, account_id, kind CHECK IN (media, comment, person), provider_identity, created_at, last_seen_at)`. No existing table changes (R-IG2).
 - `src/comms/core/keys/purposes.py`: `PurposePattern("meta-ig-access-token.", "opaque", "staged", False, "at_rotation")` and `purpose_of(name) -> KeyPurpose | None` that resolves a static name or a pattern match (alias grammar from settings).
 - `src/comms/core/keys/secrets.py`: `SECRET_ITEMS` check uses `purpose_of`.
 - `src/comms/core/credentials.py` `_credential`, `src/comms/runtime/operator/credentials.py` `_purpose`: use `purpose_of`.
@@ -94,8 +92,8 @@ Spec: sections 5.1 (minus `publish_quota`, `publish_preview`), 7, 9, 14 items 4,
 - `src/comms/transports/instagram/{media,comments,insights,messages,context}.py` (reads only).
 - `src/comms/services/instagram.py` (reads).
 - `src/comms/mcp/tools/instagram.py`: the 12 read `ToolSpec`s; `src/comms/mcp/tools/__init__.py` `FAMILIES` gains it.
-- `src/comms/services/context.py`: `_PROVENANCE["instagram"] = {"instagram_live"}`.
-- `src/comms/mcp/tools/account.py`, `src/comms/core/identities.py`: identity inspect for `iga_`, `igm_`, `igc_`.
+- Paging: Meta's `after` cursor becomes a `cur_` through `ContextHandles` (target `iga_`, actor `instagram`); `src/comms/services/context.py` is not changed (R-IG2).
+- `src/comms/mcp/tools/account.py`, `src/comms/core/identities.py`: identity inspect for `iga_`, `igk_`, `igm_`, `igc_`, `igp_`.
 - `docs/verification/comms-v0.3-actor-matrix.md`: fifth column; existing rows get `— : not an Instagram tool`; 12 new rows.
 - `tests/core/providers/test_actor_matrix.py`: `ACTORS` from the header row; `_rows` accepts 5 cells.
 - `tests/mcp/catalog_pin.json`: regenerated.

@@ -1141,3 +1141,16 @@
   - GI-1 (Bearer on `graph.instagram.com`, including `/refresh_access_token`) is the first live step and can stop MI-1 for a ruling;
   - open questions 1 to 4 in the spec need owner answers before MI-3.
 
+
+### 2026-10-04 (Australia/Sydney), IG-0
+**Raouf:**
+- **Scope:** Plan `2026-10-04-comms-instagram.md` task IG-0: pre-flight for proposed A49 (Instagram). No production code.
+- **Summary:**
+  - Baseline gate on `6e51350` (this host: Linux, running as root, no IPv6): pytest 5623 passed, 6 skipped, 7 failed; smoke 106 of 108; formal, ruff, format, mypy, build, WhatsVault and the relay all pass. The 7 pytest failures (`test_install.py` x4, `test_v03_part_b_exit.py`, `test_audit_handlers.py` anchor repair, `test_doctor.py` off-probe) and the 2 smoke failures (`doctor headless`: IPv6 unavailable; `install plans are inert`) are host artefacts and form the reference set later gates must not grow.
+  - Ruling R-IG1: execution in a development worktree (branch `ig-work`), gating each task commit in the main checkout before `comms-instagram-spec` moves; the Instagram spec joins the pins `test_v03_preflight.py` enforces.
+  - Ruling R-IG2: Instagram keeps its own three tables and an `igp_` ref for a DM counterpart (no `rcp_`/`cmg_` reuse, so no transport CHECK changes); Instagram reads are their own tools paging through `cur_`; `--exchange` deferred; the token is typed at the hidden prompt. Spec and plan amended and pinned.
+  - The v0.6 gauntlet record is copied to `docs/verification/instagram-gauntlet-v0.6.md`.
+- **Files changed:** `docs/instagram-spec-v0.6.md`, `docs/superpowers/plans/2026-10-04-comms-instagram.md`, `docs/verification/comms-v0.3-rulings.md`, `docs/verification/instagram-gauntlet-v0.6.md` (new), `tests/security/test_v03_preflight.py`, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** `tests/security/test_v03_preflight.py` passes, and fails when the Instagram spec drifts from its pin (seen failing). Doc tests green.
+- **Follow-ups:** IG-1 (the actor exists).
+

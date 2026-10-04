@@ -1,6 +1,6 @@
 # Instagram for comms: specification v0.6 rev 2 (proposed amendment A49)
 
-**Status:** Proposed, revision 2, 4 October 2026 (Australia/Sydney). Revision 2 answers the v0.6 gauntlet (`GAUNTLET-v0.6.md` in `Raoof128/Instagram-MCP`, `85cf0b1`): the publish design is re-cut to fit the mutation executor as it is, every code change the proposal needs is listed in section 14, and the wording the gauntlet marked wrong or loose is fixed. Not yet adopted: `docs/comms-spec-v0.3.md` is unchanged and stays pinned until ruling R-IG0 appends A49 and re-pins it, as A45 to A48 were added.
+**Status:** Proposed, revision 2, 4 October 2026 (Australia/Sydney). Revision 2 answers the v0.6 gauntlet (`GAUNTLET-v0.6.md` in `Raoof128/Instagram-MCP`, `85cf0b1`): the publish design is re-cut to fit the mutation executor as it is, every code change the proposal needs is listed in section 14, and the wording the gauntlet marked wrong or loose is fixed. Ruling R-IG2 (pre-flight, before any code) keeps Instagram in its own three tables with an `igp_` ref for a DM counterpart instead of reusing `rcp_` and `cmg_`, serves Instagram reads through their own tools rather than the context engine, and defers `--exchange`; sections 4, 5, 9, 12 and 14 carry those changes. Not yet adopted: `docs/comms-spec-v0.3.md` is unchanged and stays pinned until ruling R-IG0 appends A49 and re-pins it, as A45 to A48 were added.
 **Owner:** Raouf.
 **Plan:** `docs/superpowers/plans/2026-10-04-comms-instagram.md` (task by task, agent-executable).
 **Supersedes:** the TypeScript `Instagram MCP Server: Specification v0.5` (`Raoof128/Instagram-MCP`, `SPEC.md` at `7096036`, gauntleted in `GAUNTLET-v0.5.md` at `cdae96e`) and revision 1 of this document (`d9b6aa9`).
@@ -98,9 +98,9 @@ src/comms/services/instagram.py    # the service every tool calls (A37); builds 
 ## 4. Accounts
 
 ### 4.1 Refs and identities
-- New prefixes in `CORE_PREFIXES` (`core/refs.py`): `iga_` (account), `igk_` (container), `igm_` (media), `igc_` (comment). DM messages reuse `cmg_`, people `rcp_`. None collides with the Telegram `REF_PREFIXES` or WhatsVault `PREFIXES`; `tests/core/test_refs_v03.py::test_v03_prefixes_disjoint_from_telegram_whatsvault_and_5b4` pins that. `req_` and `op_` are the executor's existing refs.
+- New prefixes in `CORE_PREFIXES` (`core/refs.py`): `iga_` (account), `igk_` (container), `igm_` (media), `igc_` (comment), `igp_` (a DM counterpart, R-IG2). DM messages carry no ref: they are read-only items. `rcp_` and `cmg_` are not reused, because their tables carry `transport` CHECKs that feed the campaign engine, and Instagram joins no campaign in v1 (D-I8). None collides with the Telegram `REF_PREFIXES` or WhatsVault `PREFIXES`; `tests/core/test_refs_v03.py::test_v03_prefixes_disjoint_from_telegram_whatsvault_and_5b4` pins that. `req_` and `op_` are the executor's existing refs.
 - Aliases match `[a-z0-9_-]{1,32}` **and contain none of** `token`, `secret`, `key`, `password`, `seed`, because `comms.json`'s `_no_secrets` check refuses any key containing them (`runtime/settings.py`).
-- An `iga_` row holds alias, label, `user_id`, `obtained_at`, `expires_at`, `last_identity_check_at`. An `igk_` row holds account, kind (`image`, `reel`, `carousel`, `child`), `creation_id`, `created_at`, `status` as last seen, `published_media` (`igm_`). Both are new tables in schema migration **v10** (section 14). Identities live inside SQLCipher `comms.db` (`core/storage/db.py`; `tests/security/test_v03_egress.py::test_the_database_files_hold_no_plaintext_canary`) and leave only through `comms_admin_identity_inspect` (A44).
+- An `iga_` row holds alias, `user_id`, `obtained_at`, `expires_at`, `last_identity_check_at`, `removed_at` (labels and policy stay in `comms.json`). An `igk_` row holds account, kind (`image`, `reel`, `carousel`, `child`), `creation_id`, `created_at`, `status` as last seen, `media_ref` (`igm_`). An `igm_`, `igc_` or `igp_` row holds account, kind and the provider identity. They are three new tables in schema migration **v10** (section 14); no existing table changes. Identities live inside SQLCipher `comms.db` (`core/storage/db.py`; `tests/security/test_v03_egress.py::test_the_database_files_hold_no_plaintext_canary`) and leave only through `comms_admin_identity_inspect` (A44).
 
 ### 4.2 Secret purposes (A9, A13, A38)
 - `meta-ig-access-token.<alias>`: `opaque`, `staged`, not public, destroyed `at_rotation`. The registry is static today (`core/keys/purposes.py`); section 14 item 7 lists every file the parameterised form touches. A `.` separator keeps the slot directory flat (`<runtime>/secrets/<item>/<version>`).
@@ -125,13 +125,13 @@ src/comms/services/instagram.py    # the service every tool calls (A37); builds 
 
 ### 4.4 Operator commands (A37, never tools)
 ```bash
-comms instagram account add studio       # token on a pipe, never argv; proves /me; stores; records iga_; reloads
+comms instagram account add studio       # token at the hidden prompt, never argv, env or a pipe; proves /me; stores; records iga_; reloads
 comms instagram account list             # aliases, labels, policy, days to expiry. Never tokens or identities
 comms instagram account remove studio    # revokes the slot (A13 revoke), tombstones the iga_ row
 comms instagram token refresh [--all]    # staged: refresh, prove /me, activate, re-check, retire the old slot
 comms instagram doctor                   # per account: slot active, identity, expiry, quota, standing
 ```
-- `account add` stores the dashboard token as-is (long-lived ✅). `--exchange` is the explicit opt-in for a Business Login short-lived token; it reads the app secret from a pipe for that one call and never stores it.
+- `account add` stores the dashboard token as-is (long-lived ✅). The token is read exactly as `comms credential set` reads a credential: a TTY-only, non-echoing prompt (`cli_commands/operator.py`). The `ig_exchange_token` path for Business Login short-lived tokens is deferred (R-IG2): dashboard tokens need none.
 - Refresh persists the **returned** `access_token` as the new slot version 🔧, through `rotate_credential` (`core/credentials.py`: write, prove, one audited pointer switch, re-check, destroy). Serialisation comes from the audit writer lock. The maintenance runner refreshes when the token is at least 24 hours old and within 14 days of expiry 🧪 GI-2; `doctor` warns under 10 days.
 - Removal: the token is revoked in the slot; the owner also revokes the app in that account's Instagram settings and removes the tester role (runbook).
 
@@ -158,8 +158,8 @@ Every tool but `account_list` takes `account` (alias). Reads: optional, default 
 | `comms_instagram_comment_list` | `GET /<igm_>/comments` | `comment.list` | ✅ `igc_` refs |
 | `comms_instagram_comment_replies` | `GET /<igc_>/replies` | `comment.list` | ✅ |
 | `comms_instagram_tag_list` | `GET /<IG_ID>/tags` | `tag.list` | ✅ needs `manage_comments` 🔧 |
-| `comms_instagram_conversation_list` | `GET /me/conversations?platform=instagram` | `history.read` | ✅ one `rcp_` per counterpart |
-| `comms_instagram_conversation_messages` | takes an `rcp_`; comms resolves the conversation, then `GET /<conversation>?fields=messages`, then per message | `history.read` | 🧪 GI-8 shapes; 20 most recent only, sequential at 2 per second |
+| `comms_instagram_conversation_list` | `GET /me/conversations?platform=instagram` | `history.read` | ✅ one `igp_` per counterpart |
+| `comms_instagram_conversation_messages` | takes an `igp_`; comms resolves the conversation, then `GET /<conversation>?fields=messages`, then per message | `history.read` | 🧪 GI-8 shapes; 20 most recent only, sequential at 2 per second |
 | `comms_instagram_publish_quota` | `GET /<IG_ID>/content_publishing_limit?fields=quota_usage,config` (`since`, if given, no older than 24 h) | `publishing.quota_read` | ✅ host by doc 🔧; value 🧪 GI-3 |
 | `comms_instagram_publish_preview` | local plus one quota read | `publishing.quota_read` | D-I3: validates the exact args of one `container_create` or `carousel_create`, resolves the account, checks policy, quota and the `igk_` ledger, fetches the live `@username`, returns the preview and an advisory `preview_digest` (open question 3) |
 
@@ -173,7 +173,7 @@ Every tool but `account_list` takes `account` (alias). Reads: optional, default 
 | `comms_instagram_comment_hide` | `POST /<igc_>?hide=true\|false` ✅ | `comment.hide` | SET_STATE | ask |
 | `comms_instagram_comments_enabled_set` | `POST /<igm_>?comment_enabled=true\|false` ✅ | `media.comments_toggle` | SET_STATE | ask |
 | `comms_instagram_comment_delete` | `DELETE /<igc_>` ✅ | `comment.delete` | DESTRUCTIVE_NONIDEMPOTENT | **prompt** |
-| `comms_instagram_message_send` | `POST /<IG_ID>/messages` to an `rcp_` ✅ | `message.reply` | MESSAGE_SEND, no key | **prompt** |
+| `comms_instagram_message_send` | `POST /<IG_ID>/messages` to an `igp_` ✅ | `message.reply` | MESSAGE_SEND, no key | **prompt** |
 
 "prompt" means `requires_user_interaction` (section 11). All eight are in the host ask list anyway, because `write(capability=...)` forces `open_world=True` and `tests/security/test_host_permissions.py` ties every destructive or open-world `request_id` tool to `permissions.ask`; the prompt flag is additive.
 
@@ -251,7 +251,7 @@ Backoff with jitter per account applies to reads only. Usage headers, when prese
 
 ## 9. Context (`ContextSource`)
 
-`InstagramContext.read(query)` serves `recent` (media with captions), `comments` (for an `igm_`) and `conversation` (for an `rcp_`), provenance `instagram_live`, with `ctx_` handles bound as A30 requires. `services/context.py` `_PROVENANCE` gains `instagram: {instagram_live}` (today an unknown provenance fails closed `PROVIDER_UNAVAILABLE`). Every body is `untrusted_text`, control characters stripped, length capped. Nothing is persisted in v1.
+Instagram content is served by its own read tools through `services/instagram.py`, not by the `ContextEngine`, whose context tools address `grp_` refs (R-IG2). A Meta paging cursor becomes a client-bound `cur_` token through `ContextHandles`, with the `iga_` as the handle's target and `instagram` as its actor, exactly as group pages do (D9, A30). `services/context.py` `_PROVENANCE` is unchanged. Every body is `untrusted_text`, control characters stripped, length capped. Nothing is persisted in v1.
 
 ## 10. Webhooks (v2, not v1, all ℹ️ until a v2 gate)
 
@@ -269,7 +269,7 @@ Meta sends Instagram webhooks for the same app under `object: "instagram"`, fiel
 
 | Risk | Control |
 |---|---|
-| Prompt injection via captions, comments, DMs | Bodies only in `untrusted_text`; no write accepts retrieved text or a `ctx_` as authority (A32); every write names `account` and an `igk_`, `igm_`, `igc_` or `rcp_` |
+| Prompt injection via captions, comments, DMs | Bodies only in `untrusted_text`; no write accepts retrieved text or a `ctx_` as authority (A32); every write names `account` and an `igk_`, `igm_`, `igc_` or `igp_` |
 | Wrong-account writes | `account` required on writes; `user_id` identity check; live `@username` echoed; per-account policy; a child `igk_` of another account is refused by `carousel_create` |
 | Exfiltration through write args | The only outbound bytes a model controls are a caption, a comment or DM text, and a media URL that goes to Meta. URLs are validated and never fetched by comms |
 | Token theft | Tokens in the daemon's 0600 staged slots (A13), never in argv, env, MCP, logs or the repository (A38); revocable in Instagram settings; `comms instagram account remove` |
@@ -303,7 +303,7 @@ Meta sends Instagram webhooks for the same app under `object: "instagram"`, fiel
 | GI-5 | Insight metrics on real posts; `follow_type` versus `follower_type`; usage headers; codes 4, 17, 32, 613, 190 | Trim the metric tables; extend `IG_CODES` |
 | GI-6 | Claude Code prompts on the flagged tools through the proxy; Desktop behaviour | Ask rules in the runbook (already required) |
 | GI-7 | `comms mcp --stdio` connects under Claude Code with `MCP_PROTOCOL_NEGOTIATION` unset, `auto` and `legacy`, and under Desktop | Pin the `mcp` version that works; raise with the SDK |
-| GI-8 | Conversation and message shapes, `messages{...}` expansion, IGSID to `rcp_` (read side); a send inside the window (write side) | Fetch details per message with throttling |
+| GI-8 | Conversation and message shapes, `messages{...}` expansion, IGSID to `igp_` (read side); a send inside the window (write side) | Fetch details per message with throttling |
 
 Closed before any live run: GI-6's and GI-7's SDK halves (`GAUNTLET-v0.6.md` section A), and v0.5's G6 (comms emits `tools/list` itself), G7 (the proxy is dual-era) and G9 (no keychain).
 
@@ -313,13 +313,13 @@ Each item names the files and the pin it moves. The plan sequences them.
 
 1. **`mcp/http.py` `_tools()`** passes `meta=entry.get("_meta")`; `mcp/spec.py` gains `requires_user_interaction`; `mcp/catalog.py` `_entry` emits `_meta` when set. Pin: `tests/mcp/catalog_pin.json` (regenerated on purpose), `tests/mcp/test_catalog_pin.py`.
 2. **Actor enums:** `mcp/schemas.py` `ACTOR` (every write tool's output schema changes, so the whole pin regenerates), `core/audit/specs.py` `_ACTORS` (A7's closed enum, or every Instagram mutation fails to append), `runtime/comms_runtime.py` `_ACTORS`, `runtime/selftest.py`.
-3. **Schema migration v10** (`core/storage/migrations.py`, after v9): tables `instagram_accounts` (`iga_`) and `instagram_containers` (`igk_`); `instagram` in the `transport` CHECKs of `delivery_identities`, `contact_points`, `destinations`, `provider_objects`; `igm_` and `igc_` in the `provider_objects.kind` CHECK; `core/objects.py` `_TRANSPORTS` and `KIND_PREFIX`; `core/campaigns/directory.py` `CONTACT_TRANSPORTS` and `DESTINATION_TRANSPORTS`, with an IGSID normaliser injected per transport.
-4. **`services/context.py` `_PROVENANCE`** gains `instagram: {instagram_live}`.
+3. **Schema migration v10** (`core/storage/migrations.py`, after v9): tables `instagram_accounts` (`iga_`), `instagram_containers` (`igk_`) and `instagram_objects` (`igm_`, `igc_`, `igp_`). No existing CHECK, trigger or table changes (R-IG2).
+4. **Paging:** Instagram pages wrap Meta's cursor in a `cur_` through `services/handles.py` `ContextHandles` (target `iga_`, actor `instagram`). `services/context.py` is not changed (R-IG2).
 5. **`services/instagram.py`** calls `MutationExecutor.provider` directly with the `instagram` adapter and an `iga_`-keyed `ProviderTarget`; no `choose_actor`.
 6. **`core/providers/semantics.py`:** `SUPPORT` override table for `instagram`; `SEMANTICS` entries from 5.3; `READS` gains the read capabilities. `core/providers/capability.py` gains the 14 members. `core/providers/protocols.py` `ADAPTER_CONTRACTS` gains `instagram`. Tests: `tests/core/providers/test_protocols.py` (reads A49's capability phrases from this document), `test_semantics.py`, `test_adapter_contracts_match_a18`.
 7. **Parameterised purposes:** `core/keys/purposes.py` (a `pattern` entry `meta-ig-access-token.<alias>` beside the static map), `core/keys/secrets.py` `SECRET_ITEMS` and `FileSecretStore._check`, `core/credentials.py` `_credential`, `runtime/operator/credentials.py` `_purpose`, `runtime/proofs.py` `build_proofs` (one proof per alias from settings), `core/audit/specs.py` `_CREDENTIALS`, `tests/core/keys/test_purposes.py` DESIGN.
 8. **Settings:** `runtime/settings.py` `_TOP` gains `instagram`, a `_instagram()` validator (alias grammar, the secret-substring rule applied to aliases, `api_version` `\Av\d{2}\.0\Z`, `default` names a configured alias); `runtime/adapters.py` `AdapterSettings` gains `instagram_api_version`, `instagram_default`, `instagram_accounts`; `build_adapters` wires `_instagram`.
-9. **Identity inspect:** `mcp/tools/account.py` `comms_admin_identity_inspect` ref kinds and `core/identities.py` `identities_of` for `iga_`, `igk_`, `igm_`, `igc_`.
+9. **Identity inspect:** `mcp/tools/account.py` `comms_admin_identity_inspect` ref kinds and `core/identities.py` `identities_of` for `iga_`, `igk_`, `igm_`, `igc_`, `igp_`.
 10. **`mcp/egress.py` `_NAMES`** lists the eight writes (they echo `untrusted.username`), or `tests/security/test_v03_egress.py::test_every_tool_declares_its_egress_class` fails.
 11. **`tests/security/test_egress.py` `NETWORK_MODULES`** gains `transports/instagram/http.py`.
 12. **Actor matrix:** `docs/verification/comms-v0.3-actor-matrix.md` gains a fifth column and 22 rows; `tests/core/providers/test_actor_matrix.py` `ACTORS` and `_rows` read the header row.
@@ -334,7 +334,7 @@ Not required, confirmed: no new dependency; no change to the relay Worker, the p
 | # | Milestone | Done when |
 |---|---|---|
 | MI-1 | Items 1, 2, 7, 8 of section 14; `GraphIgApi`; `iga_` rows (migration v10, accounts part); `account add/list/remove`, `doctor`; identity proof | `comms instagram account add` stores and proves a real token; `doctor` passes; the whole gate is green with the regenerated pin; **GI-1, GI-2** pass |
-| MI-2 | Reads and context: items 4, 6 (reads), 9, 12; profile, media, comments, tags, insights, conversations, quota, preview | Two live accounts read; **GI-3, GI-4, GI-5, GI-8 (read side)** pass |
+| MI-2 | Reads and context: items 4, 6 (reads), 9, 12 (paging through `cur_`); profile, media, comments, tags, insights, conversations, quota, preview | Two live accounts read; **GI-3, GI-4, GI-5, GI-8 (read side)** pass |
 | MI-3 | Writes: comments, toggle, delete, DM reply; `IG_CODES`; items 5, 6 (writes), 10; the ask list | Executor tests pass; writes on a test post; **GI-8 (write side)** passes |
 | MI-4 | Publishing: `igk_` ledger, `container_create`, `carousel_create`, `publish`, quota and budget | Image, Reel and carousel published on a throwaway post; crash tests pass |
 | MI-5 | Hosts: `requires_user_interaction` live (item 1 wired to the four tools), host matrix, Desktop smoke | **GI-6, GI-7** resolved |

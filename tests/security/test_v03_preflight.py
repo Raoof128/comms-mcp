@@ -21,6 +21,7 @@ def test_the_spec_and_design_are_exactly_the_last_pinned_versions():
     for doc in (
         "docs/comms-spec-v0.3.md",
         "docs/superpowers/specs/2026-09-24-comms-v0.3-design.md",
+        "docs/instagram-spec-v0.6.md",  # proposed A49 (R-IG1): an edit is a ruling too
     ):
         pins = re.findall(
             rf"^\| `{re.escape(doc)}` [^|]*\| `([0-9a-f]{{16}})…` \|$", text, re.MULTILINE
