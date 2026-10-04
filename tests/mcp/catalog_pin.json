@@ -1,5 +1,5 @@
 {
-  "count": 130,
+  "count": 142,
   "names": [
     "comms_capability_list",
     "comms_context_get",
@@ -130,7 +130,19 @@
     "comms_whatsapp_health_status",
     "comms_group_member_reactions_clear",
     "comms_media_stage_begin",
-    "comms_media_stage_chunk"
+    "comms_media_stage_chunk",
+    "comms_instagram_account_list",
+    "comms_instagram_whoami",
+    "comms_instagram_profile_get",
+    "comms_instagram_media_list",
+    "comms_instagram_media_get",
+    "comms_instagram_media_insights",
+    "comms_instagram_account_insights",
+    "comms_instagram_comment_list",
+    "comms_instagram_comment_replies",
+    "comms_instagram_tag_list",
+    "comms_instagram_conversation_list",
+    "comms_instagram_conversation_messages"
   ],
   "tools": {
     "comms_capability_list": "052cd47a9b901bee8b28b3ac77c480ea5eef5e01a7bd6c1413a4b546b10b1faf",
@@ -242,7 +254,7 @@
     "comms_capability_for_group": "49e5fff9985a522b80d71281cb168885348a85506c833d14fe78b8e41ac0b437",
     "comms_capability_for_actor": "b1e31e8f28c86a39a06382339530853254ccdb039e20b7dfcc0cc5df133a4781",
     "comms_capability_refresh": "d7ecba897393adec609a13b6d93df98d78a6f72d7120b675340fcbae3fe141bb",
-    "comms_admin_identity_inspect": "c0d7d16febd89555fae19660fa20e4b9d0fd95a5a092558f640ebc1f75d08ad8",
+    "comms_admin_identity_inspect": "9860ada2cf92703b0acdcc3c7ed960cb1314c3acad24d496e91309b6a72eee45",
     "comms_directory_recipient_list": "e553e27b7ff8b1b2c68f81033b568ae113ef10fb8c709c3b0728d0665a877241",
     "comms_directory_recipient_get": "a6bd1fbcbaada34f28019281ca9fd5da886ce4b266b905c1e562d259b5ecc00d",
     "comms_directory_recipient_create": "ee9ce3e180921269872d36f4b4a3611db4ae37c7969fb48df6c4ce1304af7525",
@@ -262,7 +274,19 @@
     "comms_whatsapp_health_status": "a3ed8574ff396dbd43a67c250120c3cb7c609ef0b75e52b86df58799ab2557e4",
     "comms_group_member_reactions_clear": "0c5cd865eeb46af96557a258e76dcf32749ae73f73fbf71f572a8de4887e30ad",
     "comms_media_stage_begin": "cc37c528b84fea6b6f408154321a3b7b5d1aae8e86d2a09a389dab7e9888ae8e",
-    "comms_media_stage_chunk": "6f5702faea2d22004db2ebdef3545556268432b6ec54a47af7074b852e708c7e"
+    "comms_media_stage_chunk": "6f5702faea2d22004db2ebdef3545556268432b6ec54a47af7074b852e708c7e",
+    "comms_instagram_account_list": "fba65f8bba99f6e9b8bdb7aee497eeed9b9f8d0a005a16331d59fb8ef69e67e7",
+    "comms_instagram_whoami": "93cfca6e791cf780592bd1896e82467db6c2fd751e9bc5ca407dab9e91e2f363",
+    "comms_instagram_profile_get": "465c83777eba0dea6be0791799ec978fc859edf38c8b94f434ab4c23b3c636b1",
+    "comms_instagram_media_list": "dcbf3a53c364f38a4cf872b54fe515082a5db64df7bf64a6f89ffc11c530a035",
+    "comms_instagram_media_get": "25c9177788cc3a1c9967ec1a63248d7ebf88dec3aad2f164d7294d4cffea65f0",
+    "comms_instagram_media_insights": "08a26c13f2ccead7427a7c7b736cfce3af511db5142dafe4d4aee86f61b5bebc",
+    "comms_instagram_account_insights": "2d422c79fb7685be4c963dcf14d087c7be32d0bbbc9ba55e38ce79630afb508c",
+    "comms_instagram_comment_list": "35b3280c93c220eaeb30fca65ad2b4c7de120b0eb998034cea7bda48d4e4de4b",
+    "comms_instagram_comment_replies": "3dd4152c2fe6c62635105401c5f3e253068f20f0533c51f713ca6b59a7426a3e",
+    "comms_instagram_tag_list": "477663d0267e48e33840a573b23b134b55dc8deae255136ab8848ae9fa948572",
+    "comms_instagram_conversation_list": "4751396e5c1529286b9f14dff38d296d93fff6ad795cb2596aeb106f740e5b2a",
+    "comms_instagram_conversation_messages": "552685e57a1357856c6e08dd7a4e45b6ae79d9eaf4bf92a3154cd717aa6cad51"
   },
-  "catalog": "21cc382adb9370a76b8bbf411a96cc206575414c11f8822c70e9c38dc29fd951"
+  "catalog": "c6eb7dee1cd3eb704df6802be7242fe5a9a1d1b0b6ae0ce6eb39bd958ad76880"
 }

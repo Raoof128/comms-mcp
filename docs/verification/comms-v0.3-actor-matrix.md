@@ -121,9 +121,23 @@ MTProto rows cover both a basic group (`messages.*`) and a supergroup or channel
 | `comms_whatsapp_webhook_status` | — : a local report on the WhatsApp webhook inbox | — : a local report on the WhatsApp webhook inbox | A done: the local inbox counts |
 | `comms_capability_get` / `comms_capability_for_group` / `comms_capability_for_actor` / `comms_capability_refresh` / `comms_group_capabilities` | A done: capability service | A done: capability service | A done: capability service |
 
+## Instagram (proposed A49)
+
+The Instagram API with Instagram Login (`graph.instagram.com`, `docs/instagram-spec-v0.6.md`). One actor, `instagram`, addressed by account (`iga_`), never by group, so these rows have their own column and the group actors have none here. Each row is proved by `tests/runtime/test_instagram_reads.py` (IG-2) and the later Instagram service tests.
+
+| Tool | instagram |
+|---|---|
+| `comms_instagram_whoami` / `comms_instagram_profile_get` | A done [profile.read]: `GET /me` |
+| `comms_instagram_media_list` | A done [media.list]: `GET /me/media` |
+| `comms_instagram_media_get` | A done [media.get]: `GET /{media-id}` |
+| `comms_instagram_media_insights` / `comms_instagram_account_insights` | A done [insights.read]: `GET /{media-id}/insights`, `GET /{ig-id}/insights` |
+| `comms_instagram_comment_list` / `comms_instagram_comment_replies` | A done [comment.list]: `GET /{media-id}/comments`, `GET /{comment-id}/replies` |
+| `comms_instagram_tag_list` | A done [tag.list]: `GET /{ig-id}/tags` |
+| `comms_instagram_conversation_list` / `comms_instagram_conversation_messages` | A done [history.read]: `GET /me/conversations`, `GET /{conversation-id}`, `GET /{message-id}` |
+
 ## Local tools (no provider actor)
 
-`comms_capability_list`, `comms_group_list`, `comms_group_get`, every `comms_campaign_*`, `comms_location_*` and `comms_audience_*` tool, `comms_admin_identity_inspect`, the `comms_directory_*` tools G2–G4 add, `comms_location_member_*`, and `comms_media_stage_*` (staging a file in memory, G8). These read or write `comms.db` only. A campaign's delivery goes through the transports' delivery adapters, not these tools.
+`comms_capability_list`, `comms_group_list`, `comms_group_get`, every `comms_campaign_*`, `comms_location_*` and `comms_audience_*` tool, `comms_admin_identity_inspect`, the `comms_directory_*` tools G2–G4 add, `comms_location_member_*`, `comms_media_stage_*` (staging a file in memory, G8), and `comms_instagram_account_list` (the configured accounts, proposed A49). These read or write `comms.db` only. A campaign's delivery goes through the transports' delivery adapters, not these tools.
 
 ## Checked against the 2026 developer docs (2026-09-26)
 

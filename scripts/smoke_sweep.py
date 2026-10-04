@@ -54,6 +54,39 @@ EXPECTED_REFUSALS: Mapping[str, tuple[str, str]] = {
                     "comms_whatsapp_template_list")},
 }  # fmt: skip
 
+# Proposed A49: the selftest daemon configures no Instagram account, so every Instagram tool
+# answers NOT_CONFIGURED here, as the WhatsApp Graph tools do (R-IG4). The same tools run
+# against a fake graph.instagram.com through the real dispatcher in the pytest suite.
+INSTAGRAM_REFUSAL = ("NOT_CONFIGURED", "the selftest daemon has no Instagram account")
+_INSTAGRAM_VALUES: Mapping[str, Any] = {
+    "account": "main", "media": "igm_" + "a" * 26, "comment": "igc_" + "a" * 26,
+    "person": "igp_" + "a" * 26, "container": "igk_" + "a" * 26,
+    "children": ["igk_" + "a" * 26, "igk_" + "b" * 26], "text": "Sweep", "hide": True,
+    "enabled": True, "url": "https://cdn.example.com/sweep.jpg",
+}  # fmt: skip
+
+
+def _expected(name: str) -> tuple[str, str] | None:
+    if name.startswith("comms_instagram_"):
+        return INSTAGRAM_REFUSAL
+    return EXPECTED_REFUSALS.get(name)
+
+
+def _instagram_arguments(spec: Any) -> dict[str, Any]:
+    """Schema-valid arguments for an Instagram tool: its required keys, nothing more."""
+    props, out = spec.input_schema.get("properties", {}), {}
+    for key in spec.input_schema.get("required", ()):
+        schema = props.get(key, {})
+        if key == "request_id":
+            continue
+        if key in _INSTAGRAM_VALUES:
+            out[key] = _INSTAGRAM_VALUES[key]
+        elif "enum" in schema:
+            out[key] = schema["enum"][0]
+        elif "enum" in schema.get("items", {}):
+            out[key] = [schema["items"]["enum"][0]]
+    return out
+
 
 def _order(name: str) -> tuple[int, int, str]:
     tail = name.removeprefix("comms_")
@@ -167,6 +200,12 @@ def sweep(call: Callable[[str, dict[str, Any]], dict[str, Any]], grp: str) -> di
     for spec in sorted(TOOL_CATALOG, key=lambda s: _order(s.name)):
         props = spec.input_schema.get("properties", {})
         arguments = {}
+        if spec.name.startswith("comms_instagram_"):
+            arguments = _instagram_arguments(spec)
+            if spec.requires_request_id:
+                arguments["request_id"] = refs.mint("request")
+            report[spec.name] = _judge(spec, call(spec.name, arguments))
+            continue
         for key in spec.input_schema.get("required", ()):
             if key == "request_id":
                 continue
@@ -186,7 +225,7 @@ def _judge(spec: Any, answer: Mapping[str, Any]) -> tuple[str, str | None]:
     """``("ok", None)``, ``("expected", code)``, or ``("WRONG", why)``: a success valid against
     the output schema, exactly the pinned refusal, and nothing else."""
     body = answer.get("structuredContent") or {}
-    expected = EXPECTED_REFUSALS.get(spec.name)
+    expected = _expected(spec.name)
     if answer.get("isError"):
         code = (body.get("error") or {}).get("code")
         if code == "INTERNAL_ERROR" or code not in spec.failure_modes:

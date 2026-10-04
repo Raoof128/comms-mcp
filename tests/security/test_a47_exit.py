@@ -102,7 +102,8 @@ def test_every_telegram_media_cell_is_served_or_an_honest_b():
 def test_the_real_daemon_media_checks_are_pinned_and_the_catalog_is_130():
     added = json.loads(SMOKE_MAP.read_text(encoding="utf-8"))["added_in_v0_3"]
     assert all(f"phase_v03_daemon::{c}" in added for c in MEDIA_CHECKS)
-    assert len(TOOL_CATALOG) == 130
+    # the A47 surface holds 130; proposed A49 adds its own tools, pinned by its exit test (R-IG4)
+    assert len([s for s in TOOL_CATALOG if not s.name.startswith("comms_instagram_")]) == 130
 
 
 def test_a_tool_that_can_answer_ambiguous_declares_it():

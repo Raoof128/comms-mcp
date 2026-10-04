@@ -33,6 +33,7 @@ from comms.core.providers.media import KINDS
 from comms.core.providers.protocols import ProviderTarget
 from comms.mcp.catalog import TOOL_CATALOG
 from comms.mcp.dispatch import AuthenticatedClient
+from comms.runtime.instagram import InstagramService
 from comms.services.account import AccountService
 from comms.services.campaigns import CampaignService
 from comms.services.capability import CapabilityService
@@ -75,6 +76,7 @@ class Services:
     identity: IdentityService
     actors: tuple[str, ...]
     account_target: ProviderTarget | None = None
+    instagram: InstagramService | None = None  # proposed A49 (R-IG4)
 
 
 def group_targets(conn: Any, group: str, actors: tuple[str, ...]) -> dict[str, ProviderTarget]:
@@ -554,6 +556,11 @@ class _Facades:
             raise CommsError("NOT_CONFIGURED")
         return self.s.media
 
+    def instagram(self) -> InstagramService:
+        if self.s.instagram is None:
+            raise CommsError("NOT_CONFIGURED")
+        return self.s.instagram
+
     def account_target(self) -> ProviderTarget:
         if self.s.account_target is None:
             raise CommsError("NOT_CONFIGURED")
@@ -695,6 +702,19 @@ class _Facades:
                 a["actor"], [(g, self.targets(g)[a["actor"]]) for g in a["groups"]]),
             "capability.refresh": lambda cl, a: s.capability.refresh(a["group"], self.targets(a["group"])),
             "admin.identity_inspect": lambda cl, a: s.identity.inspect(a["ref"]),
+            # proposed A49: the Instagram tools (R-IG4: the service lives in runtime)
+            "instagram.account_list": lambda cl, a: self.instagram().account_list(),
+            "instagram.whoami": lambda cl, a: self.instagram().whoami(a),
+            "instagram.profile_get": lambda cl, a: self.instagram().profile(a),
+            "instagram.media_list": lambda cl, a: self.instagram().media_list(cl.client_ref, a),
+            "instagram.media_get": lambda cl, a: self.instagram().media_get(a),
+            "instagram.media_insights": lambda cl, a: self.instagram().media_insights(a),
+            "instagram.account_insights": lambda cl, a: self.instagram().account_insights(a),
+            "instagram.comment_list": lambda cl, a: self.instagram().comment_list(cl.client_ref, a),
+            "instagram.comment_replies": lambda cl, a: self.instagram().comment_replies(cl.client_ref, a),
+            "instagram.tag_list": lambda cl, a: self.instagram().tag_list(cl.client_ref, a),
+            "instagram.conversation_list": lambda cl, a: self.instagram().conversation_list(cl.client_ref, a),
+            "instagram.conversation_messages": lambda cl, a: self.instagram().conversation_messages(a),
         }  # fmt: skip
 
 

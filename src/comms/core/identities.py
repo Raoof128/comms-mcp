@@ -14,6 +14,13 @@ from comms.core.campaigns.directory import DirectoryNotFound
 __all__ = ["identities_of"]
 
 _OBJECTS = frozenset({"message", "invite", "template", "topic", "media"})
+_INSTAGRAM = {
+    "instagram_account": ("instagram_accounts", "user_id"),
+    "instagram_container": ("instagram_containers", "creation_id"),
+    "instagram_media": ("instagram_objects", "provider_identity"),
+    "instagram_comment": ("instagram_objects", "provider_identity"),
+    "instagram_person": ("instagram_objects", "provider_identity"),
+}
 
 
 def identities_of(conn: Any, ref: str) -> list[dict[str, str]]:
@@ -46,6 +53,12 @@ def identities_of(conn: Any, ref: str) -> list[dict[str, str]]:
             (ref,),
         ).fetchall()
         return [{"transport": t, "identity": i} for t, i in rows]
+    elif kind in _INSTAGRAM:  # proposed A49: an account, a container or an object
+        table, column = _INSTAGRAM[kind]
+        rows = [
+            ("instagram", str(r[0]))
+            for r in conn.execute(f"SELECT {column} FROM {table} WHERE ref = ?", (ref,))
+        ]
     elif kind in _OBJECTS:
         rows = conn.execute(
             "SELECT transport, provider_identity FROM provider_objects WHERE ref = ?", (ref,)

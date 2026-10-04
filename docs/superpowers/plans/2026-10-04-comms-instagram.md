@@ -8,7 +8,7 @@
 
 **Architecture:**
 - **Transport package** `src/comms/transports/instagram/`: `GraphIgApi` pinned to `https://graph.instagram.com`, capability, admin, context, publish ledger, classifier, CLI. The only `httpx` importer is `http.py`.
-- **Service** `src/comms/services/instagram.py`: the one place tools call. It builds `iga_`-keyed `ProviderTarget`s and calls `MutationExecutor.provider` directly.
+- **Service** `src/comms/runtime/instagram.py` (R-IG4): the one place tools call. It builds `iga_`-keyed `ProviderTarget`s and calls `MutationExecutor.provider` directly.
 - **Catalog** `src/comms/mcp/tools/instagram.py`: 22 `ToolSpec`s; four carry `requires_user_interaction`.
 - **No executor, recovery, relay or proxy change.** Publishing is three single-effect CREATE tools on a durable `igk_` row (spec D-I7, D-I13).
 
@@ -90,14 +90,14 @@ Spec: sections 5.1 (minus `publish_quota`, `publish_preview`), 7, 9, 14 items 4,
 
 **Files:**
 - `src/comms/transports/instagram/{media,comments,insights,messages,context}.py` (reads only).
-- `src/comms/services/instagram.py` (reads).
+- `src/comms/runtime/instagram.py` (reads; R-IG4); `src/comms/core/providers/instagram_insights.py` (the insights tables, data only).
 - `src/comms/mcp/tools/instagram.py`: the 12 read `ToolSpec`s; `src/comms/mcp/tools/__init__.py` `FAMILIES` gains it.
 - Paging: Meta's `after` cursor becomes a `cur_` through `ContextHandles` (target `iga_`, actor `instagram`); `src/comms/services/context.py` is not changed (R-IG2).
 - `src/comms/mcp/tools/account.py`, `src/comms/core/identities.py`: identity inspect for `iga_`, `igk_`, `igm_`, `igc_`, `igp_`.
-- `docs/verification/comms-v0.3-actor-matrix.md`: fifth column; existing rows get `— : not an Instagram tool`; 12 new rows.
-- `tests/core/providers/test_actor_matrix.py`: `ACTORS` from the header row; `_rows` accepts 5 cells.
+- `docs/verification/comms-v0.3-actor-matrix.md`: an Instagram table with its own header (R-IG4); `comms_instagram_account_list` among the local tools.
+- `tests/core/providers/test_actor_matrix.py`: each table's actors from its header row (R-IG4); `tests/integration/test_actor_matrix_behaviour.py` skips a table without its actor.
 - `tests/mcp/catalog_pin.json`: regenerated.
-- Tests: `tests/transports/instagram/test_media.py`, `test_insights_tables.py` (every (metric, product type) pair in spec 7 is allowed and nothing else; `crossposted_views` never by default), `test_messages_throttle.py` (2 per second, sequential), `tests/services/test_instagram_reads.py`, `tests/mcp/test_instagram_catalog.py`.
+- Tests: `tests/transports/instagram/test_media.py`, `test_insights_tables.py` (every (metric, product type) pair in spec 7 is allowed and nothing else; `crossposted_views` never by default), `test_messages_throttle.py` (2 per second, sequential), `tests/runtime/test_instagram_reads.py`, `tests/mcp/test_instagram_catalog.py`.
 
 - [ ] **Step 1: Failing tests** (above), plus `test_caption_absent_degrades_default_fields`, `test_media_url_optional`, `test_bodies_only_in_untrusted_text`.
 - [ ] **Step 2:** implement; regenerate the pin; `uv run pytest tests -q -k "instagram or actor_matrix or catalog"`.
@@ -110,7 +110,7 @@ Spec: sections 4.3, 4.5, 5.2 (comments and DM only), 5.3, 8, 14 items 5, 6 (writ
 **Files:**
 - `src/comms/transports/instagram/classify.py`: `IG_CODES: Mapping[tuple[int, int | str | None], tuple[ResultKind, str | None]]`, `classify(outcome) -> ProviderResult`, `not_sent -> FAILED_TRANSIENT`.
 - `src/comms/transports/instagram/admin.py`: `validate()` and `invoke()` for `comment.reply`, `comment.hide`, `media.comments_toggle`, `comment.delete`, `message.reply` (window check from the live conversation).
-- `src/comms/services/instagram.py` (writes): policy ceiling before any provider call; `MutationExecutor.provider` with an `iga_`-keyed target.
+- `src/comms/runtime/instagram.py` (writes): policy ceiling before any provider call; `MutationExecutor.provider` with an `iga_`-keyed target.
 - `src/comms/mcp/tools/instagram.py`: the five write `ToolSpec`s with `provider_result(account=..., untrusted=...)`.
 - `src/comms/mcp/egress.py`: `_NAMES` gains them.
 - `.claude/settings.json`: `permissions.ask` gains `mcp__comms__comms_instagram_{comment_reply,comment_hide,comments_enabled_set,comment_delete,message_send}`.

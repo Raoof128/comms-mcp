@@ -1,6 +1,6 @@
 """The Instagram section of ``comms.json`` (proposed A49, section 4.3): non-secret, no identity.
 
-``{"api_version": "v25.0", "default": "main", "dm_disclosure": null,
+``{"api_version": "v25.0", "default": "main", "dm_disclosure": null, "caption": false,
    "accounts": {"main": {"label": "Main account", "writes": false, "dms": false}}}``
 
 ``writes`` and ``dms`` are per-account ceilings: a refused write never reaches Meta. An alias
@@ -20,7 +20,7 @@ from comms.transports.instagram.http import DEFAULT_API_VERSION, api_version_ok
 
 __all__ = ["AccountPolicy", "InstagramSettings", "parse_instagram"]
 
-_TOP = {"api_version", "default", "dm_disclosure", "accounts"}
+_TOP = {"api_version", "default", "dm_disclosure", "caption", "accounts"}
 _ACCOUNT = {"label", "writes", "dms"}
 _LABEL = re.compile(r"\A[^\x00-\x1f\x7f]{1,64}\Z")
 _MAX_ACCOUNTS = 16
@@ -38,6 +38,7 @@ class InstagramSettings:
     api_version: str = DEFAULT_API_VERSION
     default: str | None = None
     dm_disclosure: str | None = None
+    caption: bool = False  # request captions only after gate GI-4 proves the field
     accounts: Mapping[str, AccountPolicy] = field(default_factory=lambda: MappingProxyType({}))
 
 
@@ -53,6 +54,9 @@ def parse_instagram(value: Any, refuse: Any) -> InstagramSettings:
         not isinstance(disclosure, str) or not 1 <= len(disclosure) <= 200
     ):
         refuse("comms.json: instagram.dm_disclosure is 1 to 200 characters")
+    caption = value.get("caption", False)
+    if not isinstance(caption, bool):
+        refuse("comms.json: instagram.caption is true or false")
     raw = value.get("accounts", {})
     if not isinstance(raw, dict) or len(raw) > _MAX_ACCOUNTS:
         refuse("comms.json: instagram.accounts is an object of at most 16 accounts")
@@ -71,4 +75,4 @@ def parse_instagram(value: Any, refuse: Any) -> InstagramSettings:
     default = value.get("default")
     if default is not None and default not in accounts:
         refuse("comms.json: instagram.default names a configured account")
-    return InstagramSettings(version, default, disclosure, MappingProxyType(accounts))
+    return InstagramSettings(version, default, disclosure, caption, MappingProxyType(accounts))

@@ -77,9 +77,8 @@ def test_adapter_contracts_match_a18():
         "telegram_user": frozenset({"delivery", "capability", "admin", "context"}),
         "whatsapp_cloud": frozenset({"delivery", "capability", "admin"}),
         "whatsapp_webhooks": frozenset({"inbound_context", "provider_updates"}),
-        "instagram": frozenset(
-            {"capability"}
-        ),  # proposed A49 (D-I1); grows with IG-2, IG-3 (R-IG3)
+        # proposed A49 (D-I1): the set grows with the code, admin in IG-3 (R-IG3)
+        "instagram": frozenset({"capability", "context"}),
     }
 
 

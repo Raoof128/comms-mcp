@@ -488,11 +488,14 @@ def _sweep_checks(d: Daemon, seed: Path, grp: str) -> dict[str, Any]:
     success valid against its output schema, or an error the tool declares; never another."""
     from smoke_sweep import sweep
 
+    from comms.mcp.catalog import TOOL_CATALOG
+
     report = sweep(lambda name, arguments: d.http(seed, name, arguments), grp)
     SWEEP_REPORT.clear()
     SWEEP_REPORT.update(report)
     wrong = {name: why for name, (kind, why) in report.items() if kind == "WRONG"}
-    return {"catalog_sweep": not wrong and len(report) == 130 or wrong}
+    # every tool, whatever the catalog's size (proposed A49 grows it; the pin holds the count)
+    return {"catalog_sweep": not wrong and len(report) == len(TOOL_CATALOG) or wrong}
 
 
 def _catalog_checks(d: Daemon, seed: Path, port: int) -> dict[str, Any]:

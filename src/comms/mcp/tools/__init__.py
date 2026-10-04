@@ -10,6 +10,7 @@ from comms.mcp.tools.context import CONTEXT_PERSON_TOOLS, CONTEXT_TOOLS
 from comms.mcp.tools.directory import DIRECTORY_TOOLS
 from comms.mcp.tools.directory_people import DIRECTORY_PEOPLE_TOOLS
 from comms.mcp.tools.groups import A46_TOOLS, GROUP_TOOLS
+from comms.mcp.tools.instagram import INSTAGRAM_TOOLS
 from comms.mcp.tools.messages import MESSAGE_TOOLS
 
 __all__ = ["FAMILIES"]
@@ -26,4 +27,5 @@ FAMILIES: tuple[tuple[ToolSpec, ...], ...] = (
     CONTEXT_PERSON_TOOLS,  # G5
     A46_TOOLS,  # spec A46 (G7)
     MEDIA_STAGE_TOOLS,  # G8 (D3)
+    INSTAGRAM_TOOLS,  # proposed A49, appended so earlier order holds
 )

@@ -28,6 +28,7 @@ from comms.mcp.oauth.server import Built, OAuthSettings, build_oauth
 from comms.runtime.adapters import Adapters
 from comms.runtime.facades import Services, build_registry
 from comms.runtime.hello import hello_handler
+from comms.runtime.instagram import InstagramService
 from comms.runtime.listeners import Listeners, RemoteListener, build_listeners
 from comms.runtime.operator import LegacySide, OperatorContext, operator_handler
 from comms.runtime.tool_calls import tool_call_handler
@@ -151,13 +152,14 @@ def build_comms_runtime(
 ) -> CommsRuntime:
     capability = CapabilityService(adapters.capability, clock=clock)
     executor = MutationExecutor(writer, adapters.admin)
+    handles = ContextHandles(conn, store, clock=clock)
     services = Services(
         conn=conn,
         capability=capability,
         context=ContextEngine(
             conn, adapters.context, clock=clock, monotonic=monotonic, capability=capability
         ),
-        handles=ContextHandles(conn, store, clock=clock),
+        handles=handles,
         groups=GroupService(conn, capability, executor),
         messages=MessageService(conn, capability, executor, clock=clock),
         campaigns=CampaignService(
@@ -181,6 +183,11 @@ def build_comms_runtime(
         identity=IdentityService(conn),
         actors=tuple(a for a in _ACTORS if a in adapters.admin or a in adapters.context),
         account_target=adapters.account,
+        instagram=None  # proposed A49
+        if adapters.instagram is None
+        else InstagramService(
+            conn, adapters.instagram, capability, handles, clock=clock, executor=executor
+        ),
     )
     dispatcher = Dispatcher(build_registry(services))
     oauth = None

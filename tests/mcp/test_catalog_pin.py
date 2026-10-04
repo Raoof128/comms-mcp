@@ -58,6 +58,13 @@ CAPABILITY_TOOLS = {
     C.MEMBER_ADD: "comms_group_member_add",
     C.MEMBER_BAN: "comms_group_member_ban",
     C.MEMBER_TAG: "comms_group_member_tag_set",  # spec A46
+    # proposed A49 (IG-2): the Instagram reads
+    C.PROFILE_READ: "comms_instagram_profile_get",
+    C.MEDIA_LIST: "comms_instagram_media_list",
+    C.MEDIA_GET: "comms_instagram_media_get",
+    C.INSIGHTS_READ: "comms_instagram_media_insights",
+    C.COMMENT_LIST: "comms_instagram_comment_list",
+    C.TAG_LIST: "comms_instagram_tag_list",
     C.REACTION_REMOVE: "comms_message_reaction_remove",
     C.REACTION_CLEAR: "comms_group_member_reactions_clear",
     C.PHONE_NUMBER_HEALTH: "comms_whatsapp_health_status",
@@ -159,12 +166,6 @@ def test_tools_list_payload_structurally_identical_ignoring_jsonrpc_framing():
 # Proposed A49: an Instagram capability whose tool a later plan task builds (as the actor
 # matrix's ``A todo:G<n>``). Each task removes its rows; the exit test requires none left.
 PENDING_A49: dict[C, str] = {
-    C.PROFILE_READ: "IG-2",
-    C.MEDIA_LIST: "IG-2",
-    C.MEDIA_GET: "IG-2",
-    C.INSIGHTS_READ: "IG-2",
-    C.COMMENT_LIST: "IG-2",
-    C.TAG_LIST: "IG-2",
     C.PUBLISHING_QUOTA_READ: "IG-4",
     C.MEDIA_CONTAINER_CREATE: "IG-4",
     C.MEDIA_CAROUSEL_CREATE: "IG-4",

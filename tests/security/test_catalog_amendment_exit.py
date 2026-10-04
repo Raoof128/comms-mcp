@@ -149,7 +149,8 @@ def test_the_catalog_is_a45_and_a46_in_full():
     a46 = {"comms_group_member_tag_set", "comms_message_reaction_remove",
            "comms_group_member_reactions_clear", "comms_whatsapp_health_status"}  # fmt: skip
     # A47 (after the amendment's tag) adds comms_message_send_media: 129 + 1
-    assert a45 | a46 <= names and len(TOOL_CATALOG) == 130
+    assert a45 | a46 <= names  # proposed A49's tools are pinned by its own exit test (R-IG4)
+    assert len([s for s in TOOL_CATALOG if not s.name.startswith("comms_instagram_")]) == 130
 
 
 def test_the_whole_path_over_mcp(tmp_path):

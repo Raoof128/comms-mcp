@@ -19,7 +19,7 @@ from comms.mcp.catalog import TOOL_CATALOG
 
 ROOT = Path(__file__).resolve().parents[3]
 MATRIX = ROOT / "docs" / "verification" / "comms-v0.3-actor-matrix.md"
-ACTORS = ("telegram_bot", "telegram_user", "whatsapp_cloud")
+ACTORS = ("telegram_bot", "telegram_user", "whatsapp_cloud", "instagram")  # instagram: A49
 KIND = re.compile(r"^(A done|A todo:G\d+[a-z]?|B\b|— :)")
 CATALOG = {spec.name for spec in TOOL_CATALOG}
 
@@ -38,12 +38,16 @@ def _rows(*, variants=True):
     """``(tool names, {actor: cell})``; a ``(variant: …)`` row is one way of calling a tool
     another row already covers (its work still counts toward G9's none-left rule)."""
     text = MATRIX.read_text(encoding="utf-8")
+    header: tuple[str, ...] = ()
     for line in text.splitlines():
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
-        if len(cells) == 4 and cells[0].startswith("`comms_"):
+        if cells[0] == "Tool" and len(cells) > 1:  # each table names its actors (A49)
+            header = tuple(cells[1:])
+            assert set(header) <= set(ACTORS), header
+        elif header and len(cells) == len(header) + 1 and cells[0].startswith("`comms_"):
             if "(variant:" in cells[0] and not variants:
                 continue
-            yield _names(cells[0]), dict(zip(ACTORS, cells[1:], strict=True))
+            yield _names(cells[0]), dict(zip(header, cells[1:], strict=True))
 
 
 def _local():

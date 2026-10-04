@@ -23,6 +23,7 @@ GOOD = {
 
 
 def _settings(tmp_path, instagram):
+    tmp_path.mkdir(exist_ok=True)
     home = tmp_path / "comms"
     home.mkdir(mode=0o700)
     os.chmod(home, 0o700)
@@ -36,7 +37,8 @@ def test_the_instagram_section_parses_into_adapter_settings(tmp_path):
     settings = _settings(tmp_path, GOOD).adapter.instagram
     assert settings is not None and settings.default == "main"
     assert settings.accounts["studio"].writes and not settings.accounts["main"].writes
-    assert settings.api_version == "v25.0"
+    assert settings.api_version == "v25.0" and settings.caption is False
+    assert _settings(tmp_path / "c", {**GOOD, "caption": True}).adapter.instagram.caption is True
 
 
 @pytest.mark.parametrize(
@@ -49,6 +51,7 @@ def test_the_instagram_section_parses_into_adapter_settings(tmp_path):
         {**GOOD, "accounts": {"main": {"label": "x", "writes": "yes"}}},
         {**GOOD, "accounts": {"main": {"writes": True}}},
         {**GOOD, "accounts": {"main": {"label": "x", "owner": "me"}}},
+        {**GOOD, "caption": "yes"},
     ],
 )
 def test_a_malformed_section_is_refused(tmp_path, broken):

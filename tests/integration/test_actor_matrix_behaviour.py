@@ -244,8 +244,8 @@ def test_every_cell_behaves_as_the_matrix_says(actor, tmp_path):
     cursor = first.structured["next_cursor"]
     wrong = []
     for names, cells in _rows(variants=False):
-        cell = cells[actor]
-        if cell.startswith("—"):
+        cell = cells.get(actor)  # an Instagram table has no group-actor column (A49)
+        if cell is None or cell.startswith("—"):
             continue
         kind = re.match(r"A done|A todo|B", cell).group(0)
         for name in sorted(names):

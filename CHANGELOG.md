@@ -1169,3 +1169,18 @@
 - **Verification:** new tests seen failing first; IG-1 targeted run 275 passed; the parallel sweep of the rest of the suite showed only the baseline set; full gate in the main checkout on this commit (see the ledger line).
 - **Follow-ups:** IG-2 (the read tools).
 
+
+### 2026-10-04 (Australia/Sydney), IG-2
+**Raouf:**
+- **Scope:** Plan task IG-2, proposed A49: the twelve Instagram read tools, end to end.
+- **Summary:**
+  - **Tools (142 in the catalog):** `comms_instagram_account_list`, `whoami`, `profile_get`, `media_list`, `media_get`, `media_insights`, `account_insights`, `comment_list`, `comment_replies`, `tag_list`, `conversation_list`, `conversation_messages`. Every id is an opaque ref (`igm_`, `igc_`, `igp_`); captions, comments and DM text only in `untrusted_text`; usernames and labels only under `untrusted`; Meta paging cursors become client-bound `cur_` tokens bound to the tool, its arguments, the account and the client.
+  - **Service:** `InstagramService` in `src/comms/runtime/instagram.py` (R-IG4); each read resolves the account, checks its identity once per daemon lifetime, checks the capability, calls Meta, and maps a refusal to a fixed code (`classify.read_refusal`).
+  - **Insights:** the tables move to `core/providers/instagram_insights.py` (R-IG4); validation per section 7, one metric group per call; Feed-only metrics refused for a video; `crossposted_views`, `facebook_views` and `engagement` never requested; code 10 is `NOT_ENOUGH_DATA`.
+  - **DMs:** conversations name each counterpart by `igp_`; message details are read sequentially at 2 per second, at most 20.
+  - **Settings:** `instagram.caption` (false by default) turns captions on after gate GI-4.
+  - **Wiring:** `Services.instagram`, the facades, the egress classes, identity inspection for every Instagram ref, the actor matrix (its own table; header-aware parser), `PENDING_A49` down to IG-3 and IG-4.
+- **Files changed:** `src/comms/runtime/{instagram,comms_runtime,facades}.py`; `src/comms/core/{identities,providers/instagram_insights}.py`; `src/comms/mcp/{egress,tools/__init__,tools/account,tools/instagram}.py`; `src/comms/transports/instagram/{config,classify,insights,media,comments,messages}.py`; `docs/verification/comms-v0.3-actor-matrix.md`; tests (`tests/runtime/test_instagram_reads.py`, `tests/transports/instagram/world.py`, the matrix parser and behaviour test, `test_catalog_pin.py`, the config test); spec, plan, rulings R-IG4 and pins; the catalog pin (`c6eb7dee1cd3eb70…`).
+- **Verification:** new tests seen failing first; 68 Instagram tests pass, including one through the real dispatcher; MCP, egress sweep, host permissions, AI boundary, layering, facades and matrix behaviour suites pass; ruff, format, mypy clean; full gate on the commit in the main checkout (ledger line).
+- **Follow-ups:** IG-3 (comment and DM writes).
+

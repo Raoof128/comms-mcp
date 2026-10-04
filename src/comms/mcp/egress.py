@@ -35,6 +35,12 @@ _BODY = frozenset(
         "comms_message_context",
         "comms_group_context",
         "comms_context_person",  # G5
+        "comms_instagram_media_list",  # proposed A49: captions, comments, DMs
+        "comms_instagram_media_get",  # proposed A49: captions, comments, DMs
+        "comms_instagram_comment_list",  # proposed A49: captions, comments, DMs
+        "comms_instagram_comment_replies",  # proposed A49: captions, comments, DMs
+        "comms_instagram_tag_list",  # proposed A49: captions, comments, DMs
+        "comms_instagram_conversation_messages",  # proposed A49: captions, comments, DMs
     }
 )
 _NAMES = frozenset(
@@ -53,6 +59,18 @@ _NAMES = frozenset(
         "comms_group_topic_get",
         "comms_account_profile",  # G8: what each account calls itself
         "comms_whatsapp_health_status",  # A46: Meta's notes
+        "comms_instagram_account_list",  # proposed A49: usernames and labels
+        "comms_instagram_whoami",  # proposed A49: usernames and labels
+        "comms_instagram_profile_get",  # proposed A49: usernames and labels
+        "comms_instagram_media_list",  # proposed A49: usernames and labels
+        "comms_instagram_media_get",  # proposed A49: usernames and labels
+        "comms_instagram_media_insights",  # proposed A49: usernames and labels
+        "comms_instagram_account_insights",  # proposed A49: usernames and labels
+        "comms_instagram_comment_list",  # proposed A49: usernames and labels
+        "comms_instagram_comment_replies",  # proposed A49: usernames and labels
+        "comms_instagram_tag_list",  # proposed A49: usernames and labels
+        "comms_instagram_conversation_list",  # proposed A49: usernames and labels
+        "comms_instagram_conversation_messages",  # proposed A49: usernames and labels
     }
 )
 _IDENTITY = frozenset({"comms_admin_identity_inspect"})
