@@ -1105,3 +1105,21 @@
   - no Markdown linter or link checker is installed, so none was run;
   - the P §88 acceptance rows stay PENDING OWNER until the runbooks' records are filled in;
   - the service-account install is still not done, and nothing keeps the daemon running.
+
+### 2026-10-04 (Australia/Sydney)
+**Raouf:**
+- **Scope:** Proposed amendment A49, Instagram as a comms actor: `docs/instagram-spec-v0.6.md` (branch `comms-instagram-spec`). A documentation change only; no code, no catalog, no pin touched.
+- **Summary:**
+  - The TypeScript `Instagram MCP Server` spec v0.5 (repository `Raoof128/Instagram-MCP`) was gauntleted line by line against the current Meta, MCP, Claude Code and `@napi-rs/keyring` sources (its `GAUNTLET-v0.5.md`): 7 corrections, 28 tightenings, four gates closed or narrowed.
+  - It is rewritten here as a Python proposal that fits comms instead of a second server: one actor `instagram` (`{capability, admin, context}`), 23 `comms_instagram_*` tools, publish as a durable saga (A41) ending `IN_FLIGHT` for a processing Reel, tokens in staged secret slots `meta-ig-access-token/<alias>` (A13), `iga_`/`igm_`/`igc_` refs, a second pinned Graph origin `https://graph.instagram.com` (amendment to A26), and a `requires_user_interaction` catalog flag emitted as `_meta` for the public-posting tools (D5 stands: host UX only).
+  - Carried corrections: latest Graph API is v26.0; dashboard tokens are long-lived by doc (no app-secret exchange); `follows`, `profile_visits`, `profile_activity` are Feed and Story only; `caption` is documented Facebook-Login-only; `timeframe` is `this_week` or `this_month`; the Bearer header is undocumented on `graph.instagram.com` (gate GI-1, no token-in-URL fallback under A26).
+  - Dropped from v0.5: the confirm-token ceremony, the OS keychain store, the in-process active account, the HEAD preflight of model-supplied URLs, env flags.
+- **Files changed:** `docs/instagram-spec-v0.6.md` (new); `AGENT.md`; `CHANGELOG.md`.
+- **Verification:**
+  - `uv sync --locked`; `uv run pytest tests/security/test_runbooks.py tests/security/test_v03_preflight.py tests/security/test_supersession.py -q`: 69 passed. The v0.3 spec pin is untouched.
+  - The full gate was not run: no source file changed.
+- **Follow-ups:**
+  - adoption ruling R-IG0 (append A49 to `docs/comms-spec-v0.3.md`, re-pin);
+  - open question 3 (an advisory `preview_digest` on the publish tools) needs an owner decision before MI-3;
+  - GI-1 (Bearer on `graph.instagram.com`) decides whether MI-1 can proceed inside A26.
+
