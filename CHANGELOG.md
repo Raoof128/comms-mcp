@@ -1241,3 +1241,24 @@
 - **Verification:** new tests seen failing first; 5,898 tests collected (262 more than the baseline's 5,636); the affected suites pass (1503); ruff, format, mypy clean; full gate on the commit in the main checkout (ledger line).
 - **Follow-ups:** the owner's IG-7: add a throwaway account, run GI-1 first, decide open questions 1 to 4, then ruling R-IG0 adopts A49.
 
+
+### 2026-10-04 (Australia/Sydney), A49 gate ledger
+**Raouf:**
+- **Scope:** The gate record for plan tasks IG-1 to IG-6 (R-IG1, R-IG8 (5)): a commit cannot hold its own result, so this entry follows the last gate.
+- **Summary:** each task commit passed the full `CLAUDE.md` Verify list in the main checkout, detached at that commit. The host is Linux, running as root, with no IPv6, so the verdict is "host-adjusted": the only failures are exactly the baseline's (`test_install.py` x4, `test_v03_part_b_exit.py`, the audit anchor-repair test and the doctor off-probe test; smoke `doctor headless` and `install plans are inert`). Contracts, formal, ruff, format, mypy, build, WhatsVault and the relay pass on every commit.
+
+  | Task | Commit | pytest (passed, baseline failures, skipped) | Smoke | Catalog |
+  |---|---|---|---|---|
+  | IG-0 | `8dac743` | baseline: 5623, 7, 6 | 106 of 108 | 130, `57e490cc…` |
+  | IG-1 | `5260e25` | 5673, 7, 6 | 106 of 108 | 130, `21cc382a…` |
+  | IG-2 | `6e13325` | 5713, 7, 6 | 106 of 108 | 142, `c6eb7dee…` |
+  | IG-3 | `245d89c` | 5778, 7, 6 | 106 of 108 | 147, `afe1a371…` |
+  | IG-4 | `e9051a6` | 5862, 7, 6 | 106 of 108 | 152, `de8c9897…` |
+  | IG-5 | `20fee34` | 5867, 7, 6 | 106 of 108 | 152, `e8d5da8e…` |
+  | IG-6 | `3e52a2c` | 5885, 7, 6 | 107 of 109 | 152, `e8d5da8e…` |
+
+- **What the gates found:** the first IG-1 gate found `ADAPTER_CONTRACTS["instagram"]` advertised with no conformance cases (R-IG3 (8)); the IG-2 gate found the smoke sweep and two exit tests pinning 130 tools (R-IG4 (6)); the IG-6 gate found the preview digest's wire domain and the real-daemon smoke count unpinned (R-IG6, R-IG8). Each was fixed in the commit that caused it before `comms-instagram-spec` moved, so the branch holds only gated commits.
+- **Files changed:** `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** the gate logs on the execution host; this entry's own commit is gated the same way.
+- **Follow-ups:** the owner's IG-7 (a throwaway account, GI-1 first, open questions 1 to 4, ruling R-IG0).
+
