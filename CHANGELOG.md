@@ -1273,3 +1273,15 @@
 - **Verification:** the nine checks pass on their own against a real selftest daemon; smoke-map and D39 exit tests pass; ruff, format, mypy clean; full gate on the commit in the main checkout.
 - **Follow-ups:** none from the smoke; the owner's IG-7 live gates remain.
 
+
+### 2026-10-04 (Australia/Sydney), README for the Instagram actor
+**Raouf:**
+- **Scope:** The owner asked for the public repositories to be professional and fully documented, with no secret pushed.
+- **Summary:**
+  - **README:** the proposed Instagram actor (A49), the catalog count with it (152), its status (gated against a scripted Graph; live gates GI-1 to GI-8 still to run; adoption by ruling R-IG0), its runbooks, its layout row and its specification.
+  - **Secret scan:** every added line in this branch's history and the changed files were scanned (patterns for Meta, Instagram, Telegram, cloud and private keys, plus `detect-secrets`). The only hits are deliberate fakes: the canary test tokens, the public age test vectors, the relay's `TEST_IDENTITY` and synthetic Meta-shaped ids. No real credential is tracked; the relay's production values are Cloudflare secrets.
+  - **Design repository:** `Raoof128/Instagram-MCP` gained a README, architecture notes, a security policy, contributing guide, code of conduct, changelog and MIT licence (matching WhatsVault), with the specification and plan mirrors updated to `3874771`.
+- **Files changed:** `README.md`, `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** documentation only; the README's paths exist; ruff and the runbook tests are unaffected.
+- **Follow-ups:** comms itself has no licence file; choosing one is the owner's call.
+
