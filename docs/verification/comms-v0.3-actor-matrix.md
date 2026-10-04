@@ -123,7 +123,7 @@ MTProto rows cover both a basic group (`messages.*`) and a supergroup or channel
 
 ## Instagram (proposed A49)
 
-The Instagram API with Instagram Login (`graph.instagram.com`, `docs/instagram-spec-v0.6.md`). One actor, `instagram`, addressed by account (`iga_`), never by group, so these rows have their own column and the group actors have none here. Each row is proved by `tests/runtime/test_instagram_reads.py` (IG-2), `tests/runtime/test_instagram_writes.py` (IG-3) and the later Instagram service tests.
+The Instagram API with Instagram Login (`graph.instagram.com`, `docs/instagram-spec-v0.6.md`). One actor, `instagram`, addressed by account (`iga_`), never by group, so these rows have their own column and the group actors have none here. Each row is proved by `tests/runtime/test_instagram_reads.py` (IG-2), `tests/runtime/test_instagram_writes.py` (IG-3) and `tests/runtime/test_instagram_publish.py` (IG-4).
 
 | Tool | instagram |
 |---|---|
@@ -134,6 +134,10 @@ The Instagram API with Instagram Login (`graph.instagram.com`, `docs/instagram-s
 | `comms_instagram_comment_list` / `comms_instagram_comment_replies` | A done [comment.list]: `GET /{media-id}/comments`, `GET /{comment-id}/replies` |
 | `comms_instagram_tag_list` | A done [tag.list]: `GET /{ig-id}/tags` |
 | `comms_instagram_conversation_list` / `comms_instagram_conversation_messages` | A done [history.read]: `GET /me/conversations`, `GET /{conversation-id}`, `GET /{message-id}` |
+| `comms_instagram_publish_quota` / `comms_instagram_publish_preview` | A done [publishing.quota_read]: `GET /{ig-id}/content_publishing_limit`, plus the local `igk_` ledger |
+| `comms_instagram_container_create` | A done [media.container_create]: `POST /{ig-id}/media` (an `igk_` ledger row) |
+| `comms_instagram_carousel_create` | A done [media.carousel_create]: `POST /{ig-id}/media` with `media_type=CAROUSEL` and this account's child `igk_` |
+| `comms_instagram_publish` | A done [media.publish]: `GET /{container-id}?fields=status_code`, then `POST /{ig-id}/media_publish` |
 | `comms_instagram_comment_reply` | A done [comment.reply]: `POST /{comment-id}/replies` |
 | `comms_instagram_comment_hide` | A done [comment.hide]: `POST /{comment-id}?hide=` |
 | `comms_instagram_comments_enabled_set` | A done [media.comments_toggle]: `POST /{media-id}?comment_enabled=` |

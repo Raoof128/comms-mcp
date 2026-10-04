@@ -17,7 +17,8 @@ from collections.abc import Callable, Mapping
 from datetime import datetime, timedelta
 from typing import Any
 
-from comms.core import timeutil
+from comms.core import domains, timeutil
+from comms.core import mutations as records
 from comms.core.canonical import jcs_dumps
 from comms.core.errors import CommsError
 from comms.core.providers.capability import Capability as C
@@ -45,6 +46,15 @@ from comms.transports.instagram.messages import (
     message_items,
     window_open,
 )
+from comms.transports.instagram.publish import (
+    CONTAINER_BUDGET,
+    LEDGER_KIND,
+    Publisher,
+    caption_counts,
+    check_carousel,
+    check_container,
+    quota,
+)
 
 __all__ = ["InstagramService"]
 
@@ -63,11 +73,12 @@ class InstagramService:
         clock: Callable[[], datetime],
         throttle: Throttle | None = None,
         executor: MutationExecutor | None = None,
+        publisher: Publisher | None = None,
     ) -> None:
         self._conn, self._accounts, self._capability = conn, accounts, capability
         self._handles, self._clock = handles, clock
         self._throttle = throttle or Throttle()
-        self._executor = executor
+        self._executor, self._publisher = executor, publisher
 
     def __repr__(self) -> str:
         return "InstagramService(<redacted>)"
@@ -317,7 +328,8 @@ class InstagramService:
         username = self._accounts.username(runtime)
         self._capability.require_for_write(ACTOR, runtime.target(), capability)
         head = {**self._head(runtime, username), "actor": ACTOR}
-        if prepare is not None:
+        replay = records.find(self._conn, client, a["request_id"]) is not None
+        if prepare is not None and not replay:  # a replay answers its record (A28), unchecked
             refused = prepare(runtime)  # a check that answers without a provider write
             if refused is not None:
                 return {**head, **refused}
@@ -397,6 +409,157 @@ class InstagramService:
             client, "comms_instagram_message_send", a, C.MESSAGE_REPLY,
             {"person": a["person"], "text": text}, prepare=prepare,
         )  # fmt: skip
+
+    # -- publishing (IG-4) -------------------------------------------------------------------------
+
+    def _publishing(self) -> Publisher:
+        if self._publisher is None:
+            raise CommsError("NOT_CONFIGURED")
+        return self._publisher
+
+    def publish_quota(self, a: Mapping[str, Any]) -> dict[str, Any]:
+        """The live published-post quota and the local 400-container ledger."""
+        runtime, username = self._read(a.get("account"), C.PUBLISHING_QUOTA_READ)
+        since = a.get("since")
+        if since is not None:
+            now = timeutil.utc(self._clock()).timestamp()
+            if not now - 24 * 3600 <= since <= now:
+                raise CommsError("INVALID_ARGUMENT")
+        live = quota(runtime, since)
+        return {**self._head(runtime, username), **live,
+                "containers_last_24h": self._publishing().budget_used(runtime),
+                "container_budget": CONTAINER_BUDGET}  # fmt: skip
+
+    def _blocked(self, runtime: AccountRuntime, live: Mapping[str, int | None]) -> str | None:
+        """What a create answers before Meta: the ledger's budget, then the live post quota."""
+        if self._publishing().budget_used(runtime) >= CONTAINER_BUDGET:
+            return "CONTAINER_BUDGET"
+        used, total = live.get("quota_usage"), live.get("quota_total")
+        if used is not None and total is not None and used >= total:
+            return "PUBLISH_CAP"
+        return None
+
+    def publish_preview(self, a: Mapping[str, Any]) -> dict[str, Any]:
+        """Exactly what one ``container_create`` or ``carousel_create`` would do (D-I3), with
+        an advisory ``preview_digest`` the create may echo (open question 3). Read-only."""
+        runtime = self._accounts.resolve(a.get("account"), for_write=True)
+        username = self._accounts.username(runtime)
+        state = self._capability.state(ACTOR, runtime.target(), C.PUBLISHING_QUOTA_READ)
+        if state is not S.AVAILABLE:
+            raise CommsError(STATE_CODE[state])
+        tool, args = a["create"], _create_args(a, ("account", "create"))
+        capability = (
+            C.MEDIA_CAROUSEL_CREATE if tool == "carousel_create" else C.MEDIA_CONTAINER_CREATE
+        )
+        try:
+            (check_carousel if tool == "carousel_create" else check_container)(args)
+        except ValueError:
+            raise CommsError("INVALID_ARGUMENT") from None
+        if tool == "carousel_create":
+            self._publishing().children(runtime, args["children"])
+        write_state = self._capability.state(ACTOR, runtime.target(), capability)
+        live = quota(runtime)
+        refusal = STATE_CODE[write_state] if write_state is not S.AVAILABLE else None
+        caption = args.get("caption")
+        tags, mentions = caption_counts(caption) if isinstance(caption, str) else (0, 0)
+        return {
+            **self._head(runtime, username),
+            "create": tool,
+            "kind": "carousel" if tool == "carousel_create" else args["kind"],
+            "children": len(args["children"]) if tool == "carousel_create" else None,
+            "caption_chars": len(caption) if isinstance(caption, str) else 0,
+            "hashtags": tags,
+            "mentions": mentions,
+            "writes_allowed": write_state is S.AVAILABLE,
+            **live,
+            "containers_last_24h": self._publishing().budget_used(runtime),
+            "container_budget": CONTAINER_BUDGET,
+            "refusal": refusal or self._blocked(runtime, live),
+            "preview_digest": _preview_digest(tool, runtime.ref, args),
+            "untrusted_text": caption if isinstance(caption, str) else None,
+        }
+
+    def _create(
+        self, client: str, tool: str, a: Mapping[str, Any], capability: C, kind_of: str
+    ) -> dict[str, Any]:
+        args = _create_args(a, ("account", "request_id", "preview_digest"))
+
+        def prepare(runtime: AccountRuntime) -> dict[str, Any] | None:
+            digest = a.get("preview_digest")
+            if digest is not None and digest != _preview_digest(tool, runtime.ref, args):
+                raise CommsError("INVALID_ARGUMENT")  # not what was previewed (open question 3)
+            if tool == "carousel_create":
+                self._publishing().children(runtime, list(a.get("children") or ()))
+            try:
+                live = quota(runtime)
+            except CommsError:  # advisory: the ledger holds; Meta's answer is final (A25)
+                live = {}
+            code = self._blocked(runtime, live)
+            if code is None:
+                return None
+            return {"result": "FAILED", "code": code, "op_ref": None, "replayed": False}
+
+        def bind(runtime: AccountRuntime) -> Callable[[Any, str], Mapping[str, Any]]:
+            def made(conn: Any, provider_ref: str) -> Mapping[str, Any]:
+                ref = store.record_container(
+                    conn, runtime.account_id, kind_of, provider_ref, now=self._clock()
+                )
+                return {"container": ref}
+
+            return made
+
+        result = self._write(
+            client, f"comms_instagram_{tool}", a, capability, args, on_created=bind,
+            prepare=prepare,
+        )  # fmt: skip
+        return {"container": None, **result}
+
+    def container_create(self, client: str, a: Mapping[str, Any]) -> dict[str, Any]:
+        kind = a.get("kind")
+        if kind not in LEDGER_KIND:
+            raise CommsError("INVALID_ARGUMENT")
+        return self._create(
+            client, "container_create", a, C.MEDIA_CONTAINER_CREATE, LEDGER_KIND[kind]
+        )
+
+    def carousel_create(self, client: str, a: Mapping[str, Any]) -> dict[str, Any]:
+        return self._create(client, "carousel_create", a, C.MEDIA_CAROUSEL_CREATE, "carousel")
+
+    def publish(self, client: str, a: Mapping[str, Any]) -> dict[str, Any]:
+        """One status read, then ``media_publish`` (D-I7). A container still processing
+        answers ``FAILED CONTAINER_NOT_READY``: call again later with a new ``request_id``."""
+
+        def prepare(runtime: AccountRuntime) -> None:
+            store.container(self._conn, a["container"], runtime.account_id)  # NOT_FOUND first
+            self._publishing()
+
+        def bind(runtime: AccountRuntime) -> Callable[[Any, str], Mapping[str, Any]]:
+            def made(conn: Any, provider_ref: str) -> Mapping[str, Any]:
+                ref = store.object_ref(
+                    conn, runtime.account_id, "media", provider_ref, now=self._clock()
+                )
+                store.mark_container(conn, a["container"], "PUBLISHED", ref)
+                return {"media": ref}
+
+            return made
+
+        result = self._write(
+            client, "comms_instagram_publish", a, C.MEDIA_PUBLISH,
+            {"container": a["container"]}, on_created=bind, prepare=prepare,
+        )  # fmt: skip
+        return {"media": None, **result}
+
+
+def _create_args(a: Mapping[str, Any], drop: tuple[str, ...]) -> dict[str, Any]:
+    """A create's arguments as Meta will see them: everything but comms' own fields."""
+    return {k: (list(v) if isinstance(v, (list, tuple)) else v) for k, v in a.items()
+            if k not in drop}  # fmt: skip
+
+
+def _preview_digest(tool: str, account_ref: str, args: Mapping[str, Any]) -> str:
+    """The advisory binding of a preview to one create: tool, account and exact arguments."""
+    body = {"tool": tool, "account": account_ref, "args": dict(args)}
+    return hashlib.sha256(domains.INSTAGRAM_PREVIEW + jcs_dumps(body)).hexdigest()
 
 
 def _query(args: Mapping[str, Any]) -> dict[str, Any]:

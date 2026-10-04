@@ -33,6 +33,7 @@ from comms.transports.instagram.admin import InstagramAdmin
 from comms.transports.instagram.capability import InstagramCapability
 from comms.transports.instagram.config import InstagramSettings
 from comms.transports.instagram.http import GraphIgApi
+from comms.transports.instagram.publish import Publisher
 from comms.transports.profiles import bot_profile, user_profile, whatsapp_profile
 from comms.transports.telegram.bot.admin import BotAdmin
 from comms.transports.telegram.bot.capability import BotCapability
@@ -111,6 +112,7 @@ class Adapters:
     downloads: dict[str, Any] = field(default_factory=dict)
     relay: Collector | None = None  # A48: the relay collector, when a relay is configured
     instagram: InstagramAccounts | None = None  # proposed A49: configured Instagram accounts
+    publisher: Publisher | None = None  # proposed A49: the container ledger's calls (IG-4)
 
     def __repr__(self) -> str:
         return (
@@ -270,7 +272,10 @@ def _instagram(
     adapters.instagram = accounts
     adapters.capability["instagram"] = InstagramCapability(accounts, clock=clock)
     if runtimes:
-        adapters.admin["instagram"] = InstagramAdmin(accounts, conn, clock=clock)
+        admin = InstagramAdmin(accounts, conn, clock=clock)
+        adapters.publisher = Publisher(conn, clock=clock)
+        adapters.publisher.register(admin)
+        adapters.admin["instagram"] = admin
 
 
 def _confirmer(conn: Any, versions: dict[str, int]) -> Callable[[str], None]:

@@ -1,5 +1,5 @@
 {
-  "count": 147,
+  "count": 152,
   "names": [
     "comms_capability_list",
     "comms_context_get",
@@ -143,6 +143,11 @@
     "comms_instagram_tag_list",
     "comms_instagram_conversation_list",
     "comms_instagram_conversation_messages",
+    "comms_instagram_publish_quota",
+    "comms_instagram_publish_preview",
+    "comms_instagram_container_create",
+    "comms_instagram_carousel_create",
+    "comms_instagram_publish",
     "comms_instagram_comment_reply",
     "comms_instagram_comment_hide",
     "comms_instagram_comments_enabled_set",
@@ -292,11 +297,16 @@
     "comms_instagram_tag_list": "477663d0267e48e33840a573b23b134b55dc8deae255136ab8848ae9fa948572",
     "comms_instagram_conversation_list": "4751396e5c1529286b9f14dff38d296d93fff6ad795cb2596aeb106f740e5b2a",
     "comms_instagram_conversation_messages": "552685e57a1357856c6e08dd7a4e45b6ae79d9eaf4bf92a3154cd717aa6cad51",
+    "comms_instagram_publish_quota": "0d657cc99c14df28cef7241bff730ab05ee70d066fd995d99b4837e33a492b33",
+    "comms_instagram_publish_preview": "7d473d10e3d454100412b01d2e573b6b0044e469e22f56c2dd31ed2f061c9077",
+    "comms_instagram_container_create": "85ee70b4e955ab1d85e41b250c13dc203da1fbd8721a805e50c0d06b991f02b2",
+    "comms_instagram_carousel_create": "21398948857a7de82aed8dfa8f64c05c4cfe8e67a95232e80ac6960fa290c3c9",
+    "comms_instagram_publish": "83766214d48693065b706f637cfc35bb7da6635f4a61f4225af4a255868fd767",
     "comms_instagram_comment_reply": "b37bbb3a7b85dc3f567d178a5dc1d6ff4584c278dc99dcdf7664ae3517d4c0dd",
     "comms_instagram_comment_hide": "bb7181afd5a731c4f1453d943dbba81a7beba682551d30d98d3053e26b3b5cbf",
     "comms_instagram_comments_enabled_set": "d722d22610a754fd2b67a39fa02b338d9bda8c45e6786b45a12fa05dfde83f05",
     "comms_instagram_comment_delete": "db651997d18d9dc8c16c634d1f3d5aecd427485040c07c8ada23c16781def79b",
     "comms_instagram_message_send": "f014e17a290f1bbca5bdd6d3c94be40af1aed2eed4be109c439a5aa4be4b81ef"
   },
-  "catalog": "afe1a371d3e0aa65bf839a5dfa0294172ed3139c9be6069d61047ebfcb9e7bfa"
+  "catalog": "de8c9897d107510b4289af09d3d8a91d49dd61ae036334234e0d6e06f0134110"
 }

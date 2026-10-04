@@ -71,6 +71,7 @@ def ig_world(tmp_path, *, writes=True, dms=True, caption=False, accounts=("main"
     service = InstagramService(
         conn, adapters.instagram, capability, env["handles"], clock=env["clock"],
         throttle=Throttle(sleep=sleep, monotonic=lambda: elapsed[0]), executor=executor,
+        publisher=adapters.publisher,
     )  # fmt: skip
     return {**env, "secrets": secrets, "fake": fake, "adapters": adapters, "service": service,
             "capability": capability, "executor": executor, "sleeps": sleeps}  # fmt: skip

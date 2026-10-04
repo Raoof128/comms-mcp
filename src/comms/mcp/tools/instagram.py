@@ -385,4 +385,113 @@ COMMENT_WRITES: tuple[ToolSpec, ...] = (
     ),
 )
 
-INSTAGRAM_TOOLS: tuple[ToolSpec, ...] = (*READ_TOOLS, *COMMENT_WRITES)
+# -- publishing (IG-4; section 6) ---------------------------------------------------------------
+
+_URL = {"type": "string", "minLength": 9, "maxLength": 2048, "pattern": "^https://"}
+_ITEM = {
+    "kind": enum(("image", "reel", "carousel_image", "carousel_video")),
+    "url": _URL,
+    "caption": string(1, 2200),
+    "alt_text": string(1, 1000),
+    "location_id": {"type": "string", "pattern": "^[0-9]{1,20}$"},
+    "share_to_feed": BOOL,
+    "cover_url": _URL,
+    "thumb_offset": integer(0, 900000),
+    "is_ai_generated": BOOL,
+}
+_CAROUSEL = {
+    "children": array(ref("instagram_container"), low=2, high=10),
+    "caption": string(1, 2200),
+    "location_id": _ITEM["location_id"],
+    "is_ai_generated": BOOL,
+}
+_DIGEST = {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+_QUOTA = {
+    "quota_usage": nullable(integer(0)),
+    "quota_total": nullable(integer(0)),
+    "quota_duration": nullable(integer(0)),
+    "containers_last_24h": integer(0),
+    "container_budget": integer(0),
+}
+_PUBLISH_FAILURES = ("INVALID_ARGUMENT",)
+
+PUBLISH_READS: tuple[ToolSpec, ...] = (
+    _read(
+        "publish_quota",
+        "Publishing quota",
+        "Posts published against Meta's live quota, and containers created in the last 24 h "
+        "against the 400 budget.",
+        {"since": integer(0)},
+        [],
+        _out(_QUOTA),
+    ),
+    _read(
+        "publish_preview",
+        "Preview a container",
+        "Check one container_create or carousel_create exactly as given (same arguments, no "
+        "request_id): what it would make, whether policy, budget and quota allow it, and a "
+        "preview_digest the create may echo. Makes nothing.",
+        {
+            "create": enum(("container_create", "carousel_create")),
+            **_ITEM,
+            "children": _CAROUSEL["children"],
+        },
+        ["account", "create"],
+        _out(
+            {
+                "create": enum(("container_create", "carousel_create")),
+                "kind": enum(("image", "reel", "carousel_image", "carousel_video", "carousel")),
+                "children": nullable(integer(2, 10)),
+                "caption_chars": integer(0, 2200),
+                "hashtags": integer(0),
+                "mentions": integer(0),
+                "writes_allowed": BOOL,
+                **_QUOTA,
+                "refusal": nullable(string(1, 64)),
+                "preview_digest": _DIGEST,
+                "untrusted_text": nullable(string(0, 2200)),
+            }
+        ),
+        failures=_PUBLISH_FAILURES,
+    ),
+)
+
+PUBLISH_WRITES: tuple[ToolSpec, ...] = (
+    _write(
+        "container_create",
+        "Create a media container",
+        "Make one image, Reel or carousel item container from a public https URL Meta fetches "
+        "(comms never does). Uses one of 400 containers a day; nothing is posted until publish.",
+        {**_ITEM, "preview_digest": _DIGEST},
+        ["kind", "url"],
+        _result({"container": nullable(ref("instagram_container"))}),
+        C.MEDIA_CONTAINER_CREATE,
+    ),
+    _write(
+        "carousel_create",
+        "Create a carousel container",
+        "Make a carousel container from 2 to 10 of this account's carousel item containers. "
+        "Nothing is posted until publish.",
+        {**_CAROUSEL, "preview_digest": _DIGEST},
+        ["children"],
+        _result({"container": nullable(ref("instagram_container"))}),
+        C.MEDIA_CAROUSEL_CREATE,
+    ),
+    _write(
+        "publish",
+        "Publish a container",
+        "Publish one container to the account's public feed. Still processing: FAILED "
+        "CONTAINER_NOT_READY, call again later with a new request_id. Public and irreversible.",
+        {"container": ref("instagram_container")},
+        ["container"],
+        _result({"media": nullable(ref("instagram_media"))}),
+        C.MEDIA_PUBLISH,
+    ),
+)
+
+INSTAGRAM_TOOLS: tuple[ToolSpec, ...] = (
+    *READ_TOOLS,
+    *PUBLISH_READS,
+    *PUBLISH_WRITES,
+    *COMMENT_WRITES,
+)

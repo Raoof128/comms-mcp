@@ -186,7 +186,13 @@ def build_comms_runtime(
         instagram=None  # proposed A49
         if adapters.instagram is None
         else InstagramService(
-            conn, adapters.instagram, capability, handles, clock=clock, executor=executor
+            conn,
+            adapters.instagram,
+            capability,
+            handles,
+            clock=clock,
+            executor=executor,
+            publisher=adapters.publisher,
         ),
     )
     dispatcher = Dispatcher(build_registry(services))

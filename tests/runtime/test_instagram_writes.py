@@ -237,6 +237,23 @@ def test_a_dm_inside_the_window_is_sent_once(world):
     assert IGSID not in json.dumps(out)
 
 
+def test_a_replay_answers_its_record_even_after_the_window_closes(world):
+    """A28: a replayed request_id returns what was recorded; no pre-check runs again."""
+    _media, _comment, person = world["seed"]
+    _thread(world, NOW - timedelta(hours=2))
+    world["fake"].routes[("POST", "/v25.0/17841400000000001/messages")] = _json(
+        200, {"recipient_id": IGSID, "message_id": "aWdfZAG1faXRlbToxOk1lc3NhZ2UwMDAy"}
+    )
+    args = {"account": "main", "person": person, "text": "Hello!", "request_id": _req()}
+    first = world["service"].message_send(CLIENT, args)
+    _thread(world, NOW - timedelta(hours=30))  # the window has since closed
+    reads = len(world["fake"].requests)
+    again = world["service"].message_send(CLIENT, args)
+    assert (first["result"], again["result"], again["replayed"]) == ("SUCCEEDED", "SUCCEEDED", True)
+    assert len(_writes(world)) == 1 and again["op_ref"] == first["op_ref"]
+    assert world["fake"].requests[reads:] == []  # no window read, no send
+
+
 def test_a_dm_over_1000_bytes_is_refused(world):
     _media, _comment, person = world["seed"]
     _thread(world, NOW - timedelta(hours=2))

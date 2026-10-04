@@ -50,15 +50,20 @@ class InstagramAdmin:
     def __init__(self, accounts: InstagramAccounts, conn: Any, *, clock: Callable[[], datetime]):
         self._accounts, self._conn, self._clock = accounts, conn, clock
         self._extra: dict[C, Callable[[SemanticOperation, AccountRuntime], ProviderResult]] = {}
+        self._checks: dict[C, Callable[[Mapping[str, Any]], None]] = {}
 
     def __repr__(self) -> str:
         return "InstagramAdmin(<redacted>)"
 
     def register(
-        self, capability: C, call: Callable[[SemanticOperation, AccountRuntime], ProviderResult]
+        self,
+        capability: C,
+        call: Callable[[SemanticOperation, AccountRuntime], ProviderResult],
+        check: Callable[[Mapping[str, Any]], None],
     ) -> None:
-        """A later family's writes (publishing, IG-4) join the same adapter."""
-        self._extra[capability] = call
+        """A later family's writes (publishing, IG-4) join the same adapter: ``check`` is its
+        ``validate`` (shapes only, ``ValueError``), ``call`` its one provider effect."""
+        self._extra[capability], self._checks[capability] = call, check
 
     # -- AdminOperations ---------------------------------------------------------------------
 
@@ -80,7 +85,9 @@ class InstagramAdmin:
             _text(a.get("text"), utf8=DM_MAX_BYTES)
         elif cap is C.COMMENT_DELETE:
             pass
-        elif cap not in self._extra:
+        elif cap in self._checks:
+            self._checks[cap](a)
+        else:
             raise NotImplementedError
 
     def invoke(self, op: SemanticOperation, target: ProviderTarget, op_key: str) -> ProviderResult:

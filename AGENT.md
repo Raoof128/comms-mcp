@@ -1324,3 +1324,19 @@ Follow the user's engineering lifecycle: design/security analysis, implementatio
 - **Verification:** new tests seen failing first; 162 Instagram tests pass, including crash at every executor point, replay, cross-account refs and the injected-comment case; MCP, conformance, egress sweep, host permissions, AI boundary, layering, facades, ambiguity and matrix suites pass; ruff, format, mypy clean; full gate on the commit in the main checkout (ledger line).
 - **Follow-ups:** IG-4 (publishing).
 
+
+### 2026-10-04 (Australia/Sydney), IG-4
+**Raouf:**
+- **Scope:** Plan task IG-4, proposed A49: publishing on the durable `igk_` container ledger.
+- **Summary:**
+  - **Tools (152 in the catalog):** `comms_instagram_publish_quota` and `publish_preview` (reads); `container_create`, `carousel_create` and `publish` (CREATE writes, each one `request_id` and one provider effect, all three in the ask list and the egress classes). The catalog now follows section 5's order.
+  - **Ledger:** every container Meta makes is an `igk_` row the moment Meta answers, so the 400-per-24-hours budget never undercounts, even across a crash. A full ledger is `FAILED CONTAINER_BUDGET`; a full live post quota is `FAILED PUBLISH_CAP`; both answer before Meta with nothing recorded.
+  - **Publish:** one status read, then `media_publish`. `IN_PROGRESS`, `ERROR` and `EXPIRED` answer `CONTAINER_NOT_READY`, `CONTAINER_FAILED` and `CONTAINER_EXPIRED`; a container the ledger knows as published answers `SUCCEEDED` with its `igm_` and makes no call; one Meta reports published but comms never named is `OUTCOME_UNKNOWN` (A19). Nothing polls (D-I13).
+  - **URLs:** `transports/instagram/urls.py` passes only `https` URLs to a public DNS name (no userinfo, IP literal in any spelling, `localhost` or private-use name, port but 443, whitespace; at most 2,048 characters). comms never fetches them.
+  - **Preview:** read-only; reports kind, caption counts, policy, the ledger, the live quota and the refusal a create would answer, with an advisory `preview_digest` that the creates may echo (open question 3, built as proposed; the owner may drop it).
+  - **Replay fix:** a replayed `request_id` now skips every pre-check and answers its record (A28). IG-3's `message_send` re-checked the DM window on replay and could answer `WINDOW_CLOSED` for a DM already sent; a test now covers it.
+  - **Ruling R-IG6:** the points above; the catalog pin is regenerated (`afe1a371d3e0aa65…` to `de8c9897d107510b…`); `PENDING_A49` is empty.
+- **Files changed:** `src/comms/transports/instagram/{urls,publish,admin}.py`; `src/comms/runtime/{instagram,adapters,comms_runtime,facades}.py`; `src/comms/mcp/{egress,tools/instagram}.py`; `.claude/settings.json`; `docs/verification/comms-v0.3-{actor-matrix,rulings}.md`; tests (`tests/runtime/test_instagram_publish.py`, `tests/transports/instagram/{test_urls,test_publish_ledger,world}.py`, `tests/runtime/test_instagram_writes.py`, `test_catalog_pin.py`, the catalog pin).
+- **Verification:** new tests seen failing first, including the replay flaw against the unfixed service; 241 Instagram tests pass, including every crash point, replay, the budget, the quota and cross-account children; MCP, conformance, egress, host permissions, AI boundary, layering, wire-size, runtime, ambiguity and matrix suites pass (1427); ruff, format, mypy clean; full gate on the commit in the main checkout (ledger line).
+- **Follow-ups:** IG-5 (`requires_user_interaction` through the daemon).
+

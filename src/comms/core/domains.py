@@ -14,6 +14,7 @@ __all__ = [
     "CURSOR",
     "DIRECTORY_IDENTITY",
     "IDEMPOTENCY",
+    "INSTAGRAM_PREVIEW",
     "LOCAL_LEASE",
     "LOCAL_LEASE_AUDIENCE",
     "MTPROTO_RANDOM_ID",
@@ -45,3 +46,4 @@ BACKUP_BINDING = b"comms-backup-binding/v1\0"  # comms v0.3 B25
 BACKUP_SCHEMA = b"comms-backup/v1\0"  # comms v0.3 B25: the payload's schema name
 DIRECTORY_IDENTITY = b"comms-directory-identity/v1\0"  # catalog amendment G3 (A45, D1)
 RELAY_PULL = b"comms-relay-pull/v1\0"  # comms v0.3 A48: the relay's pull signature
+INSTAGRAM_PREVIEW = b"comms-instagram-preview/v1\0"  # proposed A49: the advisory preview digest

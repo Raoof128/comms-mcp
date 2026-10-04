@@ -41,6 +41,7 @@ _BODY = frozenset(
         "comms_instagram_comment_replies",  # proposed A49: captions, comments, DMs
         "comms_instagram_tag_list",  # proposed A49: captions, comments, DMs
         "comms_instagram_conversation_messages",  # proposed A49: captions, comments, DMs
+        "comms_instagram_publish_preview",  # proposed A49: captions, comments, DMs
     }
 )
 _NAMES = frozenset(
@@ -71,6 +72,11 @@ _NAMES = frozenset(
         "comms_instagram_tag_list",  # proposed A49: usernames and labels
         "comms_instagram_conversation_list",  # proposed A49: usernames and labels
         "comms_instagram_conversation_messages",  # proposed A49: usernames and labels
+        "comms_instagram_publish_quota",  # proposed A49: usernames and labels
+        "comms_instagram_publish_preview",  # proposed A49: usernames and labels
+        "comms_instagram_container_create",  # proposed A49: the account's username
+        "comms_instagram_carousel_create",  # proposed A49: the account's username
+        "comms_instagram_publish",  # proposed A49: the account's username
         "comms_instagram_comment_reply",  # proposed A49: the account's username
         "comms_instagram_comment_hide",  # proposed A49: the account's username
         "comms_instagram_comments_enabled_set",  # proposed A49: the account's username

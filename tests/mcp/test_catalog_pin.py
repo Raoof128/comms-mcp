@@ -66,6 +66,10 @@ CAPABILITY_TOOLS = {
     C.COMMENT_LIST: "comms_instagram_comment_list",
     C.TAG_LIST: "comms_instagram_tag_list",
     # proposed A49 (IG-3): comment moderation
+    C.PUBLISHING_QUOTA_READ: "comms_instagram_publish_quota",
+    C.MEDIA_CONTAINER_CREATE: "comms_instagram_container_create",
+    C.MEDIA_CAROUSEL_CREATE: "comms_instagram_carousel_create",
+    C.MEDIA_PUBLISH: "comms_instagram_publish",
     C.COMMENT_REPLY: "comms_instagram_comment_reply",
     C.COMMENT_HIDE: "comms_instagram_comment_hide",
     C.COMMENT_DELETE: "comms_instagram_comment_delete",
@@ -170,12 +174,7 @@ def test_tools_list_payload_structurally_identical_ignoring_jsonrpc_framing():
 
 # Proposed A49: an Instagram capability whose tool a later plan task builds (as the actor
 # matrix's ``A todo:G<n>``). Each task removes its rows; the exit test requires none left.
-PENDING_A49: dict[C, str] = {
-    C.PUBLISHING_QUOTA_READ: "IG-4",
-    C.MEDIA_CONTAINER_CREATE: "IG-4",
-    C.MEDIA_CAROUSEL_CREATE: "IG-4",
-    C.MEDIA_PUBLISH: "IG-4",
-}
+PENDING_A49: dict[C, str] = {}  # every A49 capability has its tool (IG-4)
 
 
 def test_every_semantic_capability_has_a_tool():
