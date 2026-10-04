@@ -1248,3 +1248,21 @@ Follow the user's engineering lifecycle: design/security analysis, implementatio
   - open question 3 (an advisory `preview_digest` on the publish tools) needs an owner decision before MI-3;
   - GI-1 (Bearer on `graph.instagram.com`) decides whether MI-1 can proceed inside A26.
 
+
+### 2026-10-04 (Australia/Sydney), later
+**Raouf:**
+- **Scope:** Revision 2 of the Instagram proposal (A49) and its implementation plan, on branch `comms-instagram-spec`. Documentation only; no source, pin or catalog touched.
+- **Summary:**
+  - The v0.6 gauntlet (`GAUNTLET-v0.6.md` in `Raoof128/Instagram-MCP`, `85cf0b1`) found that revision 1 described executor behaviour comms does not have (`IN_FLIGHT` as a caller-visible result, resume by `op_ref`, step records carrying a provider ref) and left 14 implied code changes unstated.
+  - Revision 2 of `docs/instagram-spec-v0.6.md` re-cuts publishing as three single-effect CREATE tools (`container_create`, `carousel_create`, `publish`) on a durable `igk_` ledger row, so no executor, recovery, relay or proxy change is needed and every call fits the proxy's 30 s forward timeout (D-I13). It drops `IN_FLIGHT` and the resume tool (22 tools, 14 reads and 8 writes), makes the error table step-scoped (no CREATE is ever retried by comms), lists every required code change with the pin it moves (section 14), and fixes the wording the gauntlet marked wrong: `test_egress.py` is an httpx-import allowlist, `smoke_sweep.py` is the catalog sweep, the alias grammar excludes the `_no_secrets` substrings, the refresh call's query-string token is named in GI-1, `mcp/http.py` must pass `meta=`.
+  - New plan `docs/superpowers/plans/2026-10-04-comms-instagram.md`: tasks IG-0 to IG-6 for the agent (test-first, one pin regeneration per task, named tests per review focus), IG-7 for the owner (tokens, live gates GI-1 to GI-8, ruling R-IG0), and an agent brief.
+- **Files changed:** `docs/instagram-spec-v0.6.md`; `docs/superpowers/plans/2026-10-04-comms-instagram.md` (new); `AGENT.md`; `CHANGELOG.md`.
+- **Verification:**
+  - `uv run pytest tests/security/test_runbooks.py tests/security/test_v03_preflight.py tests/security/test_supersession.py tests/core/providers/test_protocols.py -q`: green. The v0.3 spec pin is untouched.
+  - `mcp` 2.2.0 driven live over stdio with the proxy's `Server` construction: legacy `initialize`, modern `server/discover` and bare modern `tools/list` served; tool `_meta` survived `ListToolsResult.model_validate` (gauntlet v0.6, section A).
+  - The full gate was not run: no source file changed.
+- **Follow-ups:**
+  - IG-0 pins this revision and copies the gauntlet record into `docs/verification/`;
+  - GI-1 (Bearer on `graph.instagram.com`, including `/refresh_access_token`) is the first live step and can stop MI-1 for a ruling;
+  - open questions 1 to 4 in the spec need owner answers before MI-3.
+
