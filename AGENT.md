@@ -1387,3 +1387,14 @@ Follow the user's engineering lifecycle: design/security analysis, implementatio
 - **Verification:** the gate logs on the execution host; this entry's own commit is gated the same way.
 - **Follow-ups:** the owner's IG-7 (a throwaway account, GI-1 first, open questions 1 to 4, ruling R-IG0).
 
+
+### 2026-10-04 (Australia/Sydney), A49 end-to-end smoke
+**Raouf:**
+- **Scope:** The owner's request for a full end-to-end smoke covering every function: Instagram now runs on the real daemon, through the installed binary, not only in the pytest suite.
+- **Summary:**
+  - **Seam:** `comms selftest-daemon` builds the real Instagram adapters (accounts, capability, admin, publishing ledger) over a scripted graph.instagram.com when `comms.json` names Instagram accounts; `Adapters.instagram_transport` hands the same transport to the operator commands. Production passes `None`, the network (R-IG9).
+  - **Smoke:** `drive_instagram` adds an account at the hidden prompt through a real pty, drives all 22 tools over HTTP `/mcp`, replays a DM, runs both doctors, refreshes the token, verifies the audit chain and removes the account. Nine checks; the smoke is 118 checks, 44 against a real daemon.
+- **Files changed:** `src/comms/runtime/{selftest,adapters,assemble}.py`; `scripts/{smoke_daemon,e2e_smoke}.py`; `docs/verification/{comms-v0.3-rulings.md,comms-v0.3-smoke-map.json}`; `tests/security/test_d39_pre_exit.py`; `CLAUDE.md`.
+- **Verification:** the nine checks pass on their own against a real selftest daemon; smoke-map and D39 exit tests pass; ruff, format, mypy clean; full gate on the commit in the main checkout.
+- **Follow-ups:** none from the smoke; the owner's IG-7 live gates remain.
+

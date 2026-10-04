@@ -113,6 +113,15 @@
     "phase_v03_daemon::a retained Telegram document pages back whole with its SHA-256",
     "phase_v03_daemon::every catalog tool answers over HTTP: a schema-valid success or its pinned refusal",
     "phase_v03_daemon::a webhook the relay held while the daemon was off is read over MCP once it starts",
-    "phase_v03_daemon::an unsigned delivery through the relay is quarantined, never inboxed, and the mailbox drains"
+    "phase_v03_daemon::an unsigned delivery through the relay is quarantined, never inboxed, and the mailbox drains",
+    "phase_v03_daemon::instagram: before an account is added, every Instagram tool answers NOT_CONFIGURED",
+    "phase_v03_daemon::instagram: account add reads the token at a hidden prompt on a real terminal, proves it and echoes nothing secret",
+    "phase_v03_daemon::instagram: account list shows the account registered and configured",
+    "phase_v03_daemon::instagram: all 22 tools succeed over HTTP with schema-valid results against the scripted Graph",
+    "phase_v03_daemon::instagram: a replayed DM request answers its record and sends nothing twice",
+    "phase_v03_daemon::instagram: both doctors report the account healthy",
+    "phase_v03_daemon::instagram: token refresh rotates the token and the account keeps working",
+    "phase_v03_daemon::instagram: the audit chain verifies after every Instagram write",
+    "phase_v03_daemon::instagram: account remove revokes the token and the tools answer NOT_CONFIGURED again"
   ]
 }

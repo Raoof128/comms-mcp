@@ -132,7 +132,7 @@ logged in since 2026-09-28 and were driven live (rulings R-TG1 to R-TG4). Next: 
 uv sync --locked
 uv run python scripts/extract_contracts.py --check
 uv run pytest -q                                  # 5894 passed, 4 skipped
-uv run python scripts/e2e_smoke.py                # 109 checks, end to end (34 against a real daemon; every tool swept; the relay under wrangler dev)
+uv run python scripts/e2e_smoke.py                # 118 checks, end to end (44 against a real daemon; every tool swept; the relay under wrangler dev)
 uv run pytest tests/formal -q -s                  # 57 passed: 544 states/22 assertions; campaign 96,528/11; operations 4,728
 uv run ruff check src tests scripts
 uv run ruff format --check src tests scripts

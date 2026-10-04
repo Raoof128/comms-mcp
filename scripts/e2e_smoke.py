@@ -1992,6 +1992,20 @@ async def _comms_drive(root: Path) -> dict[str, Any]:
     return out
 
 
+# proposed A49: the Instagram checks on the real daemon (scripts/smoke_daemon.py drive_instagram)
+INSTAGRAM_CHECKS = (
+    "ig_unconfigured_before_add",
+    "ig_account_add_hidden_prompt",
+    "ig_account_list",
+    "ig_tools_end_to_end",
+    "ig_replay_no_second_send",
+    "ig_doctors",
+    "ig_token_refresh",
+    "ig_audit_verifies",
+    "ig_account_remove",
+)
+
+
 def phase_v03_daemon(ledger: Ledger) -> None:
     """D39-PRE E11 (D39-A): the real daemon in its own process, driven only through the
     installed comms binary, the admin socket, stdio and HTTP (scripts/smoke_daemon.py)."""
@@ -2014,6 +2028,12 @@ def phase_v03_daemon(ledger: Ledger) -> None:
                 except AssertionError as failed:
                     reason = str(failed)[:200]
                     results.update(relay_offline_catchup=reason, relay_quarantine=reason)
+            with tempfile.TemporaryDirectory(dir="/tmp", prefix="sd") as short:
+                try:  # proposed A49: a failure here fails its own checks, never the others
+                    results.update(smoke_daemon.drive_instagram(Path(short)))
+                except AssertionError as failed:
+                    reason = str(failed)[:200]
+                    results.update(dict.fromkeys(INSTAGRAM_CHECKS, reason))
         return results
 
     def verdict(key: str) -> Any:
@@ -2165,6 +2185,51 @@ def phase_v03_daemon(ledger: Ledger) -> None:
         area,
         "an unsigned delivery through the relay is quarantined, never inboxed, and the mailbox drains",
         lambda: verdict("relay_quarantine"),
+    )
+    ledger.run(
+        area,
+        "instagram: before an account is added, every Instagram tool answers NOT_CONFIGURED",
+        lambda: verdict("ig_unconfigured_before_add"),
+    )
+    ledger.run(
+        area,
+        "instagram: account add reads the token at a hidden prompt on a real terminal, proves it and echoes nothing secret",
+        lambda: verdict("ig_account_add_hidden_prompt"),
+    )
+    ledger.run(
+        area,
+        "instagram: account list shows the account registered and configured",
+        lambda: verdict("ig_account_list"),
+    )
+    ledger.run(
+        area,
+        "instagram: all 22 tools succeed over HTTP with schema-valid results against the scripted Graph",
+        lambda: verdict("ig_tools_end_to_end"),
+    )
+    ledger.run(
+        area,
+        "instagram: a replayed DM request answers its record and sends nothing twice",
+        lambda: verdict("ig_replay_no_second_send"),
+    )
+    ledger.run(
+        area,
+        "instagram: both doctors report the account healthy",
+        lambda: verdict("ig_doctors"),
+    )
+    ledger.run(
+        area,
+        "instagram: token refresh rotates the token and the account keeps working",
+        lambda: verdict("ig_token_refresh"),
+    )
+    ledger.run(
+        area,
+        "instagram: the audit chain verifies after every Instagram write",
+        lambda: verdict("ig_audit_verifies"),
+    )
+    ledger.run(
+        area,
+        "instagram: account remove revokes the token and the tools answer NOT_CONFIGURED again",
+        lambda: verdict("ig_account_remove"),
     )
 
 

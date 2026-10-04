@@ -113,6 +113,9 @@ class Adapters:
     relay: Collector | None = None  # A48: the relay collector, when a relay is configured
     instagram: InstagramAccounts | None = None  # proposed A49: configured Instagram accounts
     publisher: Publisher | None = None  # proposed A49: the container ledger's calls (IG-4)
+    # proposed A49: the Graph transport every Instagram client uses; None is the network
+    # (production). ``comms selftest-daemon`` injects a scripted one, as it does for the bot.
+    instagram_transport: Any = None
 
     def __repr__(self) -> str:
         return (
@@ -173,7 +176,7 @@ def build_adapters(
     else:
         _webhooks(adapters, conn, secrets, clock, monotonic, archive)
     if settings.instagram is not None:
-        _instagram(adapters, conn, secrets, settings.instagram, clock)
+        instagram_adapters(adapters, conn, secrets, settings.instagram, clock)
     if adapters.graph is not None:  # G8: group reads live, messages from the archive (if any)
         adapters.context["whatsapp_cloud"] = WhatsAppContext(
             adapters.context.get("whatsapp_cloud"), adapters.graph, clock=clock
@@ -248,12 +251,14 @@ def _whatsapp(
         )
 
 
-def _instagram(
+def instagram_adapters(
     adapters: Adapters,
     conn: Any,
     secrets: SecretStore,
     settings: InstagramSettings,
     clock: Callable[[], datetime],
+    *,
+    transport: Any = None,
 ) -> None:
     """Proposed A49: one ``GraphIgApi`` per alias configured in comms.json, registered
     (``iga_``) and holding an active token. No network here: the identity check is lazy."""
@@ -265,11 +270,12 @@ def _instagram(
         if row is None or version is None:
             continue
         api = GraphIgApi(
-            secrets, purpose=purpose, version=version, api_version=settings.api_version
-        )
+            secrets, purpose=purpose, version=version, api_version=settings.api_version,
+            transport=transport,
+        )  # fmt: skip
         runtimes[alias] = AccountRuntime(alias, row.ref, row.id, policy, api, row.user_id)
     accounts = InstagramAccounts(conn, settings, runtimes, clock=clock)
-    adapters.instagram = accounts
+    adapters.instagram, adapters.instagram_transport = accounts, transport
     adapters.capability["instagram"] = InstagramCapability(accounts, clock=clock)
     if runtimes:
         admin = InstagramAdmin(accounts, conn, clock=clock)

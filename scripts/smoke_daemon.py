@@ -64,6 +64,48 @@ class Daemon:
         path.write_text(json.dumps({"local_port": self.port, **extra}), encoding="utf-8")
         path.chmod(0o600)
 
+    def tty(self, *argv: str, secret: str) -> subprocess.CompletedProcess[str]:
+        """One ``comms`` command whose hidden prompt is answered on a real terminal: a pty
+        becomes the child's controlling terminal, so ``getpass`` reads it with echo off."""
+        import fcntl
+        import pty
+        import termios
+
+        master, slave = pty.openpty()
+
+        def controlling() -> None:
+            os.setsid()
+            fcntl.ioctl(0, termios.TIOCSCTTY, 0)
+
+        try:
+            proc = subprocess.Popen(
+                [COMMS, *argv], env=self.env, stdin=slave, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, text=True, preexec_fn=controlling,  # noqa: PLW1509
+            )  # fmt: skip
+            os.close(slave)
+            slave = -1
+            # getpass flushes typed-ahead input when it turns echo off, so type only once its
+            # prompt is on the terminal
+            import select
+
+            seen, deadline = b"", time.monotonic() + 60
+            while b"not echoed" not in seen and time.monotonic() < deadline:
+                if select.select([master], [], [], 0.2)[0]:
+                    try:
+                        seen += os.read(master, 1024)
+                    except OSError:
+                        break
+                if proc.poll() is not None:
+                    break
+            time.sleep(0.1)
+            os.write(master, (secret + "\n").encode())
+            out, err = proc.communicate(timeout=90)
+        finally:
+            for fd in (master, slave):
+                if fd >= 0:
+                    os.close(fd)
+        return subprocess.CompletedProcess(proc.args, proc.returncode, out, err)
+
     def start(self, *, wait: bool = True) -> subprocess.Popen[str]:
         self.proc = subprocess.Popen(
             [
@@ -406,6 +448,140 @@ def drive_directory_and_campaigns(root: Path) -> dict[str, Any]:
         out.update(_sweep_checks(d, seed, grp))
         out["verify_after"] = d.json("audit", "verify", "--all")["ok"] is True
         out.update(_webhook_checks(d, webhook_port))
+    finally:
+        if d.proc is not None and d.proc.poll() is None:
+            d.stop()
+    return out
+
+
+IG_TOKEN = "IGAAsmokeTOKENsmokeTOKENsmokeTOKEN0123456789"  # the documented token shape
+IG_USER = "17841400000000099"  # the selftest daemon's scripted account (runtime/selftest.py)
+
+
+def drive_instagram(root: Path) -> dict[str, Any]:
+    """Proposed A49 on the real daemon: an account added at the hidden prompt, all 22 Instagram
+    tools over HTTP /mcp against the selftest daemon's scripted graph.instagram.com, a replay,
+    both doctors, a token refresh, the audit chain, and the account removed again."""
+    import jsonschema
+
+    from comms.core import refs
+    from comms.mcp.catalog import TOOL_CATALOG
+
+    out: dict[str, Any] = {}
+    specs = {s.name: s for s in TOOL_CATALOG}
+    d = Daemon(root / "ig")
+    d.json("keys", "provision", "--state-dir", str(d.state), "--runtime-dir", str(d.run))
+    d.settings(instagram={"default": "main", "dm_disclosure": "Sent with comms",
+                          "accounts": {"main": {"label": "Smoke", "writes": True, "dms": True}}})  # fmt: skip
+    d.start()
+    try:
+        d.json("cutover", "run")
+        seed = root / "seed-ig"
+        d.json("client", "add", "--name", "smoke-ig", "--helper-path", str(seed))
+
+        def code(answer: dict[str, Any]) -> Any:
+            return (answer.get("structuredContent") or {}).get("error", {}).get("code")
+
+        before = d.http(seed, "comms_instagram_whoami", {})
+        out["ig_unconfigured_before_add"] = code(before) == "NOT_CONFIGURED" or before
+
+        added = d.tty("transport", "instagram", "account", "add", "main", secret=IG_TOKEN)
+        reply = json.loads(added.stdout) if added.returncode == 0 else {}
+        out["ig_account_add_hidden_prompt"] = (
+            reply.get("alias") == "main" and str(reply.get("account", "")).startswith("iga_")
+            and reply.get("username") == "selftest.studio" and reply.get("reloaded") is True
+            and IG_TOKEN not in added.stdout + added.stderr and IG_USER not in added.stdout
+        ) or f"rc={added.returncode} {added.stderr.strip()[-200:]}"  # fmt: skip
+        listed = d.json("transport", "instagram", "account", "list")["accounts"]
+        out["ig_account_list"] = [(a["alias"], a["configured"], bool(a["account"]))
+                                  for a in listed] == [("main", True, True)] or listed  # fmt: skip
+
+        wrong: dict[str, Any] = {}
+        seen: dict[str, dict[str, Any]] = {}
+
+        def call(name: str, arguments: dict[str, Any], **extra: Any) -> dict[str, Any]:
+            spec = specs[f"comms_instagram_{name}"]
+            if spec.requires_request_id:
+                arguments = {"account": "main", **arguments, "request_id": refs.mint("request")}
+            answer = d.http(seed, spec.name, {**arguments, **extra})
+            body = dict(answer.get("structuredContent") or {})
+            if answer["isError"]:
+                wrong[spec.name] = code(answer)
+                return {}
+            try:
+                jsonschema.Draft202012Validator(spec.output_schema).validate(body)
+            except jsonschema.ValidationError as bad:
+                wrong[spec.name] = f"output schema: {bad.message[:100]}"
+            seen[spec.name] = body
+            return body
+
+        call("account_list", {})
+        call("whoami", {})
+        call("profile_get", {})
+        media = call("media_list", {}).get("items", [{}])[0].get("media", "")
+        call("media_get", {"media": media})
+        call("media_insights", {"media": media, "metrics": ["reach"]})
+        call("account_insights", {"metrics": ["views"], "breakdown": "follower_type"})
+        comment = call("comment_list", {"media": media}).get("items", [{}])[0].get("comment", "")
+        call("comment_replies", {"comment": comment})
+        call("tag_list", {})
+        person = call("conversation_list", {}).get("items", [{}])[0].get("person", "")
+        call("conversation_messages", {"person": person})
+        call("publish_quota", {})
+        image = {
+            "kind": "image",
+            "url": "https://cdn.example.com/smoke.jpg",
+            "caption": "Smoke #ig",
+        }
+        digest = call("publish_preview", {"account": "main", "create": "container_create",
+                                          **image}).get("preview_digest")  # fmt: skip
+        container = call("container_create", image, preview_digest=digest).get("container")
+        children = [call("container_create", {"kind": "carousel_image", "url": image["url"]})
+                    .get("container") for _ in range(2)]  # fmt: skip
+        call("carousel_create", {"children": children})
+        published = call("publish", {"container": container})
+        call("comment_reply", {"comment": comment, "text": "Thanks!"})
+        call("comment_hide", {"comment": comment, "hide": True})
+        call("comments_enabled_set", {"media": media, "enabled": False})
+        call("comment_delete", {"comment": comment})
+        sent = call("message_send", {"person": person, "text": "Hello from the smoke"})
+        names = [s.name for s in TOOL_CATALOG if s.name.startswith("comms_instagram_")]
+        bad_results = {n: b.get("result") for n, b in seen.items()
+                       if "result" in b and b["result"] != "SUCCEEDED"}  # fmt: skip
+        out["ig_tools_end_to_end"] = (
+            not wrong and not bad_results and sorted(seen) == sorted(names) and len(names) == 22
+            and str(published.get("media", "")).startswith("igm_")
+        ) or {**wrong, **bad_results, "missing": sorted(set(names) - set(seen))}  # fmt: skip
+
+        request_id = refs.mint("request")
+        dm = {"account": "main", "person": person, "text": "Once only", "request_id": request_id}
+        first = d.http(seed, "comms_instagram_message_send", dm)["structuredContent"]
+        again = d.http(seed, "comms_instagram_message_send", dm)["structuredContent"]
+        out["ig_replay_no_second_send"] = (
+            first.get("result") == "SUCCEEDED" and again.get("replayed") is True
+            and again.get("op_ref") == first.get("op_ref") and sent.get("result") == "SUCCEEDED"
+        ) or [first, again]  # fmt: skip
+
+        found = d.json("transport", "instagram", "doctor")["findings"]
+        report = d.json("doctor", "--state-dir", str(d.state))
+        ig_codes = [f["code"] for f in report["findings"] if f["code"].startswith("IG_")]
+        out["ig_doctors"] = (
+            found == [{"alias": "main", "status": "OK", "codes": []}] and ig_codes == []
+        ) or [found, ig_codes]  # fmt: skip
+
+        refreshed = d.json("transport", "instagram", "token", "refresh", "--alias", "main")
+        out["ig_token_refresh"] = (
+            [r.get("refreshed") for r in refreshed["results"]] == [True]
+            and d.http(seed, "comms_instagram_whoami", {})["isError"] is False
+        ) or refreshed  # fmt: skip
+
+        out["ig_audit_verifies"] = d.json("audit", "verify", "--all")["ok"] is True
+
+        removed = d.json("transport", "instagram", "account", "remove", "main")
+        after = d.http(seed, "comms_instagram_whoami", {})
+        out["ig_account_remove"] = (
+            removed.get("token_revoked") is True and code(after) == "NOT_CONFIGURED"
+        ) or [removed, code(after)]  # fmt: skip
     finally:
         if d.proc is not None and d.proc.poll() is None:
             d.stop()

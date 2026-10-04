@@ -95,7 +95,9 @@ def assemble_runtime(
     proofs: Mapping[str, Callable[[bytes], None]] | None = None,
 ) -> Assembled:
     adapters = adapters_factory(state, settings)
-    instagram = InstagramOperator(state.conn, settings.adapter.instagram)  # proposed A49
+    instagram = InstagramOperator(  # proposed A49: the adapters' Graph transport (None: network)
+        state.conn, settings.adapter.instagram, transport=adapters.instagram_transport
+    )
     remote = None
     if settings.remote is not None:
         remote = RemoteConfig(

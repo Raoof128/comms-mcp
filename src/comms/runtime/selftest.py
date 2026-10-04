@@ -14,7 +14,11 @@ adapter factory differs. Every provider here is local and deterministic:
   never re-ingests), so group context reads are ``telegram_local`` from the real retained
   updates (D39-PRE E11c);
 - with a webhook port configured, the real webhook pipeline (inbox, worker, the comms archive,
-  the ingress) runs with fixed selftest secrets.
+  the ingress) runs with fixed selftest secrets;
+- proposed A49: with Instagram accounts in comms.json, the real Instagram adapters (accounts,
+  capability, the admin adapter, the publishing ledger) and the operator commands run over a
+  scripted graph.instagram.com (``_InstagramGraph``): one public account that has one post with
+  one comment, one DM thread with a message an hour old, and containers that finish at once.
 
 Nothing here opens a socket beyond the daemon's own listeners, or reads a credential; any other
 provider transport that is touched fails loudly (``_Unreachable``).
@@ -50,7 +54,7 @@ from comms.core.providers.protocols import (
     ProviderTarget,
     SemanticOperation,
 )
-from comms.runtime.adapters import Adapters
+from comms.runtime.adapters import Adapters, instagram_adapters
 from comms.runtime.relay import Collector
 from comms.runtime.selftest_relay import LoopbackRelay
 from comms.runtime.settings import DaemonSettings
@@ -238,6 +242,97 @@ def _bot_transport() -> Any:
     return httpx.MockTransport(handle)
 
 
+SELFTEST_IG_USER = "17841400000000099"  # proposed A49: the scripted account's user id
+_IG_MEDIA, _IG_COMMENT, _IG_PERSON = "17900000000000099", "17800000000000099", "9876500099"
+_IG_THREAD = "aWdfZAG06MTpJR01lc3NhZA2VUaHJlYWQ6c2VsZnRlc3Q"
+_IG_MESSAGE = "aWdfZAG1faXRlbToxOklHTWVzc2FnZAselftest01"
+
+
+class _InstagramGraph:
+    """A scripted graph.instagram.com (proposed A49), one per daemon process so the containers
+    it made survive a reload. Every answer has Meta's documented shape; anything else is 404."""
+
+    def __init__(self) -> None:
+        self._ids = itertools.count(int(time.time() * 1000))  # numeric, unique per run
+        self.containers: set[str] = set()
+        self.media = {_IG_MEDIA}
+
+    def _item(self, media: str) -> dict[str, Any]:
+        return {"id": media, "media_type": "IMAGE", "timestamp": "2026-10-01T10:00:00+0000",
+                "like_count": 2, "comments_count": 1, "is_comment_enabled": True,
+                "username": "selftest.studio", "permalink": "https://www.instagram.com/p/self/"}  # fmt: skip
+
+    def handle(self, request: Any) -> Any:
+        import httpx
+
+        method, parts = request.method, request.url.path.strip("/").split("/")
+        node, edge = (parts[1] if len(parts) > 1 else ""), (parts[2] if len(parts) > 2 else None)
+        ok = {"success": True}
+        if parts == ["refresh_access_token"]:
+            body: Any = {"access_token": "IGAAselftestREFRESHED" + "0" * 32,
+                         "token_type": "bearer", "expires_in": 5184000}  # fmt: skip
+        elif method == "GET" and node == "me" and edge is None:
+            body = {"user_id": SELFTEST_IG_USER, "username": "selftest.studio",
+                    "account_type": "BUSINESS", "followers_count": 3, "follows_count": 1,
+                    "media_count": len(self.media), "name": "Selftest"}  # fmt: skip
+        elif method == "GET" and node == "me" and edge == "media":
+            body = {"data": [self._item(m) for m in sorted(self.media)]}
+        elif method == "GET" and node == "me" and edge == "conversations":
+            body = {"data": [{"id": _IG_THREAD, "participants": {"data": [
+                {"id": _IG_PERSON, "username": "selftest.customer"}]}}]}  # fmt: skip
+        elif method == "GET" and node == _IG_THREAD:
+            body = {"messages": {"data": [{"id": _IG_MESSAGE}]}}
+        elif method == "GET" and node == _IG_MESSAGE:
+            stamp = datetime.fromtimestamp(time.time() - 3600, UTC)
+            body = {"id": _IG_MESSAGE, "from": {"id": _IG_PERSON}, "message": "selftest hello",
+                    "created_time": stamp.strftime("%Y-%m-%dT%H:%M:%S+0000")}  # fmt: skip
+        elif method == "GET" and node in self.media and edge is None:
+            body = self._item(node)
+        elif method == "GET" and edge == "insights":
+            body = {"data": [{"name": request.url.params.get("metric", "reach").split(",")[0],
+                              "period": "day", "values": [{"value": 5}],
+                              "total_value": {"value": 5}}]}  # fmt: skip
+        elif method == "GET" and node in self.media and edge == "comments":
+            body = {"data": [{"id": _IG_COMMENT, "text": "selftest comment",
+                              "username": "selftest.fan", "timestamp": "2026-10-01T11:00:00+0000"}]}  # fmt: skip
+        elif method == "GET" and edge in ("replies", "tags"):
+            body = {"data": [self._item(_IG_MEDIA)] if edge == "tags" else []}
+        elif method == "GET" and edge == "content_publishing_limit":
+            body = {"data": [{"quota_usage": 0,
+                              "config": {"quota_total": 50, "quota_duration": 86400}}]}  # fmt: skip
+        elif method == "GET" and node in self.containers:
+            body = {"id": node, "status_code": "FINISHED"}
+        elif method == "POST" and node == SELFTEST_IG_USER and edge == "media":
+            made = str(next(self._ids))
+            self.containers.add(made)
+            body = {"id": made}
+        elif method == "POST" and node == SELFTEST_IG_USER and edge == "media_publish":
+            made = str(next(self._ids))
+            self.media.add(made)
+            body = {"id": made}
+        elif method == "POST" and node == SELFTEST_IG_USER and edge == "messages":
+            body = {"recipient_id": _IG_PERSON, "message_id": _IG_MESSAGE + "R"}
+        elif method == "POST" and node == _IG_COMMENT and edge == "replies":
+            body = {"id": str(next(self._ids))}
+        elif method in ("POST", "DELETE") and node in (_IG_COMMENT, *self.media) and edge is None:
+            body = ok
+        else:
+            return httpx.Response(404, json={"error": {"code": 100, "message": "selftest"}})
+        return httpx.Response(200, json=body)
+
+
+_INSTAGRAM_GRAPH: _InstagramGraph | None = None
+
+
+def _instagram_transport() -> Any:
+    import httpx
+
+    global _INSTAGRAM_GRAPH
+    if _INSTAGRAM_GRAPH is None:
+        _INSTAGRAM_GRAPH = _InstagramGraph()
+    return httpx.MockTransport(_INSTAGRAM_GRAPH.handle)
+
+
 class _OneSecret:
     def get(self, item: str, version: int) -> bytes:
         return _SELFTEST_BOT.encode()
@@ -298,4 +393,9 @@ def selftest_adapters(state: CommsState, settings: DaemonSettings) -> Adapters:
             clock=clock,
         )
         adapters.context["whatsapp_cloud"] = ArchiveContext(state.conn, clock=clock)
+    if settings.adapter.instagram is not None:  # proposed A49: the real adapters, scripted Graph
+        instagram_adapters(
+            adapters, state.conn, state.secrets, settings.adapter.instagram, clock,
+            transport=_instagram_transport(),
+        )  # fmt: skip
     return adapters
