@@ -104,3 +104,25 @@ def test_runbooks_exist_and_cover_p84_p85():
         assert item in whatsapp.lower(), item
     for text in (telegram, whatsapp):
         assert "--run-live-acceptance" in text and "disposable" in text.lower()
+
+
+def test_instagram_live_cases_are_not_configured_without_an_account(monkeypatch):
+    """Proposed A49 (IG-6): until the accounts file names an Instagram account, every
+    Instagram case reports NOT_CONFIGURED in a live run, never a result."""
+    from comms.core.providers.protocols import ADAPTER_CONTRACTS
+    from tests.conformance.registry import REGISTRY
+    from tests.conformance.runner import Registry, run_suite
+
+    monkeypatch.delenv("COMMS_LIVE_ACCOUNTS", raising=False)
+    cases = {k: v for k, v in REGISTRY.cases.items() if k[0] == "instagram"}
+    report = run_suite(Registry(cases), {"instagram": ADAPTER_CONTRACTS["instagram"]}, live=True)
+    assert report.failures == () and report.passed == 0
+    assert set(report.skipped.values()) == {"NOT_CONFIGURED"} and len(report.skipped) == 6
+
+
+def test_the_instagram_runbook_covers_every_live_gate():
+    text = (ROOT / "docs" / "runbooks" / "live-acceptance-instagram.md").read_text()
+    for gate in ("GI-1", "GI-2", "GI-3", "GI-4", "GI-5", "GI-6", "GI-7", "GI-8"):
+        assert gate in text, gate
+    assert "--run-live-acceptance" in text and "throwaway" in text.lower()
+    assert "hidden prompt" in text.lower()  # the token is never piped or passed (R-IG2)

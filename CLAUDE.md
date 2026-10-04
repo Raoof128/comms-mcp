@@ -97,6 +97,11 @@ request or frame (32 KiB raw per chunk, slice or inline file). Exit: `tests/secu
 - **The daemon side.** The daemon's `relay` loop pulls with signed requests, verifies, stores through the inbox, and acks. `comms relay setup` prints the owner's deploy steps. Runbook: `docs/runbooks/whatsapp-relay.md`.
 - **Evidence:** `docs/verification/comms-relay.md`.
 - **Exit test:** `tests/security/test_relay_exit.py`.
+**Instagram, proposed A49** (branch `comms-instagram-spec`; spec `docs/instagram-spec-v0.6.md`; plan `docs/superpowers/plans/2026-10-04-comms-instagram.md`; not adopted until ruling R-IG0):
+- **The actor.** `instagram`, one per account (`iga_`), over `graph.instagram.com` pinned in `transports/instagram/http.py`. Accounts live in `comms.json` (`instagram.accounts`: label, `writes`, `dms`) and in schema v10's own three tables; tokens are `meta-ig-access-token.<alias>`, added at the hidden prompt with `comms transport instagram account add`.
+- **The tools.** 22 `comms_instagram_*` tools (14 reads, 8 writes; 152 in the catalog). Every id is a ref (`igk_`, `igm_`, `igc_`, `igp_`); captions, comments and DMs only in `untrusted_text`. Publishing is three single-effect CREATEs on the `igk_` ledger (the 400-a-day budget); four tools carry `requires_user_interaction`.
+- **Evidence:** rulings R-IG1 to R-IG8 in `docs/verification/comms-v0.3-rulings.md`; live gates GI-1 to GI-8 in `docs/runbooks/live-acceptance-instagram.md` (owner-run).
+- **Exit test:** `tests/security/test_instagram_exit.py`.
 **Live** (under the owner's user; see Host state): the relay was deployed on 2026-09-27 and a
 Meta test webhook went through it to the archive; the Telegram bot and user account have been
 logged in since 2026-09-28 and were driven live (rulings R-TG1 to R-TG4). Next: D39-B, the owner-run live acceptance records.
@@ -126,8 +131,8 @@ logged in since 2026-09-28 and were driven live (rulings R-TG1 to R-TG4). Next: 
 ```bash
 uv sync --locked
 uv run python scripts/extract_contracts.py --check
-uv run pytest -q                                  # 5632 passed, 4 skipped
-uv run python scripts/e2e_smoke.py                # 108 checks, end to end (34 against a real daemon; every tool swept; the relay under wrangler dev)
+uv run pytest -q                                  # 5894 passed, 4 skipped
+uv run python scripts/e2e_smoke.py                # 109 checks, end to end (34 against a real daemon; every tool swept; the relay under wrangler dev)
 uv run pytest tests/formal -q -s                  # 57 passed: 544 states/22 assertions; campaign 96,528/11; operations 4,728
 uv run ruff check src tests scripts
 uv run ruff format --check src tests scripts
@@ -176,6 +181,7 @@ CLI forwarder.
 | Comms composition, facades, listeners, the daemon's comms side (repo root) | `src/comms/runtime/` (`assemble.py`, `serve.py`, `workers.py`, `state.py`, `provision.py`) |
 | Operator commands (repo root) | `src/comms/runtime/operator/` |
 | `comms` CLI (repo root) | `src/comms/cli.py`, `src/comms/cli_commands/` |
+| Instagram actor, proposed A49 (repo root): Graph client, accounts, ledger, publishing, classifier | `src/comms/transports/instagram/`; service `src/comms/runtime/instagram.py`; operator `src/comms/runtime/operator/instagram.py` |
 | Evidence, gates, deviations | `docs/verification/` |
 
 ## Frozen wires — changing these breaks both halves

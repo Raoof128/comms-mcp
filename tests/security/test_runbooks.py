@@ -32,6 +32,7 @@ EXPECTED = {
     "clients-codex",  # comms v0.3 D38
     "clients-chatgpt",  # comms v0.3 D38
     "whatsapp-relay",  # comms v0.3 A48
+    "live-acceptance-instagram",  # proposed A49 (IG-6)
 }
 
 

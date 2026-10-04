@@ -198,6 +198,16 @@ def drive_install_and_surfaces(root: Path) -> dict[str, Any]:
 
         out["stdio_tools"] = asyncio.run(d.mcp(seed, listed)) == [s.name for s in TOOL_CATALOG]
 
+        async def flagged(session: Any) -> Any:  # proposed A49: the host's prompt flag
+            tools = (await session.list_tools()).tools
+            return {
+                t.name for t in tools if (t.meta or {}).get("anthropic/requiresUserInteraction")
+            }
+
+        out["stdio_meta"] = asyncio.run(d.mcp(seed, flagged)) == {
+            s.name for s in TOOL_CATALOG if s.requires_user_interaction
+        }
+
         async def reading(session: Any) -> Any:
             return await session.call_tool("comms_location_list", {})
 

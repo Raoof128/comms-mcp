@@ -2,7 +2,8 @@
 
 One finding per problem, each a fixed code an owner can act on; an account with none is ``OK``.
 The identity probe is injected (a live ``GET /me``); a probe that cannot run reports
-``IG_IDENTITY_UNCHECKED`` rather than success (fail closed).
+``IG_IDENTITY_UNCHECKED`` rather than success (fail closed). ``comms doctor`` is offline and
+reads no token material, so it passes no probe and the identity codes never appear there.
 """
 
 from __future__ import annotations
@@ -29,8 +30,8 @@ CODES = (
 
 def findings(
     configured: Sequence[str],
-    live: Mapping[str, tuple[Any, bytes | None]],
-    identity: Callable[[str, bytes], str | None],
+    live: Mapping[str, tuple[Any, bool]],
+    identity: Callable[[str], str | None] | None,
     *,
     now: datetime,
 ) -> list[dict[str, Any]]:
@@ -40,18 +41,18 @@ def findings(
         if alias not in live:
             codes.append("IG_ACCOUNT_UNREGISTERED")
         else:
-            row, token = live[alias]
+            row, has_token = live[alias]
             if alias not in configured:
                 codes.append("IG_ACCOUNT_UNCONFIGURED")
-            if token is None:
+            if not has_token:
                 codes.append("IG_TOKEN_MISSING")
             expires = timeutil.instant(row.expires_at)
             if expires <= now:
                 codes.append("IG_TOKEN_EXPIRED")
             elif expires - now < EXPIRY_WARNING:
                 codes.append("IG_TOKEN_EXPIRING")
-            if token is not None and expires > now:
-                user_id = identity(alias, token)
+            if identity is not None and has_token and expires > now:
+                user_id = identity(alias)
                 if user_id is None:
                     codes.append("IG_IDENTITY_UNCHECKED")
                 elif user_id != row.user_id:

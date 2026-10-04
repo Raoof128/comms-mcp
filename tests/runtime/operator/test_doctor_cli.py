@@ -89,3 +89,66 @@ def test_a_logged_in_telegram_session_is_not_reported_missing(daemon_world, caps
     (session_dir / "primary.session").write_bytes(b"")
     after = {s for code, s in _codes(_doctor(paths, capsys)) if code == "CREDENTIAL_NOT_CONFIGURED"}
     assert "telegram-session" not in after
+
+
+def _comms_json(paths, body):
+    paths.settings.write_text(json.dumps(body))
+    paths.settings.chmod(0o600)
+
+
+def test_instagram_accounts_are_checked_offline(daemon_world, capsys):
+    """Proposed A49 (IG-6): comms.json against the registered accounts and their token
+    metadata. No network and no token material: identity is the operator doctor's job."""
+    from datetime import timedelta
+
+    from comms.transports.instagram import store
+
+    run, paths, state = daemon_world["run"], daemon_world["paths"], daemon_world["state"]
+    run("cutover", "run")
+    run("retention", "run")
+    rotate_credential(state.writer, state.secrets, "meta-ig-access-token.main", b"IGAA" + b"x" * 40,
+                      prove=lambda v: None, now=_now())  # fmt: skip
+    store.register_account(state.conn, "main", "17841400000000001", now=_now(),
+                           lifetime=timedelta(days=5))  # fmt: skip
+    store.register_account(state.conn, "old", "17841400000000002", now=_now(),
+                           lifetime=timedelta(days=60))  # fmt: skip
+    state.conn.close()
+    _comms_json(paths, {"instagram": {"accounts": {"main": {"label": "Main"},
+                                                   "studio": {"label": "Studio"}}}})  # fmt: skip
+    report = _doctor(paths, capsys)
+    instagram = {(c, s) for c, s in _codes(report) if c.startswith("IG_")}
+    assert instagram == {
+        ("IG_TOKEN_EXPIRING", "main"),
+        ("IG_ACCOUNT_UNREGISTERED", "studio"),
+        ("IG_ACCOUNT_UNCONFIGURED", "old"),
+        ("IG_TOKEN_MISSING", "old"),
+    }
+    assert report["ok"] is False
+    text = json.dumps(report)
+    assert "17841400000000001" not in text and "IGAA" not in text
+
+
+def test_an_expiring_token_alone_keeps_the_doctor_ok(daemon_world, capsys):
+    from datetime import timedelta
+
+    from comms.transports.instagram import store
+
+    run, paths, state = daemon_world["run"], daemon_world["paths"], daemon_world["state"]
+    run("cutover", "run")
+    run("retention", "run")
+    rotate_credential(state.writer, state.secrets, "meta-ig-access-token.main", b"IGAA" + b"x" * 40,
+                      prove=lambda v: None, now=_now())  # fmt: skip
+    store.register_account(state.conn, "main", "17841400000000001", now=_now(),
+                           lifetime=timedelta(days=5))  # fmt: skip
+    state.conn.close()
+    _comms_json(paths, {"instagram": {"accounts": {"main": {"label": "Main"}}}})
+    report = _doctor(paths, capsys)
+    assert {c for c, _s in _codes(report)} == {"CREDENTIAL_NOT_CONFIGURED", "IG_TOKEN_EXPIRING"}
+    assert report["ok"] is True  # a warning: refresh within ten days
+
+
+def test_a_malformed_comms_json_is_a_finding_not_a_crash(daemon_world, capsys):
+    daemon_world["state"].conn.close()
+    _comms_json(daemon_world["paths"], {"instagram": {"token": "x"}})
+    report = _doctor(daemon_world["paths"], capsys)
+    assert ("SETTINGS_INVALID", None) in _codes(report) and report["ok"] is False

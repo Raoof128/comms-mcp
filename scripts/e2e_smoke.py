@@ -2036,6 +2036,11 @@ def phase_v03_daemon(ledger: Ledger) -> None:
         "client add then tools/list over stdio equals the catalog",
         lambda: verdict("stdio_tools"),
     )
+    ledger.run(
+        area,
+        "tools/list over stdio keeps the prompt flag on exactly the flagged tools",
+        lambda: verdict("stdio_meta"),
+    )
     ledger.run(area, "a read over stdio reaches the daemon", lambda: verdict("stdio_read"))
     ledger.run(
         area, "a write over local HTTP with a fresh cml1 lease", lambda: verdict("http_write")

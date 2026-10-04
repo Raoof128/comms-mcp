@@ -279,17 +279,20 @@ def _refresh(ctx: OperatorContext, args: dict[str, Any]) -> dict[str, Any]:
 
 def _doctor(ctx: OperatorContext, args: dict[str, Any]) -> dict[str, Any]:
     operator = _operator(ctx)
-    live = {}
+    live, tokens = {}, {}
     for row in store.live_accounts(ctx.conn):
         purpose = instagram_token_purpose(row.alias)
         try:
-            live[row.alias] = (row, active_credential(ctx.conn, ctx.secrets, purpose))
+            token = active_credential(ctx.conn, ctx.secrets, purpose)
         except KeySlotError:
-            live[row.alias] = (row, None)
+            token = None
+        live[row.alias] = (row, token is not None)
+        if token is not None:
+            tokens[row.alias] = token
 
-    def identity(alias: str, token: bytes) -> str | None:
+    def identity(alias: str) -> str | None:
         try:
-            return operator.probe(alias, token)[0]
+            return operator.probe(alias, tokens[alias])[0]
         except CredentialProofFailed:
             return None
 

@@ -1227,3 +1227,17 @@
 - **Verification:** the four new tests seen failing first; MCP, host permissions, AI boundary, wire-size and publishing suites pass (903); ruff, format, mypy clean; full gate on the commit in the main checkout (ledger line).
 - **Follow-ups:** IG-6 (doctor, smoke sweep, runbooks, exit test, CLAUDE.md).
 
+
+### 2026-10-04 (Australia/Sydney), IG-6
+**Raouf:**
+- **Scope:** Plan task IG-6, proposed A49: the doctor, the smoke, the runbooks, the exit test and `CLAUDE.md`. The implementation of A49 is complete; adoption waits for the owner's steps (plan IG-7, ruling R-IG0).
+- **Summary:**
+  - **Doctor:** `comms doctor` now checks each Instagram account offline against `comms.json` and its token metadata (`IG_ACCOUNT_UNREGISTERED`, `IG_ACCOUNT_UNCONFIGURED`, `IG_TOKEN_MISSING`, `IG_TOKEN_EXPIRED`, `IG_TOKEN_EXPIRING` as a warning); a `comms.json` that does not load is `SETTINGS_INVALID`. The identity check stays with `comms transport instagram doctor`.
+  - **Smoke:** a new check proves the prompt flag survives the real stdio proxy (109 checks). The daemon sweep expects `NOT_CONFIGURED` from every Instagram tool on the selftest daemon (fixed in the IG-2 commit, R-IG4 (6), after the plan's ordering would have failed IG-2 to IG-5's smoke gate); `tests/runtime/test_instagram_sweep.py` drives all 22 tools through the real dispatcher against a fake graph.instagram.com.
+  - **Runbooks:** `live-acceptance-instagram.md` (new: GI-1 to GI-8, the throwaway account, the hidden prompt); `install.md` (adding an account, refresh); `clients-claude-code.md` (the ask rules, the prompt flag, `instagram.default`).
+  - **Exit test:** `tests/security/test_instagram_exit.py` pins the 22 names and order, the catalog digest and count (152), the ask list, the egress classes, `NETWORK_MODULES`, `_meta` on exactly four tools, `ADAPTER_CONTRACTS["instagram"]`, the five prefixes, the actor enums and schema v10.
+  - **Ruling R-IG8:** the points above. `CLAUDE.md` gains the A49 paragraph, the Map row and the counts.
+- **Files changed:** `src/comms/runtime/{doctor,operator/instagram}.py`; `src/comms/transports/instagram/doctor.py`; `scripts/{e2e_smoke,smoke_daemon}.py`; `docs/runbooks/{live-acceptance-instagram,install,clients-claude-code}.md`; `docs/verification/{comms-v0.3-rulings.md,comms-v0.3-smoke-map.json}`; `CLAUDE.md`; tests (`tests/security/test_instagram_exit.py`, `tests/runtime/test_instagram_sweep.py`, `tests/runtime/operator/test_doctor_cli.py`, `tests/conformance/test_live_gating.py`, `tests/security/test_runbooks.py`).
+- **Verification:** new tests seen failing first; 5,898 tests collected (262 more than the baseline's 5,636); the affected suites pass (1503); ruff, format, mypy clean; full gate on the commit in the main checkout (ledger line).
+- **Follow-ups:** the owner's IG-7: add a throwaway account, run GI-1 first, decide open questions 1 to 4, then ruling R-IG0 adopts A49.
+

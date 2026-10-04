@@ -54,10 +54,21 @@ since 2026-09-27), skip step 1 and give every command the same directories:
    WhatsApp needs `meta.phone_number_id` and `meta.waba_id` in `comms.json` before
    `meta-access-token` can be proved. For Meta's webhooks, see `whatsapp-relay.md`.
 
+   Instagram (proposed A49) is per account: describe each in `comms.json` under
+   `instagram.accounts` (alias, label, `writes`, `dms`; no token and no ids), then add it. The
+   dashboard token is typed at the hidden prompt and proved with `GET /me` before it is active.
+   Tokens last 60 days: refresh them before `comms doctor` reports `IG_TOKEN_EXPIRING`.
+
+   ```bash
+   comms transport instagram account add main
+   comms transport instagram doctor
+   comms transport instagram token refresh --all
+   ```
+
 5. Add each MCP client. Its `cml1` seed goes to that client's helper only.
 
    ```bash
    comms client add --name claude-code --helper-path ~/.config/comms/claude-code.seed
    ```
 
-`comms doctor` must report no finding except `CREDENTIAL_NOT_CONFIGURED` for providers you do not use, and `"ok": true`. A Meta webhook secret reads `CREDENTIAL_UNCONFIRMED` until Meta has used it once (R-E6).
+`comms doctor` must report no finding except `CREDENTIAL_NOT_CONFIGURED` for providers you do not use (and `IG_TOKEN_EXPIRING`, a warning), and `"ok": true`. A Meta webhook secret reads `CREDENTIAL_UNCONFIRMED` until Meta has used it once (R-E6).

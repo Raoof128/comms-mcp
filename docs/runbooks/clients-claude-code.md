@@ -31,6 +31,14 @@ or cannot be undone) goes under `permissions.ask`. This repository's `.claude/se
 the worked example, and `tests/security/test_host_permissions.py` keeps its ask list equal to
 the catalog's consequential tools.
 
+**Instagram (proposed A49).** Its eight writes are in the ask list like every other
+consequential tool. Four of them (`comms_instagram_publish`, `comment_reply`, `comment_delete`,
+`message_send`) also carry `requires_user_interaction`, so Claude Code prompts on every call to
+them, in every permission mode, with no "don't ask again"; `claude -p` and `dontAsk` deny them.
+Allowing the Instagram reads by name also auto-approves reading comments and DMs, which are other
+people's data: decide that per project. Set `instagram.default` in `comms.json` to the account a
+project reads by default; a write always names its `account`.
+
 Restart Claude Code; `/mcp` shows `comms` connected with its tools. The seed file stays 0600 and
 never enters a repository.
 
@@ -52,7 +60,7 @@ filled, into `docs/verification/comms-v0.3-acceptance/<date>-claude-code.md` (D3
 | Catalog digest the client saw | PENDING OWNER |
 | Catalog digest of the artifact | PENDING OWNER |
 | Auth | local stdio proxy with a `cml1` lease (`comms mcp --stdio`) |
-| Visible tools (count; every catalog tool listed? 130 since A47) | PENDING OWNER |
+| Visible tools (count; every catalog tool listed? 130 since A47; 152 with proposed A49) | PENDING OWNER |
 | A read: `comms_group_list`, then `comms_context_recent` on a disposable group | PENDING OWNER |
 | A write: `comms_message_send` from the bot into the disposable group | PENDING OWNER |
 | A destructive call: `comms_message_delete` of that message (the client must mark it destructive and confirm) | PENDING OWNER |

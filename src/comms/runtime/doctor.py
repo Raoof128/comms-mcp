@@ -6,7 +6,11 @@ is absent. It runs while a daemon runs. The report carries fixed codes and subje
 phases), never material.
 
 ``ok`` is true when the only findings are ``CREDENTIAL_NOT_CONFIGURED`` (the owner's choice of
-providers); ``--production`` exits nonzero otherwise.
+providers) or ``IG_TOKEN_EXPIRING`` (a warning); ``--production`` exits nonzero otherwise.
+
+Proposed A49: the Instagram accounts in comms.json are checked against the registered ones and
+their token metadata, offline. The identity check needs Meta and a token, so it is
+``comms transport instagram doctor``'s, never this one's.
 """
 
 from __future__ import annotations
@@ -16,17 +20,28 @@ from datetime import datetime
 from typing import Any
 
 from comms.core.doctor import Finding, doctor
+from comms.core.keys.purposes import instagram_token_purpose
 from comms.core.keys.secrets import FileSecretStore, SecretStoreError
-from comms.core.keys.slots import KeySlotStore
+from comms.core.keys.slots import KeySlotStore, active_version
 from comms.core.storage.db import CommsDbKeyError, open_comms_db
 from comms.core.storage.migrations import MIGRATIONS
 from comms.core.storage.rekey import ITEM, KeyPointer
 from comms.runtime.paths import CommsPaths
+from comms.runtime.settings import SettingsError, load_settings
 from comms.runtime.state import bootstrap_state
+from comms.transports.instagram import store as instagram_store
+from comms.transports.instagram.doctor import findings as instagram_findings
 
 __all__ = ["open_read_only", "run_doctor"]
 
-_ACCEPTABLE = frozenset({"CREDENTIAL_NOT_CONFIGURED"})
+_ACCEPTABLE = frozenset({"CREDENTIAL_NOT_CONFIGURED", "IG_TOKEN_EXPIRING"})
+_INSTAGRAM_DETAIL = {
+    "IG_ACCOUNT_UNREGISTERED": "in comms.json but never added (comms transport instagram account add)",
+    "IG_ACCOUNT_UNCONFIGURED": "added but missing from comms.json",
+    "IG_TOKEN_MISSING": "no active token",
+    "IG_TOKEN_EXPIRED": "the token has expired: add the account's token again",
+    "IG_TOKEN_EXPIRING": "the token expires within ten days (comms transport instagram token refresh)",
+}
 
 
 def _report(bootstrap: str, findings: list[Finding]) -> dict[str, Any]:
@@ -60,6 +75,24 @@ def open_read_only(paths: CommsPaths) -> Any:
     """comms.db under the pointer's key only: no repair, no migration, nothing created."""
     key = FileSecretStore(paths.secrets_dir).get(ITEM, KeyPointer(paths.db_key_pointer).get())
     return open_comms_db(paths.db, key)
+
+
+def _instagram(paths: CommsPaths, conn: Any, now: datetime) -> list[Finding]:
+    """Proposed A49: each account's offline findings; metadata only, no network."""
+    try:
+        settings = load_settings(paths.settings).adapter.instagram
+    except SettingsError:
+        return [Finding("SETTINGS_INVALID", None, "comms.json does not load")]
+    configured = sorted(settings.accounts) if settings is not None else []
+    live = {
+        row.alias: (row, active_version(conn, instagram_token_purpose(row.alias)) is not None)
+        for row in instagram_store.live_accounts(conn)
+    }
+    return [
+        Finding(code, report["alias"], _INSTAGRAM_DETAIL[code])
+        for report in instagram_findings(configured, live, None, now=now)
+        for code in report["codes"]
+    ]
 
 
 def run_doctor(paths: CommsPaths, *, now: datetime) -> dict[str, Any]:
@@ -97,6 +130,7 @@ def run_doctor(paths: CommsPaths, *, now: datetime) -> dict[str, Any]:
             legacy=None if legacy is None else legacy[1],
             telegram_session=_telegram_session(paths),
         )
+        findings += _instagram(paths, conn, now)
         return _report(bootstrap_state(conn, store, paths), findings)
     finally:
         conn.close()
