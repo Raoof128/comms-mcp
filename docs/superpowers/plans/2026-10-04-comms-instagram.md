@@ -169,6 +169,20 @@ Spec: sections 4.4, 11, 13, 14 items 13, 14, 15.
 - [ ] **Step 2:** implement; run `uv run python scripts/smoke_sweep.py` against the self-test daemon.
 - [ ] **Step 3:** full gate; AGENT.md and CHANGELOG.md; commit.
 
+### Task IG-8: Stories publishing (R-IG10, the owner's request)
+
+Spec: revision 3, section 6 (Story), D-I10, section 14 item 3.
+
+**Files:**
+- `src/comms/core/storage/migrations.py`: `Migration(11, SCHEMA_V11, rebuild=True)`: `instagram_containers` rebuilt with `kind` admitting `story`; rows, index and trigger kept.
+- `src/comms/transports/instagram/{publish,store}.py`: kinds `story_image` and `story_video` (`media_type=STORIES`, `image_url` or `video_url`, nothing else); ledger kind `story`.
+- `src/comms/mcp/tools/instagram.py`: the two kinds in `container_create` and `publish_preview`; the catalog pin regenerated.
+- Tests: the Story arguments Meta refuses are refused first; a Story container publishes; migration v11 keeps every v10 row and refuses an unknown kind; the end-to-end sweep and the daemon smoke publish a Story.
+
+- [ ] **Step 1: Failing tests.**
+- [ ] **Step 2:** implement; regenerate the pin; targeted tests.
+- [ ] **Step 3:** full gate; audit entries; commit.
+
 ### Task IG-7: Owner steps (not for the agent)
 
 - [ ] Add each Instagram professional account to the Meta app (public account, Business or Creator), accept the invite, generate the dashboard token with the minimum scopes.

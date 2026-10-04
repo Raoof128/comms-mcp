@@ -1,6 +1,7 @@
 """Publishing on a durable container ref (proposed A49, sections 5.2 and 6; D-I7, D-I13).
 
-Three single-effect CREATEs, each one ``request_id``: ``container_create`` (one item),
+Three single-effect CREATEs, each one ``request_id``: ``container_create`` (one item: an image,
+a Reel, a Story (R-IG10) or a carousel item),
 ``carousel_create`` (from 2 to 10 child ``igk_``) and ``publish`` (one status read, then
 ``media_publish``). Each ``igk_`` is a row of ``instagram_containers``, the account's 400-per-24-h
 budget, written as soon as Meta answers with an id (before the executor records the step), so a
@@ -46,10 +47,20 @@ CONTAINER_BUDGET = 400  # containers per rolling 24 h per account ✅
 CAPTION_MAX, HASHTAGS_MAX, MENTIONS_MAX, ALT_TEXT_MAX = 2200, 30, 20, 1000
 CAROUSEL_MIN, CAROUSEL_MAX = 2, 10
 THUMB_OFFSET_MAX = 15 * 60 * 1000  # a Reel is at most 15 minutes; the offset is in ms
-ITEM_KINDS = ("image", "reel", "carousel_image", "carousel_video")
-LEDGER_KIND = {"image": "image", "reel": "reel", "carousel_image": "child",
-               "carousel_video": "child"}  # fmt: skip
+ITEM_KINDS = ("image", "reel", "story_image", "story_video", "carousel_image", "carousel_video")
+LEDGER_KIND = {
+    "image": "image",
+    "reel": "reel",
+    "story_image": "story",  # R-IG10
+    "story_video": "story",
+    "carousel_image": "child",
+    "carousel_video": "child",
+}
 _ALLOWED = {
+    # R-IG10: a Story takes its URL and nothing else (no caption, location, alt text, cover,
+    # AI label or sticker); @mentions (user_tags) stay out with every user tag (D-I10)
+    "story_image": {"kind", "url"},
+    "story_video": {"kind", "url"},
     "image": {"kind", "url", "caption", "alt_text", "location_id", "is_ai_generated"},
     "reel": {
         "kind",
@@ -144,7 +155,10 @@ def _check_publish(a: Mapping[str, Any]) -> None:
 def _container_body(a: Mapping[str, Any]) -> dict[str, Any]:
     kind = a["kind"]
     body: dict[str, Any] = {}
-    if kind in ("image", "carousel_image"):
+    if kind.startswith("story_"):  # R-IG10
+        body["media_type"] = "STORIES"
+        body["image_url" if kind == "story_image" else "video_url"] = a["url"]
+    elif kind in ("image", "carousel_image"):
         body["image_url"] = a["url"]
     else:
         body["media_type"] = "REELS" if kind == "reel" else "VIDEO"

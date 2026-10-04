@@ -53,7 +53,9 @@ Run GI-1 first. If it fails, stop: Instagram work waits for a ruling (spec open 
 
 The publishing path (`container_create`, `publish_preview`, `publish`) is exercised on GI-3's
 run: one image container from a public `https` URL you control, published once, then deleted in
-the Instagram app.
+the Instagram app. Then one Story (`kind` `story_image`, a 9:16 JPEG): it must publish, and
+`comms_instagram_media_get` on its `igm_` reads `media_type` `IMAGE` (Meta's documented answer for
+a Story). It disappears by itself after 24 hours.
 
 ## Afterwards
 

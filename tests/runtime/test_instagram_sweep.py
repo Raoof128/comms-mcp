@@ -16,6 +16,7 @@ from jsonschema import Draft202012Validator
 from comms.core import refs
 from comms.mcp.catalog import TOOL_CATALOG
 from comms.mcp.dispatch import AuthenticatedClient
+from comms.transports.instagram import store
 from tests.core.campaign_helpers import NOW
 from tests.runtime.test_instagram_reads import _dispatcher
 from tests.transports.instagram.fakes import USER_ID, USERNAME
@@ -114,6 +115,14 @@ def test_every_instagram_tool_succeeds_end_to_end(world):
     ]
     call("carousel_create", {"children": children})
     call("publish", {"container": container["container"]})
+    story = call("container_create", {"kind": "story_image", "url": image["url"]})["container"]
+    account_id = world["adapters"].instagram.resolve("main", for_write=True).account_id
+    creation = store.container(world["conn"], story, account_id).creation_id
+    world["fake"].routes[("GET", f"/v25.0/{creation}")] = lambda _r: httpx.Response(
+        200, json={"id": creation, "status_code": "FINISHED"}
+    )
+    shared = call("publish", {"container": story})  # R-IG10: a Story, published as any other
+    assert shared["result"] == "SUCCEEDED" and shared["media"].startswith("igm_")
     call("comment_reply", {"comment": comment, "text": "Thanks!"})
     call("comment_hide", {"comment": comment, "hide": True})
     call("comments_enabled_set", {"media": media, "enabled": False})

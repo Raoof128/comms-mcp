@@ -7,8 +7,9 @@ and WhatsApp through a single MCP server, with every write audited. It runs on t
 - **WhatsApp:** the Cloud API for sending. Meta's webhooks reach the Mac through a Cloudflare
   Worker relay that holds them encrypted while the Mac is off (`relay/`).
 - **Instagram (proposed amendment A49, this branch):** one or more professional accounts through
-  the Instagram API with Instagram Login: posts, insights, comments and DMs to read; publishing,
-  comment moderation and DM replies inside Meta's 24-hour window to write. Design and history:
+  the Instagram API with Instagram Login: posts, insights, comments and DMs to read; publishing
+  posts, Reels, carousels and Stories, comment moderation, and DM replies inside Meta's 24-hour
+  window to write. Design and history:
   [`Raoof128/Instagram-MCP`](https://github.com/Raoof128/Instagram-MCP); specification:
   `docs/instagram-spec-v0.6.md`.
 - **One MCP catalog of 130 tools** (152 with the 22 Instagram tools): messages, media, groups

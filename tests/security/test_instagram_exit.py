@@ -51,7 +51,7 @@ PROMPTED = {
     "comms_instagram_comment_delete",
     "comms_instagram_message_send",
 }
-CATALOG_DIGEST = "e8d5da8e115a14a66a1489e48625e17ddc5c829c707ce"  # a prefix of the pin (R-IG7)
+CATALOG_DIGEST = "1032910948054f2585316d40eca1be973dfe6347ab7b8"  # a prefix of the pin (R-IG10)
 
 
 def test_the_22_tools_in_order_and_the_catalog_digest():
@@ -102,4 +102,4 @@ def test_actor_contracts_prefixes_enums_and_schema():
     }
     assert "instagram" in AUDIT_ACTORS and "instagram" in MCP_ACTORS
     assert "instagram" in _TRANSPORT["enum"]
-    assert MIGRATIONS[-1].version == 10
+    assert MIGRATIONS[-1].version == 11  # v11: a Story in the ledger (R-IG10)

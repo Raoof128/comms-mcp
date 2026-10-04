@@ -393,7 +393,9 @@ COMMENT_WRITES: tuple[ToolSpec, ...] = (
 
 _URL = {"type": "string", "minLength": 9, "maxLength": 2048, "pattern": "^https://"}
 _ITEM = {
-    "kind": enum(("image", "reel", "carousel_image", "carousel_video")),
+    "kind": enum(
+        ("image", "reel", "story_image", "story_video", "carousel_image", "carousel_video")
+    ),
     "url": _URL,
     "caption": string(1, 2200),
     "alt_text": string(1, 1000),
@@ -444,7 +446,17 @@ PUBLISH_READS: tuple[ToolSpec, ...] = (
         _out(
             {
                 "create": enum(("container_create", "carousel_create")),
-                "kind": enum(("image", "reel", "carousel_image", "carousel_video", "carousel")),
+                "kind": enum(
+                    (
+                        "image",
+                        "reel",
+                        "story_image",
+                        "story_video",
+                        "carousel_image",
+                        "carousel_video",
+                        "carousel",
+                    )
+                ),
                 "children": nullable(integer(2, 10)),
                 "caption_chars": integer(0, 2200),
                 "hashtags": integer(0),
@@ -464,8 +476,9 @@ PUBLISH_WRITES: tuple[ToolSpec, ...] = (
     _write(
         "container_create",
         "Create a media container",
-        "Make one image, Reel or carousel item container from a public https URL Meta fetches "
-        "(comms never does). Uses one of 400 containers a day; nothing is posted until publish.",
+        "Make one image, Reel, Story or carousel item container from a public https URL Meta "
+        "fetches (comms never does). A Story takes only its URL. Uses one of 400 containers a "
+        "day; nothing is posted until publish.",
         {**_ITEM, "preview_digest": _DIGEST},
         ["kind", "url"],
         _result({"container": nullable(ref("instagram_container"))}),

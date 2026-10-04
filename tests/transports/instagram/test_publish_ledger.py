@@ -112,3 +112,28 @@ def test_a_carousel_has_2_to_10_distinct_children():
     with pytest.raises(ValueError):
         check_carousel({"children": [ref, others[0]], "alt_text": "x"})
     check_carousel({"children": [ref, *others[:9]], "caption": "Ten"})
+
+
+STORY = "https://cdn.example.com/story.jpg"
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        {"caption": "Hi"},
+        {"alt_text": "x"},
+        {"location_id": "7"},
+        {"share_to_feed": True},
+        {"cover_url": "https://cdn.example.com/c.jpg"},
+        {"thumb_offset": 10},
+        {"is_ai_generated": True},
+    ],
+)
+def test_a_story_takes_only_a_url(extra):
+    """R-IG10: Meta accepts no caption, location, alt text, cover or AI label on a Story."""
+    for kind in ("story_image", "story_video"):
+        with pytest.raises(ValueError):
+            check_container({"kind": kind, "url": STORY, **extra})
+        check_container({"kind": kind, "url": STORY})
+    with pytest.raises(ValueError):
+        check_container({"kind": "story_image", "url": "http://cdn.example.com/s.jpg"})

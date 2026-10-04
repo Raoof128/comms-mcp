@@ -1,4 +1,5 @@
-"""Proposed A49, plan IG-1: schema v10 and the Instagram tables (R-IG2)."""
+"""Proposed A49, plan IG-1: schema v10 and the Instagram tables (R-IG2); plan IG-8: migration v11
+lets the container ledger record a Story (R-IG10)."""
 
 from datetime import UTC, datetime, timedelta
 
@@ -29,7 +30,7 @@ def _add(conn, alias="main", user=USER):
 
 
 def test_migration_v10_adds_tables_and_checks(conn):
-    assert conn.execute("SELECT max(version) FROM schema_version").fetchone()[0] == 10
+    assert conn.execute("SELECT max(version) FROM schema_version").fetchone()[0] == 11
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert {"instagram_accounts", "instagram_containers", "instagram_objects"} <= tables
     for transport_table in ("delivery_identities", "contact_points", "destinations"):
@@ -107,3 +108,40 @@ def test_audit_payload_accepts_instagram_actor():
         None,
         {"tool": "comms_instagram_publish", "scope": "provider", "actor": "instagram"},
     )
+
+
+def test_migration_v11_keeps_every_v10_container_and_admits_a_story(tmp_path):
+    """R-IG10: v11 rebuilds instagram_containers alone; rows, index and trigger survive."""
+    from comms.core.storage.db import open_comms_db
+    from comms.core.storage.migrations import MIGRATIONS, migrate
+    from tests.core.schema_fixtures import KEY
+
+    db = open_comms_db(tmp_path / "comms.db", KEY)
+    assert migrate(db, MIGRATIONS[:10]) == 10
+    _add(db)
+    account = store.account_by_alias(db, "main")
+    kept = store.record_container(db, account.id, "image", "1790001", now=NOW)
+    with pytest.raises(CommsError):  # v10's ledger has no Story kind
+        store.record_container(db, account.id, "story_unknown", "1790002", now=NOW)
+    assert migrate(db) == 11
+    box = store.container(db, kept, account.id)
+    assert (box.kind, box.creation_id) == ("image", "1790001")
+    story = store.record_container(db, account.id, "story", "1790003", now=NOW)
+    assert store.container(db, story, account.id).kind == "story"
+    with pytest.raises(sqlcipher3.dbapi2.IntegrityError), write_tx(db):
+        db.execute(
+            "INSERT INTO instagram_containers (ref, account_id, kind, creation_id, created_at)"
+            " VALUES (?, ?, 'post', '1790004', '2026-10-04T00:00:00Z')",
+            (mint("instagram_container"), account.id),
+        )
+    with pytest.raises(sqlcipher3.dbapi2.IntegrityError), write_tx(db):
+        db.execute("UPDATE instagram_containers SET kind = 'reel' WHERE ref = ?", (story,))
+    names = {
+        r[0]
+        for r in db.execute(
+            "SELECT name FROM sqlite_master WHERE tbl_name = 'instagram_containers'"
+        )
+    }
+    assert {"instagram_containers_recent", "instagram_containers_binding_immutable"} <= names
+    assert db.execute("PRAGMA foreign_key_check").fetchall() == []
+    db.close()

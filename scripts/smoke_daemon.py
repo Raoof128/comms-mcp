@@ -540,6 +540,10 @@ def drive_instagram(root: Path) -> dict[str, Any]:
                     .get("container") for _ in range(2)]  # fmt: skip
         call("carousel_create", {"children": children})
         published = call("publish", {"container": container})
+        story = call("container_create", {"kind": "story_video", "url": image["url"]}).get(
+            "container"
+        )  # proposed A49, R-IG10: a Story
+        shared = call("publish", {"container": story})
         call("comment_reply", {"comment": comment, "text": "Thanks!"})
         call("comment_hide", {"comment": comment, "hide": True})
         call("comments_enabled_set", {"media": media, "enabled": False})
@@ -551,6 +555,7 @@ def drive_instagram(root: Path) -> dict[str, Any]:
         out["ig_tools_end_to_end"] = (
             not wrong and not bad_results and sorted(seen) == sorted(names) and len(names) == 22
             and str(published.get("media", "")).startswith("igm_")
+            and str(shared.get("media", "")).startswith("igm_")
         ) or {**wrong, **bad_results, "missing": sorted(set(names) - set(seen))}  # fmt: skip
 
         request_id = refs.mint("request")

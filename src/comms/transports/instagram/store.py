@@ -43,7 +43,7 @@ _KIND_PREFIX = {
     "comment": "instagram_comment",
     "person": "instagram_person",
 }
-_CONTAINER_KINDS = frozenset({"image", "reel", "carousel", "child"})
+_CONTAINER_KINDS = frozenset({"image", "reel", "story", "carousel", "child"})  # story: R-IG10
 _STATUSES = frozenset({"IN_PROGRESS", "FINISHED", "ERROR", "EXPIRED", "PUBLISHED"})
 
 

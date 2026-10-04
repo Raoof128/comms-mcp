@@ -1285,3 +1285,16 @@
 - **Verification:** documentation only; the README's paths exist; ruff and the runbook tests are unaffected.
 - **Follow-ups:** comms itself has no licence file; choosing one is the owner's call.
 
+
+### 2026-10-04 (Australia/Sydney), IG-8: Stories publishing
+**Raouf:**
+- **Scope:** The owner asked for the MCP to publish Stories as well as posts. Plan task IG-8, spec revision 3, ruling R-IG10.
+- **Summary:**
+  - **Facts checked first:** Meta's Instagram Login content-publishing guide confirms `media_type=STORIES` with `image_url` or `video_url` on `graph.instagram.com`, under the scopes already required. The IG User Media reference refuses caption, location, alt text, `share_to_feed`, cover, thumbnail offset and AI label on a Story; stickers are not supported; a Story video runs 3 to 60 s, 100 MB at most.
+  - **Tool:** `comms_instagram_container_create` (and `publish_preview`) gain kinds `story_image` and `story_video`. A Story takes only its URL; anything else is refused before Meta. `publish` publishes it like any container. No new tool, scope or host.
+  - **Ledger:** migration v11 rebuilds `instagram_containers` so its `kind` admits `story`, keeping every v10 row, the index and the immutability trigger.
+  - **Pins:** spec and plan re-pinned with R-IG10; the catalog pin moves for two tools (`e8d5da8e115a14a6…` to `1032910948054f25…`).
+- **Files changed:** `src/comms/core/storage/migrations.py`; `src/comms/transports/instagram/{publish,store}.py`; `src/comms/mcp/tools/instagram.py`; `docs/instagram-spec-v0.6.md`; the plan; `docs/verification/{comms-v0.3-rulings.md,comms-v0.3-smoke-map.json}`; `docs/runbooks/live-acceptance-instagram.md`; `scripts/{smoke_daemon,e2e_smoke}.py`; `README.md`; `CLAUDE.md`; tests (`test_store.py`, `test_publish_ledger.py`, `test_instagram_publish.py`, `test_instagram_sweep.py`, `test_instagram_exit.py`, the catalog pin).
+- **Verification:** the new tests seen failing first (11 more, 5,909 collected); the Instagram suites pass; the real-daemon smoke publishes a Story through the installed binary; full gate on the commit.
+- **Follow-ups:** a live Story on the throwaway account (runbook, GI-3's run).
+

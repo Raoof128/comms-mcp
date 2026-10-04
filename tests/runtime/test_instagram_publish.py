@@ -1,4 +1,4 @@
-"""Proposed A49, plan IG-4: publishing on the ``igk_`` ledger through the real executor
+"""Proposed A49, plan IG-4 (Stories: IG-8, R-IG10): publishing on the ``igk_`` ledger through the real executor
 (sections 5.1, 5.2, 6, 8; D-I3, D-I7, D-I13; A19, A28; open question 3; R-IG6)."""
 
 import json
@@ -367,3 +367,30 @@ def test_records_never_hold_captions_urls_or_ids(world):
         "SELECT payload FROM audit_events")])  # fmt: skip
     for secret in (IMAGE["caption"], IMAGE["url"], CREATION, MEDIA_ID, USER_ID):
         assert secret not in rows
+
+
+@pytest.mark.parametrize(
+    ("kind", "field"), [("story_image", "image_url"), ("story_video", "video_url")]
+)
+def test_a_story_is_a_stories_container_and_publishes(world, kind, field):
+    """R-IG10: media_type STORIES with the one URL, recorded as a Story, published as any other."""
+    url = "https://cdn.example.com/story"
+    out = _valid("container_create", _create(world, {"kind": kind, "url": url}))
+    assert out["result"] == "SUCCEEDED"
+    (post,) = _posts(world, MEDIA_PATH)
+    assert json.loads(post.content) == {"media_type": "STORIES", field: url}
+    box = store.container(world["conn"], out["container"], _main(world).account_id)
+    assert box.kind == "story"
+    _status(world, CREATION, "FINISHED")
+    published = _valid("publish", _publish(world, out["container"]))
+    assert published["result"] == "SUCCEEDED" and published["media"].startswith("igm_")
+    preview = _valid("publish_preview", world["service"].publish_preview(
+        {"account": "main", "create": "container_create", "kind": kind, "url": url}))  # fmt: skip
+    assert (preview["kind"], preview["refusal"]) == (kind, None)
+
+
+def test_a_story_with_a_caption_is_refused_before_meta(world):
+    with pytest.raises(CommsError) as refused:
+        _create(world, {"kind": "story_image", "url": "https://cdn.example.com/s.jpg",
+                        "caption": "Not on a Story"})  # fmt: skip
+    assert refused.value.code == "INVALID_ARGUMENT" and _posts(world) == []
