@@ -26,7 +26,7 @@ from typing import Any, Literal
 
 from comms.core.providers.capability import Capability as C
 
-__all__ = ["READS", "SEMANTICS", "SUPPORT", "OperationSemantics", "is_write"]
+__all__ = ["INSTAGRAM", "READS", "SEMANTICS", "SUPPORT", "OperationSemantics", "is_write"]
 
 RetryClass = Literal["SET_STATE", "CREATE", "DESTRUCTIVE_NONIDEMPOTENT", "MESSAGE_SEND", "READ"]
 
@@ -41,6 +41,7 @@ class OperationSemantics:
 
 
 BOT, USER, CLOUD, HOOKS = "telegram_bot", "telegram_user", "whatsapp_cloud", "whatsapp_webhooks"
+INSTAGRAM = "instagram"  # proposed A49
 
 # Capabilities that change nothing at the provider (inbound webhook deliveries included).
 READS = frozenset(
@@ -66,6 +67,14 @@ READS = frozenset(
         C.GROUP_GET,
         C.GROUP_MEMBERS,
         C.GROUP_INVITE_GET,
+        # proposed A49: the instagram actor's reads
+        C.PROFILE_READ,
+        C.MEDIA_LIST,
+        C.MEDIA_GET,
+        C.INSIGHTS_READ,
+        C.COMMENT_LIST,
+        C.TAG_LIST,
+        C.PUBLISHING_QUOTA_READ,
     }
 )
 
@@ -104,11 +113,22 @@ _TELEGRAM_CAPS = (
     *(C.HISTORY_READ, C.HISTORY_SEARCH, C.GROUP_CREATE, C.GROUP_DELETE, C.GROUP_MIGRATE),
 )
 _HOOK_CAPS = (C.WEBHOOK_RECEIVE_MESSAGE, C.WEBHOOK_RECEIVE_STATUS)
+# Proposed A49 (section 5.3): what only the instagram actor offers.
+_INSTAGRAM_CAPS = (
+    *(C.PROFILE_READ, C.MEDIA_LIST, C.MEDIA_GET, C.INSIGHTS_READ, C.COMMENT_LIST, C.TAG_LIST),
+    *(C.PUBLISHING_QUOTA_READ, C.MEDIA_CONTAINER_CREATE, C.MEDIA_CAROUSEL_CREATE, C.MEDIA_PUBLISH),
+    *(C.COMMENT_REPLY, C.COMMENT_HIDE, C.COMMENT_DELETE, C.MEDIA_COMMENTS_TOGGLE),
+)
 
 SUPPORT: Mapping[C, tuple[str, ...]] = MappingProxyType(
     {
         **{c: (USER,) if c in _USER_ONLY else _TELEGRAM for c in _TELEGRAM_CAPS},
-        **{c: (CLOUD,) for c in C if c not in _TELEGRAM_CAPS and c not in _HOOK_CAPS},
+        **{
+            c: (CLOUD,)
+            for c in C
+            if c not in _TELEGRAM_CAPS and c not in _HOOK_CAPS and c not in _INSTAGRAM_CAPS
+        },
+        **dict.fromkeys(_INSTAGRAM_CAPS, (INSTAGRAM,)),
         **dict.fromkeys(_HOOK_CAPS, (HOOKS,)),
         # G6: every actor resets a group's primary invite link (Telegram: a new primary link
         # revokes the old; WhatsApp: the one link is reset)
@@ -125,6 +145,9 @@ SUPPORT: Mapping[C, tuple[str, ...]] = MappingProxyType(
         C.MESSAGE_MARK_READ: (USER, CLOUD),
         C.MESSAGE_SEND_MEDIA: (*_TELEGRAM, CLOUD),  # A47 (H4)
         C.MEDIA_UPLOAD: (USER, CLOUD),  # A47 (H5): messages.uploadMedia to the account itself
+        # proposed A49: an Instagram DM thread is read, and answered inside the 24-hour window
+        C.HISTORY_READ: (USER, INSTAGRAM),
+        C.MESSAGE_REPLY: (CLOUD, INSTAGRAM),
     }
 )
 
@@ -170,6 +193,11 @@ _CREATES = frozenset(
         C.MEDIA_UPLOAD,
         C.TEMPLATE_CREATE,
         C.CHAT_SET_PHOTO,  # each call adds a new photo to the chat's photo history
+        # proposed A49: each makes a new Instagram object; none has a provider idempotency key
+        C.MEDIA_CONTAINER_CREATE,
+        C.MEDIA_CAROUSEL_CREATE,
+        C.MEDIA_PUBLISH,
+        C.COMMENT_REPLY,
     }
 )
 _DESTROYS = frozenset(
@@ -180,6 +208,7 @@ _DESTROYS = frozenset(
         C.MESSAGE_DELETE,
         C.MEDIA_DELETE,
         C.TEMPLATE_DELETE,
+        C.COMMENT_DELETE,  # proposed A49
     }
 )
 

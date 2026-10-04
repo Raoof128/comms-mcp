@@ -107,3 +107,18 @@ class Capability(StrEnum):
     GROUP_MESSAGE_SEND = "group.message.send"
     # A47 (H4): a photo or a document to a group, on every actor
     MESSAGE_SEND_MEDIA = "message.send_media"
+    # Proposed A49 (Instagram, docs/instagram-spec-v0.6.md section 5.3): the instagram actor
+    PROFILE_READ = "profile.read"
+    MEDIA_LIST = "media.list"
+    MEDIA_GET = "media.get"
+    INSIGHTS_READ = "insights.read"
+    COMMENT_LIST = "comment.list"
+    TAG_LIST = "tag.list"
+    PUBLISHING_QUOTA_READ = "publishing.quota_read"
+    MEDIA_CONTAINER_CREATE = "media.container_create"
+    MEDIA_CAROUSEL_CREATE = "media.carousel_create"
+    MEDIA_PUBLISH = "media.publish"
+    COMMENT_REPLY = "comment.reply"
+    COMMENT_HIDE = "comment.hide"
+    COMMENT_DELETE = "comment.delete"
+    MEDIA_COMMENTS_TOGGLE = "media.comments_toggle"

@@ -35,7 +35,7 @@ _SERVICE = re.compile(r"[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*\Z")
 _RAW_PROPERTIES = frozenset({"method", "path", "endpoint", "rpc", "raw"})
 
 
-_TRANSPORT = {"type": "string", "enum": ["telegram", "whatsapp"]}
+_TRANSPORT = {"type": "string", "enum": ["instagram", "telegram", "whatsapp"]}  # A49
 
 _SEED = ToolSpec(
     name="comms_capability_list",

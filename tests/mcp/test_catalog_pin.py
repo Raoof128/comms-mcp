@@ -156,7 +156,30 @@ def test_tools_list_payload_structurally_identical_ignoring_jsonrpc_framing():
         }
 
 
+# Proposed A49: an Instagram capability whose tool a later plan task builds (as the actor
+# matrix's ``A todo:G<n>``). Each task removes its rows; the exit test requires none left.
+PENDING_A49: dict[C, str] = {
+    C.PROFILE_READ: "IG-2",
+    C.MEDIA_LIST: "IG-2",
+    C.MEDIA_GET: "IG-2",
+    C.INSIGHTS_READ: "IG-2",
+    C.COMMENT_LIST: "IG-2",
+    C.TAG_LIST: "IG-2",
+    C.PUBLISHING_QUOTA_READ: "IG-4",
+    C.MEDIA_CONTAINER_CREATE: "IG-4",
+    C.MEDIA_CAROUSEL_CREATE: "IG-4",
+    C.MEDIA_PUBLISH: "IG-4",
+    C.COMMENT_REPLY: "IG-3",
+    C.COMMENT_HIDE: "IG-3",
+    C.COMMENT_DELETE: "IG-3",
+    C.MEDIA_COMMENTS_TOGGLE: "IG-3",
+}
+
+
 def test_every_semantic_capability_has_a_tool():
-    assert set(CAPABILITY_TOOLS) == set(SUPPORT), set(SUPPORT) ^ set(CAPABILITY_TOOLS)
+    assert not set(PENDING_A49) & set(CAPABILITY_TOOLS)
+    assert set(CAPABILITY_TOOLS) | set(PENDING_A49) == set(SUPPORT), set(SUPPORT) ^ set(
+        CAPABILITY_TOOLS
+    )
     missing = {c.value: t for c, t in CAPABILITY_TOOLS.items() if t not in BY_NAME}
     assert missing == {}

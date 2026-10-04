@@ -1,8 +1,8 @@
 """The secret store: provider credentials in daemon-owned 0600 versioned files (A13 rev 2, N7).
 
 ``<runtime-dir>/secrets/<item>/<version>``. Items are exactly the opaque and raw purposes of
-the key inventory (provider credentials, TLS keys, the comms.db key); signing and MAC keys
-live in key slots.
+the key inventory (provider credentials, TLS keys, the comms.db key), plus one Instagram
+account token per alias (proposed A49, ``purpose_of``); signing and MAC keys live in key slots.
 There is no Keychain backend in v0.3: the ``security`` CLI cannot take a secret on stdin
 (``-w -`` stores a literal ``-``; measured, N7, R-B11) and the System Keychain needs root.
 """
@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Protocol
 
 from comms.core.keys.files import VersionedFiles
-from comms.core.keys.purposes import PURPOSES
+from comms.core.keys.purposes import PURPOSES, purpose_of
 
 __all__ = ["SECRET_ITEMS", "FileSecretStore", "SecretStore", "SecretStoreError"]
 
@@ -41,7 +41,8 @@ class FileSecretStore:
 
     @staticmethod
     def _check(item: str) -> str:
-        if not isinstance(item, str) or item not in SECRET_ITEMS:
+        spec = purpose_of(item)  # a static item, or an Instagram account's token (A49)
+        if spec is None or not (item in SECRET_ITEMS or spec.kind == "opaque"):
             raise SecretStoreError("unknown secret item")
         return item
 

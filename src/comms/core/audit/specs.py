@@ -12,7 +12,7 @@ from typing import Any
 
 from comms.core import domains
 from comms.core.campaigns.events import EVENT_TYPES
-from comms.core.keys.purposes import PURPOSES
+from comms.core.keys.purposes import PURPOSES, purpose_of
 from comms.core.providers.capability import Capability
 from comms.core.validators import (
     Validator,
@@ -40,8 +40,13 @@ RETENTION_PHASES = (
     "public_keys",
     "secrets",
 )
-_CREDENTIALS = {name for name, p in PURPOSES.items() if p.rotation == "staged"}
-_ACTORS = {"telegram_bot", "telegram_user", "whatsapp_cloud", "whatsapp_webhooks"}
+_ACTORS = {"telegram_bot", "telegram_user", "whatsapp_cloud", "whatsapp_webhooks", "instagram"}
+
+
+def _credential(value: Any) -> bool:
+    """A staged provider credential: a static one, or an Instagram account's token (A49)."""
+    spec = purpose_of(value)
+    return spec is not None and spec.rotation == "staged"
 
 
 def _matches(pattern: str) -> Validator:
@@ -77,16 +82,16 @@ AUDIT_EVENT_SPECS: dict[str, Mapping[str, Validator]] = {
         "to_state": one_of({"TRUSTED_RETIRED", "VERIFICATION_ONLY", "REVOKED"}),
     },
     "admin.credential_rotation": {
-        "purpose": one_of(_CREDENTIALS),
+        "purpose": _credential,
         "old_version": count(0),
         "new_version": count(1),
     },
     "admin.credential_rotation_rolled_back": {
-        "purpose": one_of(_CREDENTIALS),
+        "purpose": _credential,
         "restored_version": count(0),  # 0: a first activation had nothing to restore
         "orphaned_version": count(1),
     },
-    "admin.credential_revoked": {"purpose": one_of(_CREDENTIALS), "version": count(1)},
+    "admin.credential_revoked": {"purpose": _credential, "version": count(1)},
     "admin.session_revoke": {
         "phase": one_of({"started", "finished"}),
         "outcome": one_of({"pending", "confirmed", "failed", "unknown", "aborted"}),
@@ -132,6 +137,11 @@ AUDIT_EVENT_SPECS: dict[str, Mapping[str, Validator]] = {
         "state": one_of({"SUCCEEDED", "FAILED", "OUTCOME_UNKNOWN"}),
         "provider_code": nullable(_CODE),
     },
+    # Proposed A49: an Instagram account joins or leaves comms (operator only); the subject is
+    # its iga_ ref, never the alias or the account id.
+    "admin.instagram_account": {
+        "action": one_of({"added", "removed", "token_refreshed", "identity_mismatch"}),
+    },
 }
 # The ref kind each event's subject must carry (None: the event has no subject).
 SUBJECT_KINDS: dict[str, str | None] = {
@@ -154,6 +164,7 @@ SUBJECT_KINDS: dict[str, str | None] = {
     "admin.mutation_started": "operation",
     "admin.mutation_step": "operation",
     "admin.mutation_finished": "operation",
+    "admin.instagram_account": "instagram_account",
 }
 
 

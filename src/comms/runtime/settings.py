@@ -15,7 +15,11 @@ Schema::
      "meta": {"phone_number_id": "…", "waba_id": "…"},
      "backup_recipient": "age1…",
      "remote": {"issuer": "https://…", "port": 8767, "client": "cli_…", "client_id": "…",
-                "redirect_uris": ["https://…"], "owner": "…"}}
+                "redirect_uris": ["https://…"], "owner": "…"},
+     "instagram": {"api_version": "v25.0", "default": "main", "dm_disclosure": null,
+                   "accounts": {"main": {"label": "…", "writes": false, "dms": false}}}}
+
+The ``instagram`` section is proposed A49 (``comms.transports.instagram.config``).
 """
 
 from __future__ import annotations
@@ -31,6 +35,7 @@ from typing import Any
 from comms.core.strict_json import strict_json_loads
 from comms.mcp.oauth.server import OAuthSettings
 from comms.runtime.adapters import AdapterSettings
+from comms.transports.instagram.config import parse_instagram
 
 __all__ = ["HOST", "DaemonSettings", "RemoteSettings", "SettingsError", "load_settings"]
 
@@ -48,6 +53,7 @@ _TOP = {
     "remote",
     "backup_recipient",
     "relay",  # A48: {"url": "https://comms-relay.<subdomain>.workers.dev"}
+    "instagram",  # proposed A49
 }
 _META = {"phone_number_id", "waba_id"}
 _REMOTE = {"issuer", "port", "client", "client_id", "redirect_uris", "owner"}
@@ -144,6 +150,10 @@ def _remote(value: Any) -> RemoteSettings:
     )
 
 
+def _refuse(message: str) -> None:
+    raise SettingsError(message)
+
+
 def _relay(value: Any) -> str:
     relay = _object(value, {"url"}, "relay")
     url = relay.get("url")
@@ -187,6 +197,7 @@ def load_settings(path: Path) -> DaemonSettings:
     relay = None if top.get("relay") is None else _relay(top["relay"])
     if relay is not None and top.get("webhook_port") is not None:
         raise SettingsError("comms.json: with a relay, the local webhook listener is not served")
+    instagram = None if top.get("instagram") is None else parse_instagram(top["instagram"], _refuse)
     retention = _object(top.get("retention", {}), set(RETENTION_DEFAULTS), "retention")
     for name, value in retention.items():
         if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 3650:
@@ -205,6 +216,7 @@ def load_settings(path: Path) -> DaemonSettings:
             if "waba_id" not in meta
             else _text(meta["waba_id"], _DIGITS, "meta.waba_id"),
             relay_url=relay,
+            instagram=instagram,
         ),
         remote=None if top.get("remote") is None else _remote(top["remote"]),
         backup_recipient=None

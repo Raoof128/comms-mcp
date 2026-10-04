@@ -311,7 +311,7 @@ def test_the_client_sends_only_signed_counters(world):
 
 def test_schema_v9_holds_the_relay_state(world):
     conn, _relay, _collector = world
-    assert conn.execute("SELECT max(version) FROM schema_version").fetchone()[0] == 9
+    assert conn.execute("SELECT max(version) FROM schema_version").fetchone()[0] >= 9  # v10: A49
     for table, columns in {
         "relay_state": ["id", "acked_through", "purged_through", "depth", "oldest_received_at",
                         "last_attempt_at", "last_success_at", "last_error", "clock_skew_s"],

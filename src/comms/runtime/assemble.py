@@ -21,6 +21,7 @@ from comms.core.keys.slots import load_active
 from comms.runtime.adapters import Adapters, RelayKeys
 from comms.runtime.comms_runtime import CommsRuntime, RemoteConfig, build_comms_runtime
 from comms.runtime.operator import LegacySide
+from comms.runtime.operator.instagram import InstagramOperator
 from comms.runtime.proofs import build_proofs
 from comms.runtime.settings import DaemonSettings
 from comms.runtime.state import CommsState
@@ -94,6 +95,7 @@ def assemble_runtime(
     proofs: Mapping[str, Callable[[bytes], None]] | None = None,
 ) -> Assembled:
     adapters = adapters_factory(state, settings)
+    instagram = InstagramOperator(state.conn, settings.adapter.instagram)  # proposed A49
     remote = None
     if settings.remote is not None:
         remote = RemoteConfig(
@@ -116,7 +118,11 @@ def assemble_runtime(
             "secrets": state.secrets,
             "proofs": proofs
             if proofs is not None
-            else build_proofs(phone_number_id=settings.adapter.meta_phone_number_id),
+            else {
+                **build_proofs(phone_number_id=settings.adapter.meta_phone_number_id),
+                **instagram.proofs(),  # proposed A49
+            },
+            "instagram": instagram,
             "reload": reload,
             "transfers": TransferRegistry(),
             "staged": StagedImports(),

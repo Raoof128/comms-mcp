@@ -31,6 +31,8 @@ def test_error_codes_are_exactly_p54_plus_named_additions():
         "RETIRED_TOOL",
         "TOOL_NOT_FOUND",
         "AUDIT_INTEGRITY_DEGRADED",
+        "IDENTITY_MISMATCH",  # proposed A49 (R-IG3)
+        "NOT_ENOUGH_DATA",  # proposed A49 (R-IG3)
     }
     assert ERROR_CODES == _p54() | NAMED_ADDITIONS
     assert len(_p54()) == 16

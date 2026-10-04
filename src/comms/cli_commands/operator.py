@@ -69,6 +69,15 @@ OPERATOR_COMMANDS: Mapping[tuple[str, ...], Sequence[Arg]] = {
     ("relay", "export-pull-key"): (("--state-dir", "optional"),),
     ("relay", "new-path"): (),
     ("relay", "status"): (("--state-dir", "optional"),),
+    # proposed A49: Instagram accounts; the token is typed at the hidden prompt, as a credential
+    ("transport", "instagram", "account", "add"): (("alias", "positional"),),
+    ("transport", "instagram", "account", "list"): (),
+    ("transport", "instagram", "account", "remove"): (("alias", "positional"),),
+    ("transport", "instagram", "token", "refresh"): (
+        ("--alias", "optional"),
+        ("--all", "switch"),
+    ),
+    ("transport", "instagram", "doctor"): (),
 }
 OPERATOR_GROUPS = tuple(sorted({words[0] for words in OPERATOR_COMMANDS}))
 LOCAL_GROUPS = frozenset({"daemon", "doctor", "relay"})  # run by the local operator CLI
@@ -84,7 +93,9 @@ CLI_FLOWS: dict[tuple[str, ...], str] = {
     ("transport", "telegram", "login"): "auth login",
     ("transport", "telegram", "revoke-session"): "auth revoke-this-session",
 }
-_VALUE_FROM_STDIN = frozenset({("credential", "set"), ("credential", "rotate")})
+_VALUE_FROM_STDIN = frozenset(
+    {("credential", "set"), ("credential", "rotate"), ("transport", "instagram", "account", "add")}
+)
 
 
 def _dest(flag: str) -> str:

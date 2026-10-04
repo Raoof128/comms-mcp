@@ -106,7 +106,7 @@ def obj(
 
 
 REQUEST_ID = ref("request")
-ACTORS = ("telegram_bot", "telegram_user", "whatsapp_cloud")
+ACTORS = ("telegram_bot", "telegram_user", "whatsapp_cloud", "instagram")  # instagram: A49
 ACTOR: Mapping[str, Any] = enum(ACTORS)
 OUTCOMES = ("SUCCEEDED", "FAILED", "OUTCOME_UNKNOWN", "IN_FLIGHT", "INVITE_REQUIRED")
 

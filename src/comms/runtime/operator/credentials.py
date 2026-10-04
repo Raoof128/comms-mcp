@@ -16,7 +16,7 @@ from __future__ import annotations
 from typing import Any
 
 from comms.core.credentials import CredentialCheckFailed, revoke_credential, rotate_credential
-from comms.core.keys.purposes import PURPOSES
+from comms.core.keys.purposes import purpose_of
 from comms.core.keys.slots import KeySlotError
 from comms.runtime.operator.context import OperatorContext, OperatorHandler
 from comms.runtime.proofs import CredentialProofFailed
@@ -28,11 +28,8 @@ def _purpose(ctx: OperatorContext, args: dict[str, Any]) -> str:
     purpose = args.get("purpose")
     if purpose == "telegram-session":
         raise ValueError("the Telegram session comes from: comms transport telegram login")
-    if (
-        not isinstance(purpose, str)
-        or PURPOSES.get(purpose) is None
-        or PURPOSES[purpose].rotation != "staged"
-    ):
+    spec = purpose_of(purpose)  # an Instagram account's token is one too (proposed A49)
+    if not isinstance(purpose, str) or spec is None or spec.rotation != "staged":
         raise ValueError("not a provider credential")
     if ctx.secrets is None or ctx.proofs is None or purpose not in ctx.proofs:
         raise ValueError("credentials are managed by the daemon")

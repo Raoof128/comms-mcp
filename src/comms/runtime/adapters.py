@@ -23,9 +23,15 @@ from comms.core.credentials import (
     record_confirmed,
 )
 from comms.core.delivery.transport import DeliveryTransport
+from comms.core.keys.purposes import instagram_token_purpose
 from comms.core.keys.secrets import SecretStore
 from comms.core.providers.protocols import ProviderTarget
 from comms.runtime.relay import Collector
+from comms.transports.instagram import store as instagram_store
+from comms.transports.instagram.accounts import AccountRuntime, InstagramAccounts
+from comms.transports.instagram.capability import InstagramCapability
+from comms.transports.instagram.config import InstagramSettings
+from comms.transports.instagram.http import GraphIgApi
 from comms.transports.profiles import bot_profile, user_profile, whatsapp_profile
 from comms.transports.telegram.bot.admin import BotAdmin
 from comms.transports.telegram.bot.capability import BotCapability
@@ -65,6 +71,7 @@ class AdapterSettings:
     meta_phone_number_id: str | None = None
     meta_waba_id: str | None = None
     relay_url: str | None = None  # A48: WhatsApp webhooks arrive through the relay
+    instagram: InstagramSettings | None = None  # proposed A49
 
 
 @dataclass(frozen=True)
@@ -102,6 +109,7 @@ class Adapters:
     # A47 (H3): each Telegram actor's download of its own ``med_`` (WhatsApp's is ``media``)
     downloads: dict[str, Any] = field(default_factory=dict)
     relay: Collector | None = None  # A48: the relay collector, when a relay is configured
+    instagram: InstagramAccounts | None = None  # proposed A49: configured Instagram accounts
 
     def __repr__(self) -> str:
         return (
@@ -161,6 +169,8 @@ def build_adapters(
         _relay(adapters, conn, secrets, clock, archive, settings.relay_url, relay_keys)
     else:
         _webhooks(adapters, conn, secrets, clock, monotonic, archive)
+    if settings.instagram is not None:
+        _instagram(adapters, conn, secrets, settings.instagram, clock)
     if adapters.graph is not None:  # G8: group reads live, messages from the archive (if any)
         adapters.context["whatsapp_cloud"] = WhatsAppContext(
             adapters.context.get("whatsapp_cloud"), adapters.graph, clock=clock
@@ -233,6 +243,31 @@ def _whatsapp(
         adapters.account = ProviderTarget(
             "whatsapp", "whatsapp_cloud", "account", f"waba:{settings.meta_waba_id}"
         )
+
+
+def _instagram(
+    adapters: Adapters,
+    conn: Any,
+    secrets: SecretStore,
+    settings: InstagramSettings,
+    clock: Callable[[], datetime],
+) -> None:
+    """Proposed A49: one ``GraphIgApi`` per alias configured in comms.json, registered
+    (``iga_``) and holding an active token. No network here: the identity check is lazy."""
+    runtimes: dict[str, AccountRuntime] = {}
+    for alias, policy in settings.accounts.items():
+        row = instagram_store.account_by_alias(conn, alias)
+        purpose = instagram_token_purpose(alias)
+        version = _configured(conn, secrets, purpose)
+        if row is None or version is None:
+            continue
+        api = GraphIgApi(
+            secrets, purpose=purpose, version=version, api_version=settings.api_version
+        )
+        runtimes[alias] = AccountRuntime(alias, row.ref, row.id, policy, api, row.user_id)
+    accounts = InstagramAccounts(conn, settings, runtimes, clock=clock)
+    adapters.instagram = accounts
+    adapters.capability["instagram"] = InstagramCapability(accounts, clock=clock)
 
 
 def _confirmer(conn: Any, versions: dict[str, int]) -> Callable[[str], None]:

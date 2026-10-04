@@ -43,6 +43,7 @@ class OperatorContext:
     backup_recipient: str | None = None  # an age public key (comms.json)
     providers: Mapping[str, str] | None = None  # the account ids a backup is bound to
     retention_days: Mapping[str, int] | None = None  # campaign_body_days, identity_retention_days
+    instagram: Any = None  # proposed A49: the InstagramOperator (account add, refresh, doctor)
 
     @property
     def conn(self) -> Any:

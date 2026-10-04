@@ -24,7 +24,7 @@ from typing import Any
 from comms.core import timeutil
 from comms.core.audit.integrity import require_not_degraded
 from comms.core.audit.writer import AuditWriter
-from comms.core.keys.purposes import PURPOSES
+from comms.core.keys.purposes import purpose_of
 from comms.core.keys.secrets import SecretStore
 from comms.core.keys.slots import KeySlotError, active_version, key_id_for, register_version
 from comms.core.storage.db import write_tx
@@ -49,7 +49,7 @@ class CredentialCheckFailed(Exception):
 
 
 def _credential(purpose: str) -> None:
-    spec = PURPOSES.get(purpose)
+    spec = purpose_of(purpose)  # a static credential, or an Instagram account's token (A49)
     if spec is None or spec.rotation != "staged":
         raise KeySlotError("not a provider credential")
 

@@ -563,9 +563,9 @@ class _Facades:
         s, c = self.s, _ctx
         return {
             "capability.list": lambda cl, a: {"capabilities": [
-                {"capability": cap, "transport": "telegram" if actor.startswith("telegram") else "whatsapp",
-                 "state": "SUPPORTED"} for actor, caps in s.capability.list().items() for cap in caps
-                if a.get("transport") in (None, "telegram" if actor.startswith("telegram") else "whatsapp")]},
+                {"capability": cap, "transport": _transport(actor), "state": "SUPPORTED"}
+                for actor, caps in s.capability.list().items() for cap in caps
+                if a.get("transport") in (None, _transport(actor))]},
             "context.get": self.context_get,
             "context.recent": self.context_recent,
             "context.around_message": self.around,
@@ -696,6 +696,11 @@ class _Facades:
             "capability.refresh": lambda cl, a: s.capability.refresh(a["group"], self.targets(a["group"])),
             "admin.identity_inspect": lambda cl, a: s.identity.inspect(a["ref"]),
         }  # fmt: skip
+
+
+def _transport(actor: str) -> str:
+    """An actor's transport: ``telegram_*``, ``whatsapp_*``, or ``instagram`` (proposed A49)."""
+    return actor if actor == "instagram" else actor.split("_", 1)[0]
 
 
 def _instant(text: str) -> datetime:

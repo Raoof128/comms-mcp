@@ -18,7 +18,7 @@
 
 - **Branch and approvals.** Work on branch `comms-instagram-spec` (this plan and the spec are already on it). Merge, push and the ruling R-IG0 only with the owner's approval.
 - **Commits.** Commit only when the full gate shows `GATE ok=1`. Write nothing in-tree while a gate runs. Executed with a development worktree (branch `ig-work`): each task is committed there, gated in the main checkout on that exact commit, and only then is `comms-instagram-spec` moved to it (R-IG1).
-- **Secrets.** A token reaches `comms instagram account add` only on a pipe. Never commit, log or print one. Tests use fake tokens of the documented shape.
+- **Secrets.** A token reaches `comms transport instagram account add` only on a pipe. Never commit, log or print one. Tests use fake tokens of the documented shape.
 - **Fail closed.** `UNKNOWN` is never `AVAILABLE`; a rejected proof leaves the working slot active; a classifier miss is `OUTCOME_UNKNOWN`.
 - **One copy of each rule.** URL validation in `urls.py`; the error table in `classify.py`; the insight tables in `insights.py`; the alias grammar in `settings.py`.
 - **Every call fits 30 s** (the proxy's `_TIMEOUT_S`). No tool sleeps or polls. At most two Graph calls per tool.
@@ -58,7 +58,7 @@ Spec: sections 3, 4, 14 items 2, 3 (accounts part), 7, 8, 11.
 - `src/comms/core/providers/semantics.py`: `INSTAGRAM = "instagram"`; an `_INSTAGRAM_SUPPORT` override table; `SUPPORT` merged from it; `SEMANTICS` entries per spec 5.3; `READS` gains the seven read capabilities.
 - `src/comms/mcp/schemas.py`: `ACTOR` enum gains `"instagram"`.
 - `src/comms/core/audit/specs.py`: `_ACTORS` gains `"instagram"`.
-- `src/comms/runtime/comms_runtime.py`, `src/comms/runtime/selftest.py`: `_ACTORS` gains `"instagram"`.
+- `src/comms/runtime/comms_runtime.py`, `src/comms/runtime/selftest.py`: unchanged; their `_ACTORS` are group-target actors (R-IG3).
 - `src/comms/core/refs.py`: `"instagram_account": "iga_"`, `"instagram_container": "igk_"`, `"instagram_media": "igm_"`, `"instagram_comment": "igc_"`, `"instagram_person": "igp_"` (R-IG2).
 - `src/comms/core/storage/migrations.py`: `Migration(10, SCHEMA_V10)`: `instagram_accounts(id, ref, alias, user_id, obtained_at, expires_at, last_identity_check_at, created_at, removed_at)` with one live row per alias and per `user_id`; `instagram_containers(id, ref, account_id, kind CHECK IN (image, reel, carousel, child), creation_id, created_at, status, media_ref)`; `instagram_objects(id, ref, account_id, kind CHECK IN (media, comment, person), provider_identity, created_at, last_seen_at)`. No existing table changes (R-IG2).
 - `src/comms/core/keys/purposes.py`: `PurposePattern("meta-ig-access-token.", "opaque", "staged", False, "at_rotation")` and `purpose_of(name) -> KeyPurpose | None` that resolves a static name or a pattern match (alias grammar from settings).
@@ -67,8 +67,8 @@ Spec: sections 3, 4, 14 items 2, 3 (accounts part), 7, 8, 11.
 - `src/comms/runtime/proofs.py`: `build_proofs(..., instagram_aliases=...)` adds one `/me` proof per alias.
 - `src/comms/runtime/settings.py`: `_TOP` gains `"instagram"`; `_instagram()` validator; `DaemonSettings.instagram`.
 - `src/comms/runtime/adapters.py`: `AdapterSettings` fields; `_instagram(...)`; `build_adapters` calls it.
-- `src/comms/transports/instagram/{__init__,http,accounts,capability,doctor,cli}.py` (new).
-- `src/comms/cli_commands/operator.py`: `instagram account add|list|remove`, `instagram token refresh`, `instagram doctor`.
+- `src/comms/transports/instagram/{__init__,http,config,store,accounts,capability,doctor}.py` (new); `src/comms/runtime/operator/instagram.py` (new: the handlers and `InstagramOperator`, R-IG3).
+- `src/comms/cli_commands/operator.py`: `transport instagram account add|list|remove`, `transport instagram token refresh`, `transport instagram doctor` (under `transport`, R-IG3).
 - `tests/security/test_egress.py`: `NETWORK_MODULES` gains `src/comms/transports/instagram/http.py`.
 - `tests/core/keys/test_purposes.py`: DESIGN gains the pattern.
 - `tests/core/providers/test_protocols.py`: `_amendment_ids(49)` reads `docs/instagram-spec-v0.6.md` section 5.3 phrases; `test_adapter_contracts_match_a18` gains the fifth entry.
@@ -159,7 +159,7 @@ Spec: sections 4.4, 11, 13, 14 items 13, 14, 15.
 **Files:**
 - `src/comms/transports/instagram/doctor.py`: the five finding codes; wired into `comms doctor`.
 - `scripts/smoke_sweep.py`: the 22 tools against a fake `GraphIgApi`; a proxy-path `tools/list` check asserting the four `_meta` keys. `docs/verification/comms-v0.3-smoke-map.json` and `tests/security/test_smoke_map.py` updated.
-- `docs/runbooks/clients-claude-code.md`: the Instagram ask rules, `instagram.default` per project. `docs/runbooks/live-acceptance-instagram.md` (new): GI-1 to GI-8, evidence to `docs/verification/live-acceptance/<date>.json`. `docs/runbooks/install.md`: `comms instagram account add`.
+- `docs/runbooks/clients-claude-code.md`: the Instagram ask rules, `instagram.default` per project. `docs/runbooks/live-acceptance-instagram.md` (new): GI-1 to GI-8, evidence to `docs/verification/live-acceptance/<date>.json`. `docs/runbooks/install.md`: `comms transport instagram account add`.
 - `tests/security/test_runbooks.py` `EXPECTED`.
 - `tests/conformance/test_live_acceptance.py`: Instagram cases (`NOT_CONFIGURED` until the accounts file names an account).
 - `tests/security/test_instagram_exit.py` (new): pins the 22 names and order, `catalog_digest`, the ask list, `_NAMES`, `ADAPTER_CONTRACTS["instagram"]`, the four prefixes, the three actor enums, `_meta` on exactly four tools, `NETWORK_MODULES`, `SCHEMA_VERSION == 10`.
@@ -172,7 +172,7 @@ Spec: sections 4.4, 11, 13, 14 items 13, 14, 15.
 ### Task IG-7: Owner steps (not for the agent)
 
 - [ ] Add each Instagram professional account to the Meta app (public account, Business or Creator), accept the invite, generate the dashboard token with the minimum scopes.
-- [ ] `comms instagram account add <alias>` per account (token on a pipe), then `comms instagram doctor`.
+- [ ] `comms transport instagram account add <alias>` per account (token on a pipe), then `comms transport instagram doctor`.
 - [ ] Run GI-1 first. If `/refresh_access_token` refuses the `Authorization` header, stop and record the ruling (spec open question 4).
 - [ ] Run GI-2 to GI-8 per `docs/runbooks/live-acceptance-instagram.md`; the run writes the evidence file.
 - [ ] Decide open questions 1 to 3.

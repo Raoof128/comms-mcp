@@ -18,7 +18,7 @@ from typing import Any
 from comms.core import timeutil
 from comms.core.keys import ids
 from comms.core.keys.files import VersionedFiles
-from comms.core.keys.purposes import PURPOSES
+from comms.core.keys.purposes import PURPOSES, purpose_of
 from comms.core.storage.db import write_tx
 
 __all__ = [
@@ -129,7 +129,10 @@ def registry_public_for(conn: Any) -> Callable[[str], bytes | None]:
 
 def key_id_for(purpose: str, material: bytes) -> str:
     """The key ID rule for a purpose's kind (one copy: ``comms.core.keys.ids``)."""
-    kind = PURPOSES[purpose].kind
+    spec = purpose_of(purpose)
+    if spec is None:
+        raise KeySlotError("unknown key purpose")
+    kind = spec.kind
     if kind == "hmac":
         return ids.hmac_key_id(material)
     if kind == "ed25519":
@@ -149,11 +152,13 @@ def register_version(conn: Any, purpose: str, version: int, material: bytes, sta
         " VALUES (?, ?, ?, 'ACTIVE', ?)",
         (purpose, version, key_id, stamp),
     )
-    if PURPOSES[purpose].public_registry:
+    spec = purpose_of(purpose)
+    assert spec is not None  # key_id_for refused an unknown purpose
+    if spec.public_registry:
         conn.execute(
             "INSERT INTO verification_keys (key_id, purpose, algorithm, public_key,"
             " activated_at, trust_state) VALUES (?, ?, ?, ?, ?, 'ACTIVE')",
-            (key_id, purpose, PURPOSES[purpose].kind, ids.ed25519_public(material), stamp),
+            (key_id, purpose, spec.kind, ids.ed25519_public(material), stamp),
         )
     return key_id
 

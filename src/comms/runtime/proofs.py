@@ -22,7 +22,7 @@ from typing import Any
 from comms.transports.telegram.bot.http import BotApi
 from comms.transports.whatsapp.cloud.http import GraphApi
 
-__all__ = ["CredentialProofFailed", "build_proofs"]
+__all__ = ["CredentialProofFailed", "build_proofs", "one_value_store"]
 
 _APP_SECRET = re.compile(rb"^[0-9a-f]{32}$")
 _VERIFY_TOKEN = re.compile(rb"^[\x21-\x7e]{32,128}$")  # printable, no whitespace, high entropy
@@ -45,6 +45,11 @@ class _One:
 
     def __repr__(self) -> str:
         return "_One(<redacted>)"
+
+
+def one_value_store(purpose: str, value: bytes) -> Any:
+    """A store holding only the candidate, as version 1 of ``purpose`` (one copy; A49 too)."""
+    return _One(purpose, value)
 
 
 def build_proofs(

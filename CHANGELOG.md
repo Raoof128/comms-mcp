@@ -1154,3 +1154,18 @@
 - **Verification:** `tests/security/test_v03_preflight.py` passes, and fails when the Instagram spec drifts from its pin (seen failing). Doc tests green.
 - **Follow-ups:** IG-1 (the actor exists).
 
+
+### 2026-10-04 (Australia/Sydney), IG-1
+**Raouf:**
+- **Scope:** Plan task IG-1, proposed A49: the Instagram actor exists (enums, settings, purposes, schema v10, the pinned client, accounts and their operator commands). No MCP tool yet.
+- **Summary:**
+  - **Core:** 14 Instagram `Capability` members; `SUPPORT` gives them to `instagram` alone and adds it to `history.read` and `message.reply`; `SEMANTICS` (reads `READ`; container, carousel, publish and comment reply `CREATE`; hide and toggle `SET_STATE`; comment delete `DESTRUCTIVE_NONIDEMPOTENT`; the DM reply `MESSAGE_SEND` with no key); `ADAPTER_CONTRACTS["instagram"]`; refs `iga_`, `igk_`, `igm_`, `igc_`, `igp_`; the typed audit payload accepts actor `instagram` and a new `admin.instagram_account` event; `IDENTITY_MISMATCH` and `NOT_ENOUGH_DATA` join the error model.
+  - **Secrets:** `purpose_of` resolves `meta-ig-access-token.<alias>` (staged, opaque) beside the static purposes; the secret store, credential rotation, key ids and credential audit events use it. An alias never contains a word comms.json refuses as secret-like.
+  - **Schema v10:** `instagram_accounts`, `instagram_containers`, `instagram_objects`, with immutable bindings and one live row per alias and per user id; no existing table changes (R-IG2).
+  - **Transport package:** `GraphIgApi` (pinned `https://graph.instagram.com`, the token only in the Authorization header, closed nodes and edges, no `access_token` parameter ever), `config` (the comms.json section), `store`, `accounts` (lazy `/me` identity check, a mismatch blocks the alias), `capability` (per-account ceilings), `doctor`.
+  - **Operator:** `comms transport instagram account add|list|remove`, `token refresh`, `doctor` (R-IG3: under `transport`), through the staged rotation with a `/me` proof; a refresh persists the token Meta returns; per-alias proofs guard `credential rotate meta-ig-access-token.<alias>`.
+  - **Catalog:** `ACTOR` and the capability-list transport gain `instagram`; the pin regenerates (`57e490cc1f538286…` to `21cc382adb9370a7…`); `PENDING_A49` names each capability whose tool a later task builds.
+- **Files changed:** `src/comms/core/{audit/specs,credentials,errors,keys/purposes,keys/secrets,keys/slots,providers/capability,providers/protocols,providers/semantics,refs,storage/migrations}.py`; `src/comms/mcp/{catalog,schemas}.py`; `src/comms/runtime/{adapters,assemble,facades,proofs,settings}.py`, `runtime/operator/{__init__,context,credentials,instagram}.py`; `src/comms/cli_commands/operator.py`; `src/comms/transports/instagram/` (new); tests under `tests/transports/instagram/`, `tests/runtime/operator/test_instagram_accounts.py`, and the pinning tests that moved (`test_protocols`, `test_semantics`, `test_refs_*`, `test_errors`, `test_egress`, `test_catalog_pin`, `test_relay_collector`); docs (spec, plan, rulings R-IG3 and pins).
+- **Verification:** new tests seen failing first; IG-1 targeted run 275 passed; the parallel sweep of the rest of the suite showed only the baseline set; full gate in the main checkout on this commit (see the ledger line).
+- **Follow-ups:** IG-2 (the read tools).
+

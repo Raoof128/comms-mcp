@@ -36,10 +36,20 @@ MESSAGES = MappingProxyType(
         "RETIRED_TOOL": "the tool is retired",
         "TOOL_NOT_FOUND": "no such tool",
         "AUDIT_INTEGRITY_DEGRADED": "the audit trail is degraded; no new effect may start",
+        # proposed A49 (Instagram, sections 4.5 and 7)
+        "IDENTITY_MISMATCH": "the account's token names another account; re-add it",
+        "NOT_ENOUGH_DATA": "the provider has too little data to report this",
     }
 )
 NAMED_ADDITIONS = frozenset(
-    {"REQUEST_ID_REUSE", "RETIRED_TOOL", "TOOL_NOT_FOUND", "AUDIT_INTEGRITY_DEGRADED"}
+    {
+        "REQUEST_ID_REUSE",
+        "RETIRED_TOOL",
+        "TOOL_NOT_FOUND",
+        "AUDIT_INTEGRITY_DEGRADED",
+        "IDENTITY_MISMATCH",  # proposed A49
+        "NOT_ENOUGH_DATA",  # proposed A49
+    }
 )
 ERROR_CODES = frozenset(MESSAGES)
 
