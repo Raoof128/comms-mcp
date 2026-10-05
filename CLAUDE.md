@@ -109,7 +109,7 @@ pages moved to `https://raoof128.github.io/comms-mcp/`, so W-Vault's Privacy Pol
 deletion URLs in the Meta app settings must point there.
 **Live** (under the owner's user; see Host state): the relay was deployed on 2026-09-27 and a
 Meta test webhook went through it to the archive; the Telegram bot and user account have been
-logged in since 2026-09-28 and were driven live (rulings R-TG1 to R-TG4). Next: D39-B, the owner-run live acceptance records.
+logged in since 2026-09-28 and were driven live (rulings R-TG1 to R-TG4). Instagram went live on 2026-10-05 on two accounts (`main` @punpun.r12; `mqps` @mqpersiansociety, writes on, DMs off); live gates in `docs/verification/live-acceptance/2026-10-05-instagram.md`; comms is registered in Claude Code (user scope) and Codex. Next: D39-B, the owner-run live acceptance records.
 
 ## Non-negotiables
 
