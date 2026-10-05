@@ -1464,3 +1464,16 @@ Follow the user's engineering lifecycle: design/security analysis, implementatio
 - **Files changed:** `AGENT.md`, `CHANGELOG.md`.
 - **Verification:** the two gate logs on the execution host; `git merge-base --is-ancestor` for every remote branch against `origin/main`.
 - **Follow-ups (owner):** the GitHub repository is still `Raoof128/telegram-mcp`, so links to `comms-mcp` answer 404 until it is renamed in Settings. After the rename: W-Vault's Privacy Policy and data deletion URLs in the Meta app become `https://raoof128.github.io/comms-mcp/privacy/` (Pages does not redirect); on the Mac, `git remote set-url`, `uv sync --locked --reinstall-package comms-mcp` and a daemon restart. Remote branch deletion is refused from this session (HTTP 403), so the merged branches are the owner's to delete. Then IG-7 (GI-1 first; GI-3 proves the stories edge).
+
+
+### 2026-10-05 (Australia/Sydney), Instagram live acceptance, first run
+**Raouf:**
+- **Scope:** The owner renamed the repository, then asked for the Instagram live gates to run on their own account, @punpun.r12, instead of a throwaway.
+- **Summary:**
+  - **Host:** clone switched to `Raoof128/comms-mcp`. Both W-Vault URLs now point at `https://raoof128.github.io/comms-mcp/privacy/` (`#deletion` for data deletion). The daemon runs from this checkout on the existing state, backed up first to `state.bak-2026-10-05`. All 25 merged remote branches were deleted, leaving `main`.
+  - **Account:** `comms.json` gains `instagram` (`default` `main`; `main`: label `punpun.r12`, `writes` and `dms` true). punpun.r12 is an Instagram Tester on W-Vault-IG. Its token was added at the hidden prompt in Terminal.app and proved by `GET /me` (`iga_akejch7j6q3tbjh6snuj6n2ftw`, expires 2026-12-04).
+  - **Gates:** GI-3 and GI-5 pass. GI-1 passes doctor and the comment hide round trip; its refresh needs a 24-hour-old token. GI-4 passes with captions off. Publishing (feed image and Story), comment reply, replay, replies and delete all ran live. The test post was deleted afterwards. The images were served from Pages for the run only (`d79f2c1`, removed in `d41e8ef`).
+  - **Findings:** a thread without exactly one counterpart (conversation 25, likely a group) fails the whole `conversation_list` page, so no cursor passes it. `media_get` on a deleted post answers `INVALID_ARGUMENT` (Meta code 100). Both need a ruling; no code changed.
+- **Files changed:** `docs/verification/live-acceptance/2026-10-05-instagram.md` (new), `AGENT.md`, `CHANGELOG.md`. Earlier, on `main`: `site/test/` added and removed.
+- **Verification:** a scripted MCP stdio client against the running daemon (154 tools, 24 Instagram); every result was read back through comms. The live caption was checked against the permalink's `og:description`. Documentation only, so the full gate was not run.
+- **Follow-ups (owner):** token refreshes on 2026-10-06 after 16:04 and a day later (GI-1, GI-2); GI-4 with captions on; GI-6 and GI-7 in Claude Code and Desktop; GI-8 messages and one DM reply; `story_insights` once five people have viewed the Story; rulings on the two findings, then R-IG0.
