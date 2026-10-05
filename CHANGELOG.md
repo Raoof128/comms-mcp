@@ -1320,3 +1320,22 @@
 - **Files changed:** `src/comms/core/providers/instagram_insights.py`; `src/comms/transports/instagram/{http,insights}.py`; `src/comms/runtime/{instagram,facades,selftest}.py`; `src/comms/mcp/{egress.py,tools/instagram.py}`; `docs/instagram-spec-v0.6.md`; the plan; `docs/verification/{comms-v0.3-rulings.md,comms-v0.3-actor-matrix.md,comms-v0.3-smoke-map.json}`; `docs/runbooks/live-acceptance-instagram.md`; `scripts/{smoke_daemon,e2e_smoke}.py`; `README.md`; `CLAUDE.md`; tests (`test_instagram_stories.py` new, `test_instagram_sweep.py`, `test_instagram_exit.py`, the catalog pin).
 - **Verification:** the new tests seen failing first (5,923 collected); the Instagram, MCP, egress and host-permission suites pass; the real-daemon smoke reads a Story and its insights through the installed binary; full gate on the commit.
 - **Follow-ups:** GI-3 on the throwaway account proves the stories edge on the Instagram Login host.
+
+
+### 2026-10-05 (Australia/Sydney), IG-9 and the rename merged; gate ledger
+**Raouf:**
+- **Scope:** The owner approved merging Story reads (IG-9) and the `comms-mcp` rename into `main`, then asked for every log to be updated and every branch merged safely. A commit cannot hold its own gate result, so this entry records both gates.
+- **Summary:**
+  - **Merges:** `main` fast-forwarded to IG-9 (`ba05c05`), then took `comms-mcp-rename` as merge `1f66f3e`. The only conflicts were the append-only `AGENT.md` and `CHANGELOG.md`; both entries were kept.
+  - **Gates:** each commit passed the full `CLAUDE.md` Verify list in the main checkout, detached at that commit. The host is Linux, running as root, with no IPv6, so the verdict is "host-adjusted": the only failures are exactly the baseline's (`test_install.py` x4, `test_v03_part_b_exit.py`, the audit anchor-repair test and the doctor off-probe test; smoke `doctor headless` and `install plans are inert`).
+
+    | Commit | What | pytest (passed, baseline failures, skipped) | Smoke | Catalog |
+    |---|---|---|---|---|
+    | `ba05c05` | IG-9: reading Stories | 5910, 7, 6 | 116 of 118 | 154, `ce65f29f…` |
+    | `1f66f3e` | merge: the rename | 5910, 7, 6 | 116 of 118 | 154, `ce65f29f…` |
+
+  - **GitHub:** `main` pushed (`9374c6c..1f66f3e`); the Pages workflow deployed it. All 24 remote branches are ancestors of `main`, so none holds unmerged work.
+  - **Venv:** the distribution swap removes the shared console scripts; `uv sync --locked --reinstall-package comms-mcp` restores `comms` and `telegram-mcp`.
+- **Files changed:** `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** the two gate logs on the execution host; `git merge-base --is-ancestor` for every remote branch against `origin/main`.
+- **Follow-ups (owner):** the GitHub repository is still `Raoof128/telegram-mcp`, so links to `comms-mcp` answer 404 until it is renamed in Settings. After the rename: W-Vault's Privacy Policy and data deletion URLs in the Meta app become `https://raoof128.github.io/comms-mcp/privacy/` (Pages does not redirect); on the Mac, `git remote set-url`, `uv sync --locked --reinstall-package comms-mcp` and a daemon restart. Remote branch deletion is refused from this session (HTTP 403), so the merged branches are the owner's to delete. Then IG-7 (GI-1 first; GI-3 proves the stories edge).
