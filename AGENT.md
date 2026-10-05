@@ -1423,3 +1423,15 @@ Follow the user's engineering lifecycle: design/security analysis, implementatio
 - **Verification:** the new tests seen failing first (11 more, 5,909 collected); the Instagram suites pass; the real-daemon smoke publishes a Story through the installed binary; full gate on the commit.
 - **Follow-ups:** a live Story on the throwaway account (runbook, GI-3's run).
 
+
+### 2026-10-05 (Australia/Sydney), renamed to comms-mcp
+**Raouf:**
+- **Scope:** The owner asked to rename the project from `telegram-mcp` to `comms-mcp`.
+- **Summary:**
+  - **Renamed:** the Python distribution (`pyproject.toml` `name`, `uv.lock`; no dependency changed) and every link to the repository and its public pages (`site/`, README). The GitHub repository itself is renamed by the owner in its settings.
+  - **Kept on purpose:** the `telegram-mcp` console script, the Keychain service, `/private/var/run/telegram-mcp`, logger names and every frozen wire (`CLAUDE.md`, Non-negotiables). Historical records (plans, rulings, verification, this audit trail) keep the names they had.
+  - **Meta:** GitHub Pages does not redirect a renamed project site, so W-Vault's Privacy Policy and data deletion URLs in the Meta app settings must move to `https://raoof128.github.io/comms-mcp/privacy/` as soon as the repository is renamed.
+- **Files changed:** `pyproject.toml`, `uv.lock`, `site/index.html`, `site/privacy/index.html`, `README.md`, `CLAUDE.md`, `tests/security/test_ai_boundary.py`, `tests/security/test_egress.py` (the supply-chain pin compares dependencies, not the project's own renamed entry), `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** `uv lock` changed only the project's own entry; the full gate on the commit.
+- **Follow-ups:** the owner renames the repository, then updates the two Meta URLs.
+

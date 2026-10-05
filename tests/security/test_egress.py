@@ -38,7 +38,11 @@ def test_uv_lock_adds_no_new_package():
         text=True,
         check=True,
     ).stdout
-    assert _packages((ROOT / "uv.lock").read_text()) == _packages(before)
+    # The project's own entry is not a dependency: it was renamed telegram-mcp -> comms-mcp
+    # (2026-10-05). Every third-party package must be exactly the pinned set.
+    now = _packages((ROOT / "uv.lock").read_text())
+    assert "comms-mcp" in now and "telegram-mcp" not in now
+    assert now - {"comms-mcp"} == _packages(before) - {"telegram-mcp"}
 
 
 def test_only_adapter_network_modules_import_httpx_or_telethon():
