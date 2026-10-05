@@ -1375,3 +1375,18 @@
 - **Files changed:** `AGENT.md`, `CHANGELOG.md`, `docs/verification/live-acceptance/2026-10-05-instagram.md` (addendum). Outside the repo: `comms.json`, the two client configs, `~/.claude/settings.json`, the skill.
 - **Verification:** `comms transport instagram doctor` reports OK for both aliases, and `comms doctor` reports `ok: true`. Every Instagram read above went through the stdio proxy. Documentation only, so the full gate was not run.
 - **Follow-ups (owner):** restart Claude Code and Codex to load comms, then run GI-6 and GI-7 there. Nothing restarts the daemon after a reboot (`scripts/health.sh --start` in the skill). The token refreshes and the GI-8 DM work stand as before.
+
+
+### 2026-10-05 (Australia/Sydney), logs closed for the day
+**Raouf:**
+- **Scope:** The owner asked for every log to be updated.
+- **Summary:**
+  - **Codex skill:** the `comms-mcp` skill in `~/.codex/skills/` is now a full copy, not a link. `diff -r` against `~/.claude/skills/comms-mcp/` is identical, and both carry a note to keep them in sync.
+  - **Zurvan:**
+    - Ingested: the evidence file, the Instagram runbook, the skill's `SKILL.md`, `instagram.md` and `messaging.md`, and `Instagram-MCP`'s README, CHANGELOG and ARCHITECTURE.
+    - Recorded: 5 claims quoted verbatim from the evidence, 3 decisions stamped `project: comms-mcp` (not on Zurvan's public allowlist, so never published), and 1 private note for the second account.
+    - Rebuilt: search index fresh at 300,170 chunks; graph 11,608 nodes.
+  - **Design repo:** `Instagram-MCP` `b7fab7e` records the first live run in its README status and changelog.
+- **Files changed:** `AGENT.md`, `CHANGELOG.md`.
+- **Verification:** `zurvan agent prime` reports the index fresh, and a hybrid search for the DM finding returns the new claim first. Documentation only.
+- **Follow-ups (owner):** the token refreshes (GI-1 after 2026-10-06 16:04, GI-2 a day later); GI-6 and GI-7 after restarting Claude Code and Codex; GI-8; rulings on the two findings, then R-IG0; daemon auto-start at login.
