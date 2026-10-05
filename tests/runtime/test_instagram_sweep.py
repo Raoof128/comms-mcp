@@ -2,7 +2,7 @@
 graph.instagram.com (section 13 "Smoke"; R-IG4 (6)).
 
 The daemon smoke (``scripts/smoke_sweep.py``) drives the selftest daemon, which configures no
-Instagram account, so there each Instagram tool must answer ``NOT_CONFIGURED``. Here the same 22
+Instagram account, so there each Instagram tool must answer ``NOT_CONFIGURED``. Here the same 24
 tools run end to end, in the order an owner would use them, and each must succeed with a result
 valid against its output schema.
 """
@@ -39,6 +39,7 @@ def _routes():
     ok = {"success": True}
     return {
         ("GET", "/v25.0/me/media"): {"data": [item]},
+        ("GET", f"/v25.0/{USER_ID}/stories"): {"data": [item]},
         ("GET", f"/v25.0/{MEDIA}"): item,
         ("GET", f"/v25.0/{MEDIA}/insights"): metric,
         ("GET", f"/v25.0/{USER_ID}/insights"): metric,
@@ -100,6 +101,8 @@ def test_every_instagram_tool_succeeds_end_to_end(world):
     call("media_get", {"media": media})
     call("media_insights", {"media": media, "metrics": ["reach"]})
     call("account_insights", {"metrics": ["views"], "breakdown": "follower_type"})
+    story = call("story_list", {})["items"][0]["media"]  # R-IG11
+    call("story_insights", {"media": story, "metrics": ["reach", "replies"]})
     comment = call("comment_list", {"media": media})["items"][0]["comment"]
     call("comment_replies", {"comment": comment})
     call("tag_list", {})
@@ -128,4 +131,4 @@ def test_every_instagram_tool_succeeds_end_to_end(world):
     call("comments_enabled_set", {"media": media, "enabled": False})
     call("comment_delete", {"comment": comment})
     call("message_send", {"person": person, "text": "Hello"})
-    assert sorted(seen) == sorted(INSTAGRAM) and len(INSTAGRAM) == 22
+    assert sorted(seen) == sorted(INSTAGRAM) and len(INSTAGRAM) == 24

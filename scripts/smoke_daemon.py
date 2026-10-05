@@ -459,7 +459,7 @@ IG_USER = "17841400000000099"  # the selftest daemon's scripted account (runtime
 
 
 def drive_instagram(root: Path) -> dict[str, Any]:
-    """Proposed A49 on the real daemon: an account added at the hidden prompt, all 22 Instagram
+    """Proposed A49 on the real daemon: an account added at the hidden prompt, all 24 Instagram
     tools over HTTP /mcp against the selftest daemon's scripted graph.instagram.com, a replay,
     both doctors, a token refresh, the audit chain, and the account removed again."""
     import jsonschema
@@ -522,6 +522,9 @@ def drive_instagram(root: Path) -> dict[str, Any]:
         call("media_get", {"media": media})
         call("media_insights", {"media": media, "metrics": ["reach"]})
         call("account_insights", {"metrics": ["views"], "breakdown": "follower_type"})
+        story_ref = call("story_list", {}).get("items", [{}])[0].get("media", "")  # R-IG11
+        call("story_insights", {"media": story_ref, "metrics": ["navigation"],
+                                "breakdown": "story_navigation_action_type"})  # fmt: skip
         comment = call("comment_list", {"media": media}).get("items", [{}])[0].get("comment", "")
         call("comment_replies", {"comment": comment})
         call("tag_list", {})
@@ -553,7 +556,7 @@ def drive_instagram(root: Path) -> dict[str, Any]:
         bad_results = {n: b.get("result") for n, b in seen.items()
                        if "result" in b and b["result"] != "SUCCEEDED"}  # fmt: skip
         out["ig_tools_end_to_end"] = (
-            not wrong and not bad_results and sorted(seen) == sorted(names) and len(names) == 22
+            not wrong and not bad_results and sorted(seen) == sorted(names) and len(names) == 24
             and str(published.get("media", "")).startswith("igm_")
             and str(shared.get("media", "")).startswith("igm_")
         ) or {**wrong, **bad_results, "missing": sorted(set(names) - set(seen))}  # fmt: skip

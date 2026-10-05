@@ -37,6 +37,7 @@ _BODY = frozenset(
         "comms_context_person",  # G5
         "comms_instagram_media_list",  # proposed A49: captions, comments, DMs
         "comms_instagram_media_get",  # proposed A49: captions, comments, DMs
+        "comms_instagram_story_list",  # proposed A49: captions, comments, DMs
         "comms_instagram_comment_list",  # proposed A49: captions, comments, DMs
         "comms_instagram_comment_replies",  # proposed A49: captions, comments, DMs
         "comms_instagram_tag_list",  # proposed A49: captions, comments, DMs
@@ -67,6 +68,8 @@ _NAMES = frozenset(
         "comms_instagram_media_get",  # proposed A49: usernames and labels
         "comms_instagram_media_insights",  # proposed A49: usernames and labels
         "comms_instagram_account_insights",  # proposed A49: usernames and labels
+        "comms_instagram_story_list",  # proposed A49: usernames and labels
+        "comms_instagram_story_insights",  # proposed A49: usernames and labels
         "comms_instagram_comment_list",  # proposed A49: usernames and labels
         "comms_instagram_comment_replies",  # proposed A49: usernames and labels
         "comms_instagram_tag_list",  # proposed A49: usernames and labels

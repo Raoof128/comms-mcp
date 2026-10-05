@@ -55,7 +55,10 @@ The publishing path (`container_create`, `publish_preview`, `publish`) is exerci
 run: one image container from a public `https` URL you control, published once, then deleted in
 the Instagram app. Then one Story (`kind` `story_image`, a 9:16 JPEG): it must publish, and
 `comms_instagram_media_get` on its `igm_` reads `media_type` `IMAGE` (Meta's documented answer for
-a Story). It disappears by itself after 24 hours.
+a Story). `comms_instagram_story_list` must list it (this is
+GI-3's check that the `stories` edge answers on `graph.instagram.com`), and once 5 people have
+viewed it, `comms_instagram_story_insights` with `navigation` and `story_navigation_action_type`
+returns its taps and swipes. It disappears by itself after 24 hours.
 
 ## Afterwards
 

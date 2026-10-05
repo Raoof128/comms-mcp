@@ -1423,3 +1423,14 @@ Follow the user's engineering lifecycle: design/security analysis, implementatio
 - **Verification:** the new tests seen failing first (11 more, 5,909 collected); the Instagram suites pass; the real-daemon smoke publishes a Story through the installed binary; full gate on the commit.
 - **Follow-ups:** a live Story on the throwaway account (runbook, GI-3's run).
 
+
+### 2026-10-05 (Australia/Sydney), IG-9: reading Stories
+**Raouf:**
+- **Scope:** The owner asked for "the story section" to be built if needed. Stories could be published (IG-8) but not read back. Plan task IG-9, spec revision 4, ruling R-IG11.
+- **Summary:**
+  - **Facts checked first:** the IG User reference lists `GET /<IG_ID>/stories` (the account's live Stories) under Instagram Login, but the edge's own page shows only `graph.facebook.com`, so it is 🧪 GI-3 on `graph.instagram.com`. Story insights take their own metrics (`navigation`, `replies`, `profile_activity` and others) and answer under five viewers with error 10.
+  - **Tools:** `comms_instagram_story_list` reads live Stories as ordinary `igm_` refs through a client-bound cursor, asking for no caption or media URL. `comms_instagram_story_insights` checks its metrics and breakdown before any call; too few viewers is `NOT_ENOUGH_DATA`. No new capability, scope, host or table.
+  - **Pins:** spec and plan re-pinned with R-IG11; the catalog moves to 154 tools (`1032910948054f25…` to `ce65f29fdffec396…`).
+- **Files changed:** `src/comms/core/providers/instagram_insights.py`; `src/comms/transports/instagram/{http,insights}.py`; `src/comms/runtime/{instagram,facades,selftest}.py`; `src/comms/mcp/{egress.py,tools/instagram.py}`; `docs/instagram-spec-v0.6.md`; the plan; `docs/verification/{comms-v0.3-rulings.md,comms-v0.3-actor-matrix.md,comms-v0.3-smoke-map.json}`; `docs/runbooks/live-acceptance-instagram.md`; `scripts/{smoke_daemon,e2e_smoke}.py`; `README.md`; `CLAUDE.md`; tests (`test_instagram_stories.py` new, `test_instagram_sweep.py`, `test_instagram_exit.py`, the catalog pin).
+- **Verification:** the new tests seen failing first (5,923 collected); the Instagram, MCP, egress and host-permission suites pass; the real-daemon smoke reads a Story and its insights through the installed binary; full gate on the commit.
+- **Follow-ups:** GI-3 on the throwaway account proves the stories edge on the Instagram Login host.

@@ -99,8 +99,8 @@ request or frame (32 KiB raw per chunk, slice or inline file). Exit: `tests/secu
 - **Exit test:** `tests/security/test_relay_exit.py`.
 **Instagram, proposed A49** (branch `comms-instagram-spec`; spec `docs/instagram-spec-v0.6.md`; plan `docs/superpowers/plans/2026-10-04-comms-instagram.md`; not adopted until ruling R-IG0):
 - **The actor.** `instagram`, one per account (`iga_`), over `graph.instagram.com` pinned in `transports/instagram/http.py`. Accounts live in `comms.json` (`instagram.accounts`: label, `writes`, `dms`) and in three tables of their own (schema v10; v11 lets the ledger record a Story, R-IG10); tokens are `meta-ig-access-token.<alias>`, added at the hidden prompt with `comms transport instagram account add`.
-- **The tools.** 22 `comms_instagram_*` tools (14 reads, 8 writes; 152 in the catalog). Every id is a ref (`igk_`, `igm_`, `igc_`, `igp_`); captions, comments and DMs only in `untrusted_text`. Publishing (posts, Reels, carousels and Stories) is three single-effect CREATEs on the `igk_` ledger (the 400-a-day budget); four tools carry `requires_user_interaction`.
-- **Evidence:** rulings R-IG1 to R-IG10 in `docs/verification/comms-v0.3-rulings.md`; live gates GI-1 to GI-8 in `docs/runbooks/live-acceptance-instagram.md` (owner-run).
+- **The tools.** 24 `comms_instagram_*` tools (16 reads, 8 writes; 154 in the catalog; Story reads R-IG11). Every id is a ref (`igk_`, `igm_`, `igc_`, `igp_`); captions, comments and DMs only in `untrusted_text`. Publishing (posts, Reels, carousels and Stories) is three single-effect CREATEs on the `igk_` ledger (the 400-a-day budget); four tools carry `requires_user_interaction`.
+- **Evidence:** rulings R-IG1 to R-IG11 in `docs/verification/comms-v0.3-rulings.md`; live gates GI-1 to GI-8 in `docs/runbooks/live-acceptance-instagram.md` (owner-run).
 - **Exit test:** `tests/security/test_instagram_exit.py`.
 **Live** (under the owner's user; see Host state): the relay was deployed on 2026-09-27 and a
 Meta test webhook went through it to the archive; the Telegram bot and user account have been
@@ -131,7 +131,7 @@ logged in since 2026-09-28 and were driven live (rulings R-TG1 to R-TG4). Next: 
 ```bash
 uv sync --locked
 uv run python scripts/extract_contracts.py --check
-uv run pytest -q                                  # 5905 passed, 4 skipped
+uv run pytest -q                                  # 5919 passed, 4 skipped
 uv run python scripts/e2e_smoke.py                # 118 checks, end to end (44 against a real daemon; every tool swept; the relay under wrangler dev)
 uv run pytest tests/formal -q -s                  # 57 passed: 544 states/22 assertions; campaign 96,528/11; operations 4,728
 uv run ruff check src tests scripts

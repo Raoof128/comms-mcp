@@ -43,6 +43,7 @@ EDGES = frozenset(
     {
         "media",
         "media_publish",
+        "stories",  # R-IG11
         "insights",
         "comments",
         "replies",

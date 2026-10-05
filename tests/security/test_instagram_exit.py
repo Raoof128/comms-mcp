@@ -19,7 +19,7 @@ from tests.security.test_egress import NETWORK_MODULES
 
 ROOT = Path(__file__).resolve().parents[2]
 
-# Section 5's 22 tools, in catalog order: the 14 reads, then the 8 writes.
+# Section 5's 24 tools, in catalog order: the 16 reads, then the 8 writes (Story reads: R-IG11).
 TOOLS = (
     "comms_instagram_account_list",
     "comms_instagram_whoami",
@@ -28,6 +28,8 @@ TOOLS = (
     "comms_instagram_media_get",
     "comms_instagram_media_insights",
     "comms_instagram_account_insights",
+    "comms_instagram_story_list",
+    "comms_instagram_story_insights",
     "comms_instagram_comment_list",
     "comms_instagram_comment_replies",
     "comms_instagram_tag_list",
@@ -44,20 +46,20 @@ TOOLS = (
     "comms_instagram_comment_delete",
     "comms_instagram_message_send",
 )
-WRITES = TOOLS[14:]
+WRITES = TOOLS[16:]
 PROMPTED = {
     "comms_instagram_publish",
     "comms_instagram_comment_reply",
     "comms_instagram_comment_delete",
     "comms_instagram_message_send",
 }
-CATALOG_DIGEST = "1032910948054f2585316d40eca1be973dfe6347ab7b8"  # a prefix of the pin (R-IG10)
+CATALOG_DIGEST = "ce65f29fdffec3968140994814c0c224e40115b6d4ae4"  # a prefix of the pin (R-IG11)
 
 
-def test_the_22_tools_in_order_and_the_catalog_digest():
+def test_the_24_tools_in_order_and_the_catalog_digest():
     names = [s.name for s in TOOL_CATALOG]
     assert tuple(n for n in names if n.startswith("comms_instagram_")) == TOOLS
-    assert len(TOOL_CATALOG) == PIN["count"] == 152
+    assert len(TOOL_CATALOG) == PIN["count"] == 154
     assert catalog_digest() == PIN["catalog"] and PIN["catalog"].startswith(CATALOG_DIGEST)
     assert PENDING_A49 == {}  # every A49 capability has its tool
 
@@ -76,6 +78,7 @@ def test_egress_classes():
     assert {n for n in _BODY if n.startswith("comms_instagram_")} == {
         "comms_instagram_media_list",
         "comms_instagram_media_get",
+        "comms_instagram_story_list",
         "comms_instagram_comment_list",
         "comms_instagram_comment_replies",
         "comms_instagram_tag_list",

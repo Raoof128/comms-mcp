@@ -18,7 +18,8 @@ adapter factory differs. Every provider here is local and deterministic:
 - proposed A49: with Instagram accounts in comms.json, the real Instagram adapters (accounts,
   capability, the admin adapter, the publishing ledger) and the operator commands run over a
   scripted graph.instagram.com (``_InstagramGraph``): one public account that has one post with
-  one comment, one DM thread with a message an hour old, and containers that finish at once.
+  one comment, one live Story, one DM thread with a message an hour old, and containers that
+  finish at once.
 
 Nothing here opens a socket beyond the daemon's own listeners, or reads a credential; any other
 provider transport that is touched fails loudly (``_Unreachable``).
@@ -244,6 +245,7 @@ def _bot_transport() -> Any:
 
 SELFTEST_IG_USER = "17841400000000099"  # proposed A49: the scripted account's user id
 _IG_MEDIA, _IG_COMMENT, _IG_PERSON = "17900000000000099", "17800000000000099", "9876500099"
+_IG_STORY = "17900000000000199"  # R-IG11: one live Story
 _IG_THREAD = "aWdfZAG06MTpJR01lc3NhZA2VUaHJlYWQ6c2VsZnRlc3Q"
 _IG_MESSAGE = "aWdfZAG1faXRlbToxOklHTWVzc2FnZAselftest01"
 
@@ -275,6 +277,10 @@ class _InstagramGraph:
             body = {"user_id": SELFTEST_IG_USER, "username": "selftest.studio",
                     "account_type": "BUSINESS", "followers_count": 3, "follows_count": 1,
                     "media_count": len(self.media), "name": "Selftest"}  # fmt: skip
+        elif method == "GET" and node == SELFTEST_IG_USER and edge == "stories":
+            body = {"data": [self._item(_IG_STORY)]}
+        elif method == "GET" and node == _IG_STORY and edge is None:
+            body = self._item(_IG_STORY)
         elif method == "GET" and node == "me" and edge == "media":
             body = {"data": [self._item(m) for m in sorted(self.media)]}
         elif method == "GET" and node == "me" and edge == "conversations":

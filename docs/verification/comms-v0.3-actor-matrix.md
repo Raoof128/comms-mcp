@@ -131,6 +131,8 @@ The Instagram API with Instagram Login (`graph.instagram.com`, `docs/instagram-s
 | `comms_instagram_media_list` | A done [media.list]: `GET /me/media` |
 | `comms_instagram_media_get` | A done [media.get]: `GET /{media-id}` |
 | `comms_instagram_media_insights` / `comms_instagram_account_insights` | A done [insights.read]: `GET /{media-id}/insights`, `GET /{ig-id}/insights` |
+| `comms_instagram_story_list` | A done [media.list]: `GET /{ig-id}/stories` (R-IG11; the Instagram Login host is gate GI-3) |
+| `comms_instagram_story_insights` | A done [insights.read]: `GET /{media-id}/insights` with Story metrics (R-IG11) |
 | `comms_instagram_comment_list` / `comms_instagram_comment_replies` | A done [comment.list]: `GET /{media-id}/comments`, `GET /{comment-id}/replies` |
 | `comms_instagram_tag_list` | A done [tag.list]: `GET /{ig-id}/tags` |
 | `comms_instagram_conversation_list` / `comms_instagram_conversation_messages` | A done [history.read]: `GET /me/conversations`, `GET /{conversation-id}`, `GET /{message-id}` |

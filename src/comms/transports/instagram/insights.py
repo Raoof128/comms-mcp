@@ -13,6 +13,9 @@ checked against ``media_type``):
 - ``crossposted_views`` and ``facebook_views`` throw for a reel not shared to Facebook and are
   never requested; ``engagement`` does not exist.
 
+Story (R-IG11): only ``STORY_METRICS``; ``story_navigation_action_type`` breaks down
+``navigation`` alone and ``action_type`` breaks down ``profile_activity`` alone.
+
 Account: ``period=day``; the demographics are ``lifetime`` with a ``timeframe`` of ``this_week``
 or ``this_month`` (the others are unsupported since v20.0); only ``reach`` has
 ``time_series``; a breakdown only with ``total_value``.
@@ -32,11 +35,13 @@ from comms.core.providers.instagram_insights import (
     IMPRESSIONS_BEFORE,
     MEDIA_GROUPS,
     MEDIA_METRICS,
+    STORY_BREAKDOWNS,
+    STORY_METRICS,
     TIME_SERIES,
     TIMEFRAMES,
 )
 
-__all__ = ["account_params", "media_params"]
+__all__ = ["account_params", "media_params", "story_params"]
 
 
 def _group(metrics: Sequence[str]) -> str:
@@ -61,6 +66,21 @@ def media_params(
         breakdown != "action_type" or list(metrics) != ["profile_activity"]
     ):
         raise ValueError("action_type breaks down profile_activity alone")
+    params = {"metric": ",".join(metrics)}
+    if breakdown is not None:
+        params["breakdown"] = breakdown
+    return params
+
+
+def story_params(metrics: Sequence[str], breakdown: str | None) -> dict[str, str]:
+    """The query for a Story's ``GET /<media>/insights``; ``ValueError`` for what Meta refuses."""
+    metrics = list(metrics)
+    if not metrics or set(metrics) - STORY_METRICS or len(metrics) != len(set(metrics)):
+        raise ValueError("unknown or repeated Story metric")
+    if breakdown is not None and (
+        breakdown not in STORY_BREAKDOWNS or metrics != [STORY_BREAKDOWNS[breakdown]]
+    ):
+        raise ValueError("a Story breakdown breaks down its one metric alone")
     params = {"metric": ",".join(metrics)}
     if breakdown is not None:
         params["breakdown"] = breakdown

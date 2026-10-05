@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. The owner's standing rule for this repo: no subagents; the main session executes, test-first, inline. Steps use checkbox (`- [ ]`) syntax for tracking. Read `CLAUDE.md`, `AGENT.md` and `CHANGELOG.md` before the first edit.
 
-**Goal:** one more comms actor, `instagram`, serving 22 `comms_instagram_*` tools over the existing daemon, proxy, executor, secret store and audit chain, so the owner's AI assistant can read, publish to, moderate and reply on Instagram professional accounts, with every write audited.
+**Goal:** one more comms actor, `instagram`, serving 24 `comms_instagram_*` tools (22 at IG-6; IG-9 adds two Story reads) over the existing daemon, proxy, executor, secret store and audit chain, so the owner's AI assistant can read, publish to, moderate and reply on Instagram professional accounts, with every write audited.
 
 **Spec:** `docs/instagram-spec-v0.6.md` (revision 2, proposed amendment A49). Section 14 lists every code change; this plan sequences them. The spec wins over this plan; a contradiction stops the task and is recorded as a ruling (A39).
 
@@ -178,6 +178,21 @@ Spec: revision 3, section 6 (Story), D-I10, section 14 item 3.
 - `src/comms/transports/instagram/{publish,store}.py`: kinds `story_image` and `story_video` (`media_type=STORIES`, `image_url` or `video_url`, nothing else); ledger kind `story`.
 - `src/comms/mcp/tools/instagram.py`: the two kinds in `container_create` and `publish_preview`; the catalog pin regenerated.
 - Tests: the Story arguments Meta refuses are refused first; a Story container publishes; migration v11 keeps every v10 row and refuses an unknown kind; the end-to-end sweep and the daemon smoke publish a Story.
+
+- [ ] **Step 1: Failing tests.**
+- [ ] **Step 2:** implement; regenerate the pin; targeted tests.
+- [ ] **Step 3:** full gate; audit entries; commit.
+
+### Task IG-9: Reading Stories (R-IG11, the owner's request)
+
+Spec: revision 4, section 5.1 (`story_list`, `story_insights`), section 7 (Story insights).
+
+**Files:**
+- `src/comms/core/providers/instagram_insights.py`: `STORY_METRICS`, `STORY_BREAKDOWNS`.
+- `src/comms/transports/instagram/{insights,http}.py`: `story_params`; the `stories` edge.
+- `src/comms/runtime/instagram.py`: `story_list` (client-bound cursors, as `media_list`) and `story_insights`.
+- `src/comms/mcp/tools/instagram.py`, the facades, `_BODY` and `_NAMES`, the actor matrix; the catalog pin regenerated.
+- Tests: `tests/runtime/test_instagram_stories.py`; the sweep and the daemon smoke read a Story; the exit test pins 24 tools.
 
 - [ ] **Step 1: Failing tests.**
 - [ ] **Step 2:** implement; regenerate the pin; targeted tests.

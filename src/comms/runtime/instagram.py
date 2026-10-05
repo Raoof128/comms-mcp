@@ -204,6 +204,38 @@ class InstagramService:
         ]
         return {**self._head(runtime, username), "items": items, "next_cursor": token}
 
+    def story_list(self, client: str, args: Mapping[str, Any]) -> dict[str, Any]:
+        """The account's live Stories (``GET /<IG_ID>/stories``; R-IG11, 🧪 GI-3 on this host):
+        ``igm_`` refs like any media, so ``media_get`` reads one. A Story lives 24 hours."""
+        runtime, username = self._read(args.get("account"), C.MEDIA_LIST)
+        limit = str(args.get("limit", _PAGE))
+
+        def call(after: str | None) -> Any:
+            params = {
+                "fields": self._fields(),
+                "limit": limit,
+                **({"after": after} if after else {}),
+            }
+            return runtime.api.get(runtime.user_id, "stories", params=params)
+
+        data, token = self._page(client, "story_list", runtime, args, call)
+        now = self._clock()
+        items = [
+            media_item(self._conn, runtime, raw, now=now) for raw in data if isinstance(raw, dict)
+        ]
+        return {**self._head(runtime, username), "items": items, "next_cursor": token}
+
+    def story_insights(self, args: Mapping[str, Any]) -> dict[str, Any]:
+        """A Story's own metrics (R-IG11), checked before Meta is asked."""
+        runtime, username = self._read(args.get("account"), C.INSIGHTS_READ)
+        ident = self._media_id(runtime, args["media"])
+        try:
+            params = insights.story_params(args.get("metrics") or (), args.get("breakdown"))
+        except ValueError:
+            raise CommsError("INVALID_ARGUMENT") from None
+        body = graph_read(lambda: runtime.api.get(ident, "insights", params=params), insights=True)
+        return {**self._head(runtime, username), "media": args["media"], "metrics": _metrics(body)}
+
     def _media_id(self, runtime: AccountRuntime, media: object) -> str:
         return store.resolve_object(self._conn, media, "media", runtime.account_id)
 

@@ -17,6 +17,8 @@ __all__ = [
     "IMPRESSIONS_BEFORE",
     "MEDIA_GROUPS",
     "MEDIA_METRICS",
+    "STORY_BREAKDOWNS",
+    "STORY_METRICS",
     "TIMEFRAMES",
     "TIME_SERIES",
 ]
@@ -32,6 +34,16 @@ MEDIA_GROUPS: dict[str, frozenset[str]] = {
 }
 MEDIA_METRICS = frozenset().union(*MEDIA_GROUPS.values())
 IMPRESSIONS_BEFORE = datetime(2024, 7, 2, tzinfo=UTC)
+
+# R-IG11: a Story's own metrics ✅ (Instagram Media Insights). Data lives for 24 hours, and under
+# 5 viewers Meta answers code 10 (NOT_ENOUGH_DATA). impressions (media before 2 July 2024) cannot
+# apply to a live Story; facebook_views is never requested (section 7).
+STORY_METRICS = frozenset(
+    {"navigation", "replies", "link_clicks", "reach", "views", "shares", "total_interactions",
+     "follows", "profile_visits", "profile_activity"}
+)  # fmt: skip
+# each breakdown, and the one metric it breaks down
+STORY_BREAKDOWNS = {"story_navigation_action_type": "navigation", "action_type": "profile_activity"}
 
 DEMOGRAPHICS = frozenset({"follower_demographics", "engaged_audience_demographics"})
 ACCOUNT_METRICS = frozenset(

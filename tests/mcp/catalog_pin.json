@@ -1,5 +1,5 @@
 {
-  "count": 152,
+  "count": 154,
   "names": [
     "comms_capability_list",
     "comms_context_get",
@@ -138,6 +138,8 @@
     "comms_instagram_media_get",
     "comms_instagram_media_insights",
     "comms_instagram_account_insights",
+    "comms_instagram_story_list",
+    "comms_instagram_story_insights",
     "comms_instagram_comment_list",
     "comms_instagram_comment_replies",
     "comms_instagram_tag_list",
@@ -292,6 +294,8 @@
     "comms_instagram_media_get": "25c9177788cc3a1c9967ec1a63248d7ebf88dec3aad2f164d7294d4cffea65f0",
     "comms_instagram_media_insights": "08a26c13f2ccead7427a7c7b736cfce3af511db5142dafe4d4aee86f61b5bebc",
     "comms_instagram_account_insights": "2d422c79fb7685be4c963dcf14d087c7be32d0bbbc9ba55e38ce79630afb508c",
+    "comms_instagram_story_list": "6e2848c9619772d3feec6e674e3b833c71cc61fb0d7b0386292829e1d58a0228",
+    "comms_instagram_story_insights": "2b4afef693e63f5203eb852c8cdbf2115ba2481010ed5f2f28b7da0907fc059e",
     "comms_instagram_comment_list": "35b3280c93c220eaeb30fca65ad2b4c7de120b0eb998034cea7bda48d4e4de4b",
     "comms_instagram_comment_replies": "3dd4152c2fe6c62635105401c5f3e253068f20f0533c51f713ca6b59a7426a3e",
     "comms_instagram_tag_list": "477663d0267e48e33840a573b23b134b55dc8deae255136ab8848ae9fa948572",
@@ -308,5 +312,5 @@
     "comms_instagram_comment_delete": "1a4763e9be8e10e89e2ee363cc8871a3649d312c36af02454f26287f2cb0c1b8",
     "comms_instagram_message_send": "3c5c0b272a8b339d7f287f1f4897bffd0cf261ca1b00ce5634a7baaaf03f5e41"
   },
-  "catalog": "1032910948054f2585316d40eca1be973dfe6347ab7b852b590e17393c681df8"
+  "catalog": "ce65f29fdffec3968140994814c0c224e40115b6d4ae47b6f957672bd6e84628"
 }

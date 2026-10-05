@@ -14,7 +14,13 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from comms.core.providers.capability import Capability as C
-from comms.core.providers.instagram_insights import ACCOUNT_METRICS, BREAKDOWNS, MEDIA_METRICS
+from comms.core.providers.instagram_insights import (
+    ACCOUNT_METRICS,
+    BREAKDOWNS,
+    MEDIA_METRICS,
+    STORY_BREAKDOWNS,
+    STORY_METRICS,
+)
 from comms.mcp.schemas import (
     ACTOR,
     BOOL,
@@ -230,6 +236,30 @@ READ_TOOLS: tuple[ToolSpec, ...] = (
         },
         ["metrics"],
         _out({"metrics": array(METRIC, high=8)}),
+        failures=("NOT_ENOUGH_DATA",),
+    ),
+    _read(
+        "story_list",
+        "List live Stories",
+        "The account's Stories from the last 24 hours, newest first, as media refs (media_get "
+        "reads one). Stories leave this list when they expire.",
+        _PAGED,
+        [],
+        _out({"items": array(MEDIA_ITEM, high=25), "next_cursor": nullable(CURSOR)}),
+    ),
+    _read(
+        "story_insights",
+        "Get Story insights",
+        "Insights for one live Story: navigation (taps and swipes), replies, link_clicks, reach, "
+        "views, shares, total_interactions, follows, profile_visits, profile_activity. Under 5 "
+        "viewers: NOT_ENOUGH_DATA. Data ends when the Story expires.",
+        {
+            "media": ref("instagram_media"),
+            "metrics": array(enum(STORY_METRICS), low=1, high=10),
+            "breakdown": enum(tuple(STORY_BREAKDOWNS)),
+        },
+        ["media", "metrics"],
+        _out({"media": ref("instagram_media"), "metrics": array(METRIC, high=10)}),
         failures=("NOT_ENOUGH_DATA",),
     ),
     _read(

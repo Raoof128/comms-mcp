@@ -2203,7 +2203,7 @@ def phase_v03_daemon(ledger: Ledger) -> None:
     )
     ledger.run(
         area,
-        "instagram: all 22 tools succeed over HTTP with schema-valid results against the scripted Graph, a Story included",
+        "instagram: all 24 tools succeed over HTTP with schema-valid results against the scripted Graph, Stories included",
         lambda: verdict("ig_tools_end_to_end"),
     )
     ledger.run(

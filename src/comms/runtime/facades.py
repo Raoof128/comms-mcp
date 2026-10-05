@@ -709,6 +709,8 @@ class _Facades:
             "instagram.media_list": lambda cl, a: self.instagram().media_list(cl.client_ref, a),
             "instagram.media_get": lambda cl, a: self.instagram().media_get(a),
             "instagram.media_insights": lambda cl, a: self.instagram().media_insights(a),
+            "instagram.story_list": lambda cl, a: self.instagram().story_list(cl.client_ref, a),
+            "instagram.story_insights": lambda cl, a: self.instagram().story_insights(a),
             "instagram.account_insights": lambda cl, a: self.instagram().account_insights(a),
             "instagram.comment_list": lambda cl, a: self.instagram().comment_list(cl.client_ref, a),
             "instagram.comment_replies": lambda cl, a: self.instagram().comment_replies(cl.client_ref, a),
