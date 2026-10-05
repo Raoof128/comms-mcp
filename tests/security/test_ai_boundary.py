@@ -144,7 +144,7 @@ def test_whatsvault_providers_are_only_the_protocol_and_the_fake():
 
 def test_the_dormant_dispatcher_is_unreachable_from_the_root():
     assert importlib.util.find_spec("apps") is None
-    scripts = sorted(e.name for e in importlib.metadata.distribution("telegram-mcp").entry_points)
+    scripts = sorted(e.name for e in importlib.metadata.distribution("comms-mcp").entry_points)
     assert scripts == ["comms", "telegram-mcp"]
     for path in (ROOT / "src" / "comms").rglob("*.py"):
         reached = {n for n in _imports(path) if n.startswith("whatsvault")}

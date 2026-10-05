@@ -1,5 +1,9 @@
 # comms: a Telegram and WhatsApp MCP gateway for one owner
 
+> **Repository and package: `comms-mcp`** (renamed from `telegram-mcp` on 2026-10-05). The
+> legacy `telegram-mcp` command, the Keychain service, the runtime paths and the logger names keep
+> their old names on purpose: they are frozen identifiers on the owner's machine.
+
 comms lets an AI assistant (Claude Code, Codex, ChatGPT) read and act on one person's Telegram
 and WhatsApp through a single MCP server, with every write audited. It runs on the owner's Mac.
 

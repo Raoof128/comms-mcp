@@ -102,6 +102,11 @@ request or frame (32 KiB raw per chunk, slice or inline file). Exit: `tests/secu
 - **The tools.** 24 `comms_instagram_*` tools (16 reads, 8 writes; 154 in the catalog; Story reads R-IG11). Every id is a ref (`igk_`, `igm_`, `igc_`, `igp_`); captions, comments and DMs only in `untrusted_text`. Publishing (posts, Reels, carousels and Stories) is three single-effect CREATEs on the `igk_` ledger (the 400-a-day budget); four tools carry `requires_user_interaction`.
 - **Evidence:** rulings R-IG1 to R-IG11 in `docs/verification/comms-v0.3-rulings.md`; live gates GI-1 to GI-8 in `docs/runbooks/live-acceptance-instagram.md` (owner-run).
 - **Exit test:** `tests/security/test_instagram_exit.py`.
+**Renamed to `comms-mcp`** (2026-10-05): the GitHub repository and the Python distribution
+(`pyproject.toml`, `uv.lock`). Everything frozen keeps its name: the `telegram-mcp` console script,
+the Keychain service, `/private/var/run/telegram-mcp`, logger names and every wire. The public
+pages moved to `https://raoof128.github.io/comms-mcp/`, so W-Vault's Privacy Policy and data
+deletion URLs in the Meta app settings must point there.
 **Live** (under the owner's user; see Host state): the relay was deployed on 2026-09-27 and a
 Meta test webhook went through it to the archive; the Telegram bot and user account have been
 logged in since 2026-09-28 and were driven live (rulings R-TG1 to R-TG4). Next: D39-B, the owner-run live acceptance records.
