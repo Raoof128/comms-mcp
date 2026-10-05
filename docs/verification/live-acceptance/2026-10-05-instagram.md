@@ -73,3 +73,21 @@ it; `comment_delete` removed it and `comment_replies` then read empty.
 - GI-8 `conversation_messages` and one `message_send` to a person who wrote within 24 hours.
 - `story_insights` once the Story has five viewers.
 - Ruling R-IG0 (adopt A49), plus rulings on the two findings.
+
+## Addendum, 19:00 to 19:22: a second account and the clients
+
+| Field | Value |
+|---|---|
+| Account | @mqpersiansociety, `MEDIA_CREATOR`, 549 followers, 45 posts |
+| Alias and policy | `mqps`, `writes: true`, `dms: false` |
+| Account ref | `iga_akybk67tcni7nkohuiic7jj664`; token expires 2026-12-04T08:20:02Z |
+
+| Check | Result |
+|---|---|
+| Doctor | `OK` for `main` and `mqps` |
+| Reads | whoami, profile, quota (100), account insights (7-day reach 323, views 5,496, engaged 95), media list, Story list, comment list, conversation list (10) all answer |
+| Isolation | an `mqps` `igm_` read under `main` answers `NOT_FOUND` |
+| Writes enabled | `publish_preview` answers `writes_allowed: true`, `refusal: null`; nothing was published |
+| Clients | Claude Code user scope (Connected); Codex client `cli_adgyxqose5ba5etojwxamnwjtf` (a read answered) |
+
+GI-6 and GI-7 can now run in Claude Code and Codex once each is restarted.

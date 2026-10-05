@@ -1477,3 +1477,26 @@ Follow the user's engineering lifecycle: design/security analysis, implementatio
 - **Files changed:** `docs/verification/live-acceptance/2026-10-05-instagram.md` (new), `AGENT.md`, `CHANGELOG.md`. Earlier, on `main`: `site/test/` added and removed.
 - **Verification:** a scripted MCP stdio client against the running daemon (154 tools, 24 Instagram); every result was read back through comms. The live caption was checked against the permalink's `og:description`. Documentation only, so the full gate was not run.
 - **Follow-ups (owner):** token refreshes on 2026-10-06 after 16:04 and a day later (GI-1, GI-2); GI-4 with captions on; GI-6 and GI-7 in Claude Code and Desktop; GI-8 messages and one DM reply; `story_insights` once five people have viewed the Story; rulings on the two findings, then R-IG0.
+
+
+### 2026-10-05 (Australia/Sydney), clients registered, a second Instagram account, the comms-mcp skill
+**Raouf:**
+- **Scope:** The owner asked for comms to be registered in Claude Code and Codex, for the society's Instagram account to be added with writes on, and for a skill covering the whole tool surface.
+- **Summary:**
+  - **Clients:**
+    - **Claude Code:** comms is a user-scope MCP server in `~/.claude.json`, using the existing `claude-code.seed`; `claude mcp get comms` reports Connected. The repo's 61 `permissions.ask` rules are merged into `~/.claude/settings.json`, so every consequential write prompts (R-A20).
+    - **Codex:** `comms client add --name codex` made `cli_adgyxqose5ba5etojwxamnwjtf` with `~/.config/comms/codex.seed` (0600), and `[mcp_servers.comms]` was added to `~/.codex/config.toml`. A read through the Codex seed answered.
+    - **Proxy flags:** both entries pass `--daemon http://127.0.0.1:8866 --runtime-dir ~/Library/Application Support/comms/run`. Each config was backed up as `*.bak-comms-20261005` first.
+  - **Second account:**
+    - `comms.json` gains `instagram.accounts.mqps` (label `mqpersiansociety`, `writes` true, `dms` false). @mqpersiansociety is an Instagram Tester on W-Vault-IG.
+    - Its token was added at the hidden prompt and proved by `GET /me`: `iga_akybk67tcni7nkohuiic7jj664`, expires 2026-12-04.
+    - Reads verified live: whoami, profile, quota, account insights, media and Story lists, comments and conversations. An `igm_` from `mqps` read under `main` answers `NOT_FOUND`, so refs stay isolated per account.
+    - `publish_preview` answers `writes_allowed: true`.
+  - **Skill:** `~/.claude/skills/comms-mcp/` (linked into `~/.codex/skills/`). Contents:
+    - `SKILL.md`: health, refs, `request_id`, outcomes, safety rules and error codes.
+    - References: `tools.md`, all 154 tools generated from the live catalog; `messaging.md`; `instagram.md`.
+    - Scripts: `health.sh`, `call.py` with `--redact`, `dump_catalog.py`.
+    - Validated with skill-creator. A fresh agent used it to answer a read-only question correctly; its six gaps were fixed.
+- **Files changed:** `AGENT.md`, `CHANGELOG.md`, `docs/verification/live-acceptance/2026-10-05-instagram.md` (addendum). Outside the repo: `comms.json`, the two client configs, `~/.claude/settings.json`, the skill.
+- **Verification:** `comms transport instagram doctor` reports OK for both aliases, and `comms doctor` reports `ok: true`. Every Instagram read above went through the stdio proxy. Documentation only, so the full gate was not run.
+- **Follow-ups (owner):** restart Claude Code and Codex to load comms, then run GI-6 and GI-7 there. Nothing restarts the daemon after a reboot (`scripts/health.sh --start` in the skill). The token refreshes and the GI-8 DM work stand as before.
