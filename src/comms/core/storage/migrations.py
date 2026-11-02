@@ -701,6 +701,51 @@ CREATE TRIGGER instagram_containers_binding_immutable BEFORE UPDATE OF ref, acco
 """
 SCHEMA_V11: tuple[str, ...] = _statements(_SCHEMA_V11_SQL)
 
+# Proposed A50 (Pinterest, section 4.1): four tables of its own, so no existing table, trigger or
+# CHECK changes. An account row binds a ref to its alias and Pinterest user id (one live row per
+# alias and per user id; the binding never changes; a removed account keeps its row). An object
+# row is one opaque ref per (account, kind, provider identity): a board or a Pin. A media row is
+# one video upload comms made (its media id and the status last seen). A publication row is one
+# Pin comms created: the daily budget's ledger.
+_SCHEMA_V12_SQL = """
+CREATE TABLE pinterest_accounts (id INTEGER PRIMARY KEY,
+  ref TEXT NOT NULL UNIQUE CHECK (length(ref) = 30 AND substr(ref, 1, 4) = 'pna_'),
+  alias TEXT NOT NULL CHECK (length(alias) BETWEEN 1 AND 32 AND alias NOT GLOB '*[^a-z0-9_-]*'),
+  user_id TEXT NOT NULL CHECK (length(user_id) BETWEEN 1 AND 24 AND user_id NOT GLOB '*[^0-9]*'),
+  obtained_at TEXT NOT NULL, access_expires_at TEXT NOT NULL, refresh_expires_at TEXT NOT NULL,
+  last_identity_check_at TEXT, created_at TEXT NOT NULL, removed_at TEXT);
+CREATE UNIQUE INDEX pinterest_accounts_live_alias ON pinterest_accounts (alias) WHERE removed_at IS NULL;
+CREATE UNIQUE INDEX pinterest_accounts_live_user ON pinterest_accounts (user_id) WHERE removed_at IS NULL;
+CREATE TRIGGER pinterest_accounts_binding_immutable BEFORE UPDATE OF ref, alias, user_id, created_at
+  ON pinterest_accounts BEGIN SELECT RAISE(ABORT, 'pinterest account binding is immutable'); END;
+CREATE TRIGGER pinterest_accounts_removal_final BEFORE UPDATE OF removed_at ON pinterest_accounts
+  WHEN OLD.removed_at IS NOT NULL BEGIN SELECT RAISE(ABORT, 'a removed account stays removed'); END;
+CREATE TABLE pinterest_objects (id INTEGER PRIMARY KEY,
+  ref TEXT NOT NULL UNIQUE CHECK (length(ref) = 30 AND substr(ref, 1, 4) IN ('pnb_', 'pnp_')),
+  account_id INTEGER NOT NULL REFERENCES pinterest_accounts(id) ON DELETE RESTRICT,
+  kind TEXT NOT NULL CHECK (kind IN ('board', 'pin')),
+  provider_identity TEXT NOT NULL CHECK (length(provider_identity) BETWEEN 1 AND 64),
+  created_at TEXT NOT NULL, last_seen_at TEXT NOT NULL,
+  UNIQUE (account_id, kind, provider_identity));
+CREATE TRIGGER pinterest_objects_binding_immutable BEFORE UPDATE OF ref, account_id, kind, provider_identity, created_at
+  ON pinterest_objects BEGIN SELECT RAISE(ABORT, 'pinterest object binding is immutable'); END;
+CREATE TABLE pinterest_media (id INTEGER PRIMARY KEY,
+  ref TEXT NOT NULL UNIQUE CHECK (length(ref) = 30 AND substr(ref, 1, 4) = 'pnv_'),
+  account_id INTEGER NOT NULL REFERENCES pinterest_accounts(id) ON DELETE RESTRICT,
+  media_id TEXT NOT NULL CHECK (length(media_id) BETWEEN 1 AND 24 AND media_id NOT GLOB '*[^0-9]*'),
+  created_at TEXT NOT NULL,
+  status TEXT CHECK (status IS NULL OR status IN ('registered', 'processing', 'succeeded', 'failed')),
+  UNIQUE (account_id, media_id));
+CREATE TRIGGER pinterest_media_binding_immutable BEFORE UPDATE OF ref, account_id, media_id, created_at
+  ON pinterest_media BEGIN SELECT RAISE(ABORT, 'pinterest media binding is immutable'); END;
+CREATE TABLE pinterest_publications (id INTEGER PRIMARY KEY,
+  account_id INTEGER NOT NULL REFERENCES pinterest_accounts(id) ON DELETE RESTRICT,
+  object_id INTEGER NOT NULL UNIQUE REFERENCES pinterest_objects(id) ON DELETE RESTRICT,
+  created_at TEXT NOT NULL);
+CREATE INDEX pinterest_publications_recent ON pinterest_publications (account_id, created_at);
+"""
+SCHEMA_V12: tuple[str, ...] = _statements(_SCHEMA_V12_SQL)
+
 MIGRATIONS: tuple[Migration, ...] = (
     Migration(1, SCHEMA_V1),
     Migration(2, SCHEMA_V2),
@@ -713,6 +758,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(9, SCHEMA_V9),
     Migration(10, SCHEMA_V10),  # proposed A49
     Migration(11, SCHEMA_V11, rebuild=True),  # proposed A49, R-IG10: a Story in the ledger
+    Migration(12, SCHEMA_V12),  # proposed A50: the Pinterest tables
 )
 
 

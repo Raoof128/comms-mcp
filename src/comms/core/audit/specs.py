@@ -40,7 +40,14 @@ RETENTION_PHASES = (
     "public_keys",
     "secrets",
 )
-_ACTORS = {"telegram_bot", "telegram_user", "whatsapp_cloud", "whatsapp_webhooks", "instagram"}
+_ACTORS = {
+    "telegram_bot",
+    "telegram_user",
+    "whatsapp_cloud",
+    "whatsapp_webhooks",
+    "instagram",
+    "pinterest",  # proposed A50
+}
 
 
 def _credential(value: Any) -> bool:
@@ -142,6 +149,11 @@ AUDIT_EVENT_SPECS: dict[str, Mapping[str, Validator]] = {
     "admin.instagram_account": {
         "action": one_of({"added", "removed", "token_refreshed", "identity_mismatch"}),
     },
+    # Proposed A50: a Pinterest account joins or leaves comms (operator only); the subject is
+    # its pna_ ref, never the alias, the user id or a token.
+    "admin.pinterest_account": {
+        "action": one_of({"added", "removed", "token_refreshed", "identity_mismatch"}),
+    },
 }
 # The ref kind each event's subject must carry (None: the event has no subject).
 SUBJECT_KINDS: dict[str, str | None] = {
@@ -165,6 +177,7 @@ SUBJECT_KINDS: dict[str, str | None] = {
     "admin.mutation_step": "operation",
     "admin.mutation_finished": "operation",
     "admin.instagram_account": "instagram_account",
+    "admin.pinterest_account": "pinterest_account",  # proposed A50
 }
 
 

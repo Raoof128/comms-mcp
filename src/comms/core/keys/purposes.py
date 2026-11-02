@@ -17,10 +17,14 @@ from typing import Literal
 __all__ = [
     "INSTAGRAM_ALIAS",
     "INSTAGRAM_TOKEN",
+    "PINTEREST_ACCESS_TOKEN",
+    "PINTEREST_APP_SECRET",
+    "PINTEREST_REFRESH_TOKEN",
     "PURPOSES",
     "KeyPurpose",
     "instagram_alias",
     "instagram_token_purpose",
+    "pinterest_token_purposes",
     "purpose_of",
 ]
 
@@ -78,6 +82,7 @@ PURPOSES: Mapping[str, KeyPurpose] = MappingProxyType(
             _p("consent-transport-key", "p256", "refused", True, "owner_runbook"),
             _p("relay-age-key", "x25519", "new_id", False, "at_rotation"),  # A48
             _p("relay-pull-key", "hmac", "new_id", False, "at_rotation"),  # A48
+            _p("pinterest-app-secret", "opaque", "staged", False, "at_rotation"),  # A50
         )
     )
 )
@@ -108,13 +113,30 @@ def instagram_token_purpose(alias: str) -> str:
     return INSTAGRAM_TOKEN + alias
 
 
+# Proposed A50 (Pinterest, D-P4): two staged tokens per account under the same alias grammar
+# (one copy), beside the static app secret.
+PINTEREST_APP_SECRET = "pinterest-app-secret"
+PINTEREST_ACCESS_TOKEN = "pinterest-access-token."
+PINTEREST_REFRESH_TOKEN = "pinterest-refresh-token."
+_ALIAS_PREFIXES = (INSTAGRAM_TOKEN, PINTEREST_ACCESS_TOKEN, PINTEREST_REFRESH_TOKEN)
+
+
+def pinterest_token_purposes(alias: str) -> tuple[str, str]:
+    """``(access token purpose, refresh token purpose)`` for a Pinterest account alias."""
+    if instagram_alias(alias) is None:
+        raise ValueError("unexpected pinterest alias")
+    return PINTEREST_ACCESS_TOKEN + alias, PINTEREST_REFRESH_TOKEN + alias
+
+
 def purpose_of(name: object) -> KeyPurpose | None:
-    """The purpose named ``name``: a static one, or an Instagram account's token; else None."""
+    """The purpose named ``name``: a static one, or an account token (Instagram's, or one of a
+    Pinterest account's two, A50); else None."""
     if not isinstance(name, str):
         return None
     static = PURPOSES.get(name)
     if static is not None:
         return static
-    if name.startswith(INSTAGRAM_TOKEN) and instagram_alias(name[len(INSTAGRAM_TOKEN) :]):
-        return KeyPurpose(name, "opaque", "staged", False, "at_rotation")
+    for prefix in _ALIAS_PREFIXES:
+        if name.startswith(prefix) and instagram_alias(name[len(prefix) :]):
+            return KeyPurpose(name, "opaque", "staged", False, "at_rotation")
     return None

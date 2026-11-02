@@ -49,6 +49,7 @@ ADDED_IN_V03 = Counter(  # comms/core/domains.py, comms v0.3 Part A
         "b'comms-directory-identity/v1\\x00'": 1,  # catalog amendment G3: keyed contact binding
         "b'comms-relay-pull/v1\\x00'": 1,  # A48: the relay's pull signature
         "b'comms-instagram-preview/v1\\x00'": 1,  # proposed A49: the advisory preview digest
+        "b'comms-pinterest-preview/v1\\x00'": 1,  # proposed A50: the same, for a Pin
     }
 )
 

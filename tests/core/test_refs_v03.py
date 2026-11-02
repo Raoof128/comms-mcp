@@ -31,7 +31,7 @@ def test_v03_prefixes_disjoint_from_telegram_whatsvault_and_5b4():
     from comms.transports.telegram.authority.refs import REF_PREFIXES
 
     values = list(refs.CORE_PREFIXES.values())
-    assert len(values) == len(set(values)) == 32
+    assert len(values) == len(set(values)) == 36  # 32 + proposed A50's four
     others = set(REF_PREFIXES) | {"tgu_"} | {p + "_" for p in PREFIXES}
     assert not set(values) & others
 

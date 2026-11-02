@@ -39,6 +39,13 @@ Allowing the Instagram reads by name also auto-approves reading comments and DMs
 people's data: decide that per project. Set `instagram.default` in `comms.json` to the account a
 project reads by default; a write always names its `account`.
 
+**Pinterest (proposed A50).** Its five writes are in the ask list. Three of them
+(`comms_pinterest_pin_create`, `board_create`, `pin_delete`) also carry
+`requires_user_interaction`: a Pin and a board are public the moment they exist, and a delete
+cannot be undone. Set `pinterest.default` in `comms.json` to the account a project reads by
+default; a write always names its `account`. Under Pinterest's Trial access an API-created Pin
+is visible only to its creator, so a project can rehearse publishing before Standard access.
+
 Restart Claude Code; `/mcp` shows `comms` connected with its tools. The seed file stays 0600 and
 never enters a repository.
 

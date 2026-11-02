@@ -2004,6 +2004,18 @@ INSTAGRAM_CHECKS = (
     "ig_audit_verifies",
     "ig_account_remove",
 )
+# proposed A50: the Pinterest checks on the real daemon (scripts/smoke_daemon.py drive_pinterest)
+PINTEREST_CHECKS = (
+    "pn_unconfigured_before_add",
+    "pn_account_add_hidden_prompt",
+    "pn_account_list",
+    "pn_tools_end_to_end",
+    "pn_replay_no_second_pin",
+    "pn_doctors",
+    "pn_token_refresh",
+    "pn_audit_verifies",
+    "pn_account_remove",
+)
 
 
 def phase_v03_daemon(ledger: Ledger) -> None:
@@ -2034,6 +2046,12 @@ def phase_v03_daemon(ledger: Ledger) -> None:
                 except AssertionError as failed:
                     reason = str(failed)[:200]
                     results.update(dict.fromkeys(INSTAGRAM_CHECKS, reason))
+            with tempfile.TemporaryDirectory(dir="/tmp", prefix="sd") as short:
+                try:  # proposed A50: a failure here fails its own checks, never the others
+                    results.update(smoke_daemon.drive_pinterest(Path(short)))
+                except AssertionError as failed:
+                    reason = str(failed)[:200]
+                    results.update(dict.fromkeys(PINTEREST_CHECKS, reason))
         return results
 
     def verdict(key: str) -> Any:
@@ -2230,6 +2248,52 @@ def phase_v03_daemon(ledger: Ledger) -> None:
         area,
         "instagram: account remove revokes the token and the tools answer NOT_CONFIGURED again",
         lambda: verdict("ig_account_remove"),
+    )
+    # proposed A50: the Pinterest checks
+    ledger.run(
+        area,
+        "pinterest: before an account is added, every Pinterest tool answers NOT_CONFIGURED",
+        lambda: verdict("pn_unconfigured_before_add"),
+    )
+    ledger.run(
+        area,
+        "pinterest: the app secret and the OAuth code are read at a hidden prompt on a real terminal, exchanged, proved, and nothing secret is echoed",
+        lambda: verdict("pn_account_add_hidden_prompt"),
+    )
+    ledger.run(
+        area,
+        "pinterest: account list shows the account registered and configured",
+        lambda: verdict("pn_account_list"),
+    )
+    ledger.run(
+        area,
+        "pinterest: all 18 tools succeed over HTTP with schema-valid results against the scripted hosts, a video Pin included",
+        lambda: verdict("pn_tools_end_to_end"),
+    )
+    ledger.run(
+        area,
+        "pinterest: a replayed pin_create answers its record, makes no second Pin, and the budget ledger counts each Pin once",
+        lambda: verdict("pn_replay_no_second_pin"),
+    )
+    ledger.run(
+        area,
+        "pinterest: both doctors report the account healthy",
+        lambda: verdict("pn_doctors"),
+    )
+    ledger.run(
+        area,
+        "pinterest: token refresh rotates the tokens and the account keeps working",
+        lambda: verdict("pn_token_refresh"),
+    )
+    ledger.run(
+        area,
+        "pinterest: the audit chain verifies after every Pinterest write",
+        lambda: verdict("pn_audit_verifies"),
+    )
+    ledger.run(
+        area,
+        "pinterest: account remove revokes both tokens and the tools answer NOT_CONFIGURED again",
+        lambda: verdict("pn_account_remove"),
     )
 
 

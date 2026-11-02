@@ -44,6 +44,7 @@ class OperatorContext:
     providers: Mapping[str, str] | None = None  # the account ids a backup is bound to
     retention_days: Mapping[str, int] | None = None  # campaign_body_days, identity_retention_days
     instagram: Any = None  # proposed A49: the InstagramOperator (account add, refresh, doctor)
+    pinterest: Any = None  # proposed A50: the PinterestOperator (auth-url, account add, refresh)
 
     @property
     def conn(self) -> Any:

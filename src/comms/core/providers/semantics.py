@@ -26,7 +26,15 @@ from typing import Any, Literal
 
 from comms.core.providers.capability import Capability as C
 
-__all__ = ["INSTAGRAM", "READS", "SEMANTICS", "SUPPORT", "OperationSemantics", "is_write"]
+__all__ = [
+    "INSTAGRAM",
+    "PINTEREST",
+    "READS",
+    "SEMANTICS",
+    "SUPPORT",
+    "OperationSemantics",
+    "is_write",
+]
 
 RetryClass = Literal["SET_STATE", "CREATE", "DESTRUCTIVE_NONIDEMPOTENT", "MESSAGE_SEND", "READ"]
 
@@ -42,6 +50,7 @@ class OperationSemantics:
 
 BOT, USER, CLOUD, HOOKS = "telegram_bot", "telegram_user", "whatsapp_cloud", "whatsapp_webhooks"
 INSTAGRAM = "instagram"  # proposed A49
+PINTEREST = "pinterest"  # proposed A50
 
 # Capabilities that change nothing at the provider (inbound webhook deliveries included).
 READS = frozenset(
@@ -75,6 +84,12 @@ READS = frozenset(
         C.COMMENT_LIST,
         C.TAG_LIST,
         C.PUBLISHING_QUOTA_READ,
+        # proposed A50: the pinterest actor's reads
+        C.BOARD_LIST,
+        C.BOARD_GET,
+        C.PIN_LIST,
+        C.PIN_GET,
+        C.MEDIA_STATUS_READ,
     }
 )
 
@@ -120,15 +135,26 @@ _INSTAGRAM_CAPS = (
     *(C.COMMENT_REPLY, C.COMMENT_HIDE, C.COMMENT_DELETE, C.MEDIA_COMMENTS_TOGGLE),
 )
 
+# Proposed A50 (section 5.3): what only the pinterest actor offers.
+_PINTEREST_CAPS = (
+    *(C.BOARD_LIST, C.BOARD_GET, C.BOARD_CREATE),
+    *(C.PIN_LIST, C.PIN_GET, C.PIN_CREATE, C.PIN_UPDATE, C.PIN_DELETE),
+    C.MEDIA_STATUS_READ,
+)
+
 SUPPORT: Mapping[C, tuple[str, ...]] = MappingProxyType(
     {
         **{c: (USER,) if c in _USER_ONLY else _TELEGRAM for c in _TELEGRAM_CAPS},
         **{
             c: (CLOUD,)
             for c in C
-            if c not in _TELEGRAM_CAPS and c not in _HOOK_CAPS and c not in _INSTAGRAM_CAPS
+            if c not in _TELEGRAM_CAPS
+            and c not in _HOOK_CAPS
+            and c not in _INSTAGRAM_CAPS
+            and c not in _PINTEREST_CAPS
         },
         **dict.fromkeys(_INSTAGRAM_CAPS, (INSTAGRAM,)),
+        **dict.fromkeys(_PINTEREST_CAPS, (PINTEREST,)),
         **dict.fromkeys(_HOOK_CAPS, (HOOKS,)),
         # G6: every actor resets a group's primary invite link (Telegram: a new primary link
         # revokes the old; WhatsApp: the one link is reset)
@@ -144,10 +170,15 @@ SUPPORT: Mapping[C, tuple[str, ...]] = MappingProxyType(
         # the bot has no read state outside a business connection
         C.MESSAGE_MARK_READ: (USER, CLOUD),
         C.MESSAGE_SEND_MEDIA: (*_TELEGRAM, CLOUD),  # A47 (H4)
-        C.MEDIA_UPLOAD: (USER, CLOUD),  # A47 (H5): messages.uploadMedia to the account itself
+        # A47 (H5): messages.uploadMedia to the account itself; A50: a Pinterest video upload
+        C.MEDIA_UPLOAD: (USER, CLOUD, PINTEREST),
         # proposed A49: an Instagram DM thread is read, and answered inside the 24-hour window
         C.HISTORY_READ: (USER, INSTAGRAM),
         C.MESSAGE_REPLY: (CLOUD, INSTAGRAM),
+        # proposed A50: the profile, the analytics and the publishing budget on both actors
+        C.PROFILE_READ: (INSTAGRAM, PINTEREST),
+        C.INSIGHTS_READ: (INSTAGRAM, PINTEREST),
+        C.PUBLISHING_QUOTA_READ: (INSTAGRAM, PINTEREST),
     }
 )
 
@@ -198,6 +229,9 @@ _CREATES = frozenset(
         C.MEDIA_CAROUSEL_CREATE,
         C.MEDIA_PUBLISH,
         C.COMMENT_REPLY,
+        # proposed A50: a board and a Pin are new objects; Pinterest has no idempotency key
+        C.BOARD_CREATE,
+        C.PIN_CREATE,
     }
 )
 _DESTROYS = frozenset(
@@ -209,6 +243,7 @@ _DESTROYS = frozenset(
         C.MEDIA_DELETE,
         C.TEMPLATE_DELETE,
         C.COMMENT_DELETE,  # proposed A49
+        C.PIN_DELETE,  # proposed A50
     }
 )
 

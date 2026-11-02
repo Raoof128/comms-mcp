@@ -43,6 +43,35 @@ _BODY = frozenset(
         "comms_instagram_tag_list",  # proposed A49: captions, comments, DMs
         "comms_instagram_conversation_messages",  # proposed A49: captions, comments, DMs
         "comms_instagram_publish_preview",  # proposed A49: captions, comments, DMs
+        # proposed A50: board descriptions and Pin descriptions
+        "comms_pinterest_board_list",
+        "comms_pinterest_board_get",
+        "comms_pinterest_board_pins",
+        "comms_pinterest_pin_list",
+        "comms_pinterest_pin_get",
+        "comms_pinterest_pin_preview",
+    }
+)
+_PINTEREST_NAMES = frozenset(
+    {  # proposed A50: every Pinterest tool echoes the account's username; boards their names
+        "comms_pinterest_account_list",
+        "comms_pinterest_whoami",
+        "comms_pinterest_profile_get",
+        "comms_pinterest_board_list",
+        "comms_pinterest_board_get",
+        "comms_pinterest_board_pins",
+        "comms_pinterest_pin_list",
+        "comms_pinterest_pin_get",
+        "comms_pinterest_pin_analytics",
+        "comms_pinterest_account_analytics",
+        "comms_pinterest_media_status",
+        "comms_pinterest_publish_quota",
+        "comms_pinterest_pin_preview",
+        "comms_pinterest_board_create",
+        "comms_pinterest_video_upload",
+        "comms_pinterest_pin_create",
+        "comms_pinterest_pin_update",
+        "comms_pinterest_pin_delete",
     }
 )
 _NAMES = frozenset(
@@ -85,6 +114,7 @@ _NAMES = frozenset(
         "comms_instagram_comments_enabled_set",  # proposed A49: the account's username
         "comms_instagram_comment_delete",  # proposed A49: the account's username
         "comms_instagram_message_send",  # proposed A49: the account's username
+        *_PINTEREST_NAMES,
     }
 )
 _IDENTITY = frozenset({"comms_admin_identity_inspect"})

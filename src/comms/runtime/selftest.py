@@ -55,7 +55,7 @@ from comms.core.providers.protocols import (
     ProviderTarget,
     SemanticOperation,
 )
-from comms.runtime.adapters import Adapters, instagram_adapters
+from comms.runtime.adapters import Adapters, instagram_adapters, pinterest_adapters
 from comms.runtime.relay import Collector
 from comms.runtime.selftest_relay import LoopbackRelay
 from comms.runtime.settings import DaemonSettings
@@ -339,6 +339,115 @@ def _instagram_transport() -> Any:
     return httpx.MockTransport(_INSTAGRAM_GRAPH.handle)
 
 
+SELFTEST_PN_USER = "900000000000000099"  # proposed A50: the scripted account's user id
+_PN_BOARD, _PN_PIN = "549755800000099", "1100000000000000099"
+_PN_UPLOAD_HOST = "https://pinterest-media-upload.s3-accelerate.amazonaws.com/"
+
+
+class _PinterestHosts:
+    """A scripted api.pinterest.com (and its sandbox twin) plus the S3 upload host (proposed
+    A50), one per daemon process. Every answer has Pinterest's documented shape; anything else
+    is 404. The token exchange answers documented-shape tokens; the video upload answers 204."""
+
+    def __init__(self) -> None:
+        self._ids = itertools.count(int(time.time() * 1000))
+        self.pins = {_PN_PIN}
+        self.boards = {_PN_BOARD}
+        self.media: dict[str, str] = {}  # media_id -> status
+
+    def _board(self, board: str) -> dict[str, Any]:
+        return {"id": board, "name": "Selftest board", "description": "selftest", "privacy": "PUBLIC",
+                "pin_count": len(self.pins), "follower_count": 1, "collaborator_count": 0,
+                "created_at": "2026-10-01T10:00:00", "owner": {"username": "selftest.pinner"}}  # fmt: skip
+
+    def _pin(self, pin: str) -> dict[str, Any]:
+        return {"id": pin, "board_id": _PN_BOARD, "created_at": "2026-10-01T10:00:00",
+                "creative_type": "REGULAR", "media": {"media_type": "image"}, "is_owner": True,
+                "has_been_promoted": False, "title": "Selftest Pin", "description": "selftest",
+                "link": "https://example.com/rug", "alt_text": "a rug",
+                "board_owner": {"username": "selftest.pinner"},
+                "pin_metrics": {"90d": {"impression": 2}, "lifetime_metrics": {"save": 1}}}  # fmt: skip
+
+    def handle(self, request: Any) -> Any:
+        import httpx
+
+        method, path = request.method, request.url.path
+        if request.url.host.endswith("amazonaws.com"):  # the one upload: no bearer, 204
+            if "authorization" in request.headers:
+                return httpx.Response(403, text="forbidden")
+            return httpx.Response(204)
+        parts = path.strip("/").split("/")
+        if parts[:1] != ["v5"]:
+            return httpx.Response(404, json={"code": 2, "message": "selftest"})
+        tail = parts[1:]
+        headers = {"x-ratelimit-limit": "1000", "x-ratelimit-remaining": "999",
+                   "x-ratelimit-reset": "1"}  # fmt: skip
+        if method == "POST" and tail == ["oauth", "token"]:
+            auth = request.headers.get("authorization", "")
+            if not auth.startswith("Basic "):
+                return httpx.Response(401, json={"code": 2, "message": "selftest"})
+            body: Any = {"access_token": "pina_selftest_ACCESS" + "0" * 32,
+                         "refresh_token": "pinr_selftest_REFRESH" + "0" * 32,
+                         "response_type": "authorization_code", "token_type": "bearer",
+                         "expires_in": 2592000, "refresh_token_expires_in": 5184000,
+                         "scope": "boards:read boards:write pins:read pins:write user_accounts:read"}  # fmt: skip
+        elif method == "GET" and tail == ["user_account"]:
+            body = {"id": SELFTEST_PN_USER, "username": "selftest.pinner", "account_type": "BUSINESS",
+                    "board_count": len(self.boards), "pin_count": len(self.pins),
+                    "follower_count": 3, "following_count": 1, "monthly_views": 12,
+                    "business_name": "Selftest", "website_url": "https://example.com"}  # fmt: skip
+        elif method == "GET" and tail == ["user_account", "analytics"]:
+            body = {"ALL": {"summary_metrics": {"IMPRESSION": 5, "SAVE_RATE": 0.1},
+                            "daily_metrics": [{"date": "2026-10-01", "data_status": "READY",
+                                               "metrics": {"IMPRESSION": 5}}]}}  # fmt: skip
+        elif method == "GET" and tail == ["boards"]:
+            body = {"items": [self._board(b) for b in sorted(self.boards)], "bookmark": None}
+        elif method == "POST" and tail == ["boards"]:
+            made = str(next(self._ids))
+            self.boards.add(made)
+            body = self._board(made)
+        elif method == "GET" and len(tail) == 2 and tail[0] == "boards" and tail[1] in self.boards:
+            body = self._board(tail[1])
+        elif method == "GET" and (
+            tail == ["pins"] or (len(tail) == 3 and tail[0] == "boards" and tail[2] == "pins")
+        ):
+            body = {"items": [self._pin(p) for p in sorted(self.pins)], "bookmark": None}
+        elif method == "POST" and tail == ["pins"]:
+            made = str(next(self._ids))
+            self.pins.add(made)
+            body = self._pin(made)
+        elif len(tail) == 2 and tail[0] == "pins" and tail[1] in self.pins:
+            if method == "DELETE":
+                self.pins.discard(tail[1])
+            body = self._pin(tail[1])
+        elif method == "GET" and len(tail) == 3 and tail[0] == "pins" and tail[2] == "analytics":
+            body = {"ALL": {"summary_metrics": {"IMPRESSION": 7, "SAVE": 1}, "daily_metrics": [],
+                            "lifetime_metrics": {"TOTAL_COMMENTS": 0}}}  # fmt: skip
+        elif method == "POST" and tail == ["media"]:
+            made = str(next(self._ids))
+            self.media[made] = "succeeded"  # processed at once, so a video Pin follows
+            body = {"media_id": made, "media_type": "video", "upload_url": _PN_UPLOAD_HOST,
+                    "upload_parameters": {"key": f"uploads/{made}", "policy": "cG9saWN5",
+                                          "x-amz-signature": "0" * 64, "Content-Type": "multipart/form-data"}}  # fmt: skip
+        elif method == "GET" and len(tail) == 2 and tail[0] == "media" and tail[1] in self.media:
+            body = {"media_id": tail[1], "media_type": "video", "status": self.media[tail[1]]}
+        else:
+            return httpx.Response(404, json={"code": 2, "message": "selftest"})
+        return httpx.Response(200, json=body, headers=headers)
+
+
+_PINTEREST_HOSTS: _PinterestHosts | None = None
+
+
+def _pinterest_transport() -> Any:
+    import httpx
+
+    global _PINTEREST_HOSTS
+    if _PINTEREST_HOSTS is None:
+        _PINTEREST_HOSTS = _PinterestHosts()
+    return httpx.MockTransport(_PINTEREST_HOSTS.handle)
+
+
 class _OneSecret:
     def get(self, item: str, version: int) -> bytes:
         return _SELFTEST_BOT.encode()
@@ -403,5 +512,10 @@ def selftest_adapters(state: CommsState, settings: DaemonSettings) -> Adapters:
         instagram_adapters(
             adapters, state.conn, state.secrets, settings.adapter.instagram, clock,
             transport=_instagram_transport(),
+        )  # fmt: skip
+    if settings.adapter.pinterest is not None:  # proposed A50: the real adapters, scripted hosts
+        pinterest_adapters(
+            adapters, state.conn, state.secrets, settings.adapter.pinterest, clock,
+            transport=_pinterest_transport(),
         )  # fmt: skip
     return adapters

@@ -120,6 +120,27 @@ def test_instagram_live_cases_are_not_configured_without_an_account(monkeypatch)
     assert set(report.skipped.values()) == {"NOT_CONFIGURED"} and len(report.skipped) == 6
 
 
+def test_pinterest_live_cases_are_not_configured_without_an_account(monkeypatch):
+    """Proposed A50 (PN-4): until the accounts file names a Pinterest account, every Pinterest
+    case reports NOT_CONFIGURED in a live run, never a result."""
+    from comms.core.providers.protocols import ADAPTER_CONTRACTS
+    from tests.conformance.registry import REGISTRY
+    from tests.conformance.runner import Registry, run_suite
+
+    monkeypatch.delenv("COMMS_LIVE_ACCOUNTS", raising=False)
+    cases = {k: v for k, v in REGISTRY.cases.items() if k[0] == "pinterest"}
+    report = run_suite(Registry(cases), {"pinterest": ADAPTER_CONTRACTS["pinterest"]}, live=True)
+    assert report.failures == () and report.passed == 0
+    assert set(report.skipped.values()) == {"NOT_CONFIGURED"} and len(report.skipped) == 6
+
+
+def test_the_pinterest_runbook_covers_every_live_gate():
+    text = (ROOT / "docs" / "runbooks" / "live-acceptance-pinterest.md").read_text()
+    for gate in ("GP-1", "GP-2", "GP-3", "GP-4", "GP-5", "GP-6", "GP-7"):
+        assert gate in text, gate
+    assert "--run-live-acceptance" in text and "hidden prompt" in text.lower()
+
+
 def test_the_instagram_runbook_covers_every_live_gate():
     text = (ROOT / "docs" / "runbooks" / "live-acceptance-instagram.md").read_text()
     for gate in ("GI-1", "GI-2", "GI-3", "GI-4", "GI-5", "GI-6", "GI-7", "GI-8"):

@@ -47,3 +47,4 @@ BACKUP_SCHEMA = b"comms-backup/v1\0"  # comms v0.3 B25: the payload's schema nam
 DIRECTORY_IDENTITY = b"comms-directory-identity/v1\0"  # catalog amendment G3 (A45, D1)
 RELAY_PULL = b"comms-relay-pull/v1\0"  # comms v0.3 A48: the relay's pull signature
 INSTAGRAM_PREVIEW = b"comms-instagram-preview/v1\0"  # proposed A49: the advisory preview digest
+PINTEREST_PREVIEW = b"comms-pinterest-preview/v1\0"  # proposed A50: the same, for a Pin

@@ -45,6 +45,11 @@ CORE_PREFIXES: dict[str, str] = {
     "instagram_media": "igm_",
     "instagram_comment": "igc_",
     "instagram_person": "igp_",  # a DM counterpart
+    # proposed A50 (Pinterest, section 4.1): its own tables, so no existing ref kind is reused
+    "pinterest_account": "pna_",
+    "pinterest_board": "pnb_",
+    "pinterest_pin": "pnp_",
+    "pinterest_media": "pnv_",  # a video upload
 }
 _KIND_BY_PREFIX = {prefix: kind for kind, prefix in CORE_PREFIXES.items()}
 

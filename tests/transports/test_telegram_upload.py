@@ -33,7 +33,8 @@ def _invoke(tmp_path, script, cap, args, target):
 
 
 def test_upload_is_the_user_account_and_whatsapp():
-    assert set(SUPPORT[C.MEDIA_UPLOAD]) == {"telegram_user", "whatsapp_cloud"}
+    # proposed A50: the pinterest actor uploads a video the same way (its own account target)
+    assert set(SUPPORT[C.MEDIA_UPLOAD]) == {"telegram_user", "whatsapp_cloud", "pinterest"}
 
 
 def test_the_account_uploads_to_itself(tmp_path):

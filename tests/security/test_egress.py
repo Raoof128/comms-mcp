@@ -19,6 +19,8 @@ NETWORK_MODULES = {
     "transports/whatsapp/cloud/media.py",
     "transports/whatsapp/relay_client.py",  # A48: the relay's one pinned origin
     "transports/instagram/http.py",  # proposed A49: graph.instagram.com, pinned in code
+    "transports/pinterest/http.py",  # proposed A50: api.pinterest.com (or its sandbox), pinned
+    "transports/pinterest/upload.py",  # proposed A50: the one upload under amazonaws.com
     "transports/telegram/telegram/telethon_adapter.py",
     "mcp/stdio_proxy.py",  # comms v0.3 D29: loopback to the daemon's /mcp only (it refuses others)
     "runtime/selftest.py",  # D39-PRE E11c: a scripted MockTransport only (pinned below)

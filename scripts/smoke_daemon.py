@@ -596,6 +596,158 @@ def drive_instagram(root: Path) -> dict[str, Any]:
     return out
 
 
+PN_SECRET = "smokeAPPSECRETsmokeAPPSECRET0001"  # the app secret's documented shape
+PN_CODE = "smokeCODEsmokeCODE0001"  # an OAuth authorization code
+PN_USER = "900000000000000099"  # the selftest daemon's scripted account (runtime/selftest.py)
+
+
+def drive_pinterest(root: Path) -> dict[str, Any]:
+    """Proposed A50 on the real daemon: the app secret and an account's OAuth code at the hidden
+    prompt, all 18 Pinterest tools over HTTP /mcp against the selftest daemon's scripted
+    api.pinterest.com and upload host, a replay, both doctors, a token refresh, the audit chain,
+    and the account removed again."""
+    import base64
+    import hashlib
+
+    import jsonschema
+
+    from comms.core import refs
+    from comms.mcp.catalog import TOOL_CATALOG
+
+    out: dict[str, Any] = {}
+    specs = {s.name: s for s in TOOL_CATALOG}
+    d = Daemon(root / "pn")
+    d.json("keys", "provision", "--state-dir", str(d.state), "--runtime-dir", str(d.run))
+    d.settings(pinterest={"app_id": "1234567", "redirect_uri": "https://raoof128.github.io/comms-mcp/pinterest/",
+                          "default": "main", "daily_pin_budget": 5,
+                          "accounts": {"main": {"label": "Smoke", "writes": True, "sandbox": False}}})  # fmt: skip
+    d.start()
+    try:
+        d.json("cutover", "run")
+        seed = root / "seed-pn"
+        d.json("client", "add", "--name", "smoke-pn", "--helper-path", str(seed))
+
+        def code(answer: dict[str, Any]) -> Any:
+            return (answer.get("structuredContent") or {}).get("error", {}).get("code")
+
+        before = d.http(seed, "comms_pinterest_whoami", {})
+        out["pn_unconfigured_before_add"] = code(before) == "NOT_CONFIGURED" or before
+
+        secret_set = d.tty("credential", "set", "pinterest-app-secret", secret=PN_SECRET)
+        url = d.json("transport", "pinterest", "auth-url", "main")
+        added = d.tty("transport", "pinterest", "account", "add", "main", secret=PN_CODE)
+        reply = json.loads(added.stdout) if added.returncode == 0 else {}
+        out["pn_account_add_hidden_prompt"] = (
+            secret_set.returncode == 0 and PN_SECRET not in secret_set.stdout + secret_set.stderr
+            and url.get("url", "").startswith("https://www.pinterest.com/oauth/?client_id=1234567&")
+            and reply.get("alias") == "main" and str(reply.get("account", "")).startswith("pna_")
+            and reply.get("username") == "selftest.pinner" and reply.get("reloaded") is True
+            and PN_CODE not in added.stdout + added.stderr and PN_USER not in added.stdout
+            and "pina_" not in added.stdout and "pinr_" not in added.stdout
+        ) or f"rc={added.returncode} {added.stderr.strip()[-200:]}"  # fmt: skip
+        listed = d.json("transport", "pinterest", "account", "list")["accounts"]
+        out["pn_account_list"] = [(a["alias"], a["configured"], bool(a["account"]))
+                                  for a in listed] == [("main", True, True)] or listed  # fmt: skip
+
+        wrong: dict[str, Any] = {}
+        seen: dict[str, dict[str, Any]] = {}
+
+        def call(name: str, arguments: dict[str, Any], **extra: Any) -> dict[str, Any]:
+            spec = specs[name if name.startswith("comms_") else f"comms_pinterest_{name}"]
+            if spec.requires_request_id:
+                arguments = {**({"account": "main"} if spec.name.startswith("comms_pinterest_") else {}),
+                             **arguments, "request_id": refs.mint("request")}  # fmt: skip
+            answer = d.http(seed, spec.name, {**arguments, **extra})
+            body = dict(answer.get("structuredContent") or {})
+            if answer["isError"]:
+                wrong[spec.name] = code(answer)
+                return {}
+            try:
+                jsonschema.Draft202012Validator(spec.output_schema).validate(body)
+            except jsonschema.ValidationError as bad:
+                wrong[spec.name] = f"output schema: {bad.message[:100]}"
+            if spec.name.startswith("comms_pinterest_"):
+                seen[spec.name] = body
+            return body
+
+        call("account_list", {})
+        call("whoami", {})
+        call("profile_get", {})
+        board = call("board_list", {}).get("items", [{}])[0].get("board", "")
+        call("board_get", {"board": board})
+        pin = call("board_pins", {"board": board}).get("items", [{}])[0].get("pin", "")
+        call("pin_list", {})
+        call("pin_get", {"pin": pin, "metrics": True})
+        call("pin_analytics", {"pin": pin, "start_date": "2026-10-01", "end_date": "2026-10-05",
+                               "metric_types": ["IMPRESSION", "SAVE"]})  # fmt: skip
+        call("account_analytics", {"start_date": "2026-10-01", "end_date": "2026-10-05"})
+        call("publish_quota", {})
+        image = {"board": board, "kind": "image", "url": "https://cdn.example.com/smoke.jpg",
+                 "title": "Smoke", "description": "A smoke Pin", "link": "https://example.com/rug"}  # fmt: skip
+        digest = call("pin_preview", {"account": "main", **image}).get("preview_digest")
+        made = call("pin_create", image, preview_digest=digest)
+        new_board = call("board_create", {"name": "Smoke board", "privacy": "PUBLIC"}).get("board")
+        video = b"\x00\x00\x00 ftypmp42" + bytes(range(256)) * 200
+        begun = call("comms_media_stage_begin", {"mime": "video/mp4", "size": len(video),
+                                                 "sha256": hashlib.sha256(video).hexdigest()})  # fmt: skip
+        step = int(begun.get("chunk_max") or 1)
+        for seq, start in enumerate(range(0, len(video), step)):
+            call("comms_media_stage_chunk", {"upload": begun.get("upload"), "seq": seq,
+                                             "data_b64": base64.b64encode(video[start : start + step]).decode()})  # fmt: skip
+        uploaded = call("video_upload", {"upload": begun.get("upload")})
+        status = call("media_status", {"media": uploaded.get("media", "")})
+        video_pin = call("pin_create", {"board": board, "kind": "video", "media": uploaded.get("media", ""),
+                                        "cover_url": "https://cdn.example.com/cover.jpg", "title": "Clip"})  # fmt: skip
+        call(
+            "pin_update", {"pin": made.get("pin", ""), "title": "Smoke, edited", "board": new_board}
+        )
+        call("pin_delete", {"pin": made.get("pin", "")})
+        names = [s.name for s in TOOL_CATALOG if s.name.startswith("comms_pinterest_")]
+        bad_results = {n: b.get("result") for n, b in seen.items()
+                       if "result" in b and b["result"] != "SUCCEEDED"}  # fmt: skip
+        out["pn_tools_end_to_end"] = (
+            not wrong and not bad_results and sorted(seen) == sorted(names) and len(names) == 18
+            and str(made.get("pin", "")).startswith("pnp_") and str(video_pin.get("pin", "")).startswith("pnp_")
+            and status.get("status") == "succeeded"
+        ) or {**wrong, **bad_results, "missing": sorted(set(names) - set(seen))}  # fmt: skip
+
+        request_id = refs.mint("request")
+        once = {"account": "main", **image, "request_id": request_id}
+        first = d.http(seed, "comms_pinterest_pin_create", once)["structuredContent"]
+        again = d.http(seed, "comms_pinterest_pin_create", once)["structuredContent"]
+        quota = call("publish_quota", {})
+        out["pn_replay_no_second_pin"] = (
+            first.get("result") == "SUCCEEDED" and again.get("replayed") is True
+            and again.get("op_ref") == first.get("op_ref") and again.get("pin") == first.get("pin")
+            and quota.get("pins_last_24h") == 3  # the image Pin, the video Pin, this one
+        ) or [first, again, quota]  # fmt: skip
+
+        found = d.json("transport", "pinterest", "doctor")["findings"]
+        report = d.json("doctor", "--state-dir", str(d.state))
+        pn_codes = [f["code"] for f in report["findings"] if f["code"].startswith("PN_")]
+        out["pn_doctors"] = (
+            found == [{"alias": "main", "status": "OK", "codes": []}] and pn_codes == []
+        ) or [found, pn_codes]  # fmt: skip
+
+        refreshed = d.json("transport", "pinterest", "token", "refresh", "--alias", "main")
+        out["pn_token_refresh"] = (
+            [r.get("refreshed") for r in refreshed["results"]] == [True]
+            and d.http(seed, "comms_pinterest_whoami", {})["isError"] is False
+        ) or refreshed  # fmt: skip
+
+        out["pn_audit_verifies"] = d.json("audit", "verify", "--all")["ok"] is True
+
+        removed = d.json("transport", "pinterest", "account", "remove", "main")
+        after = d.http(seed, "comms_pinterest_whoami", {})
+        out["pn_account_remove"] = (
+            removed.get("tokens_revoked") == 2 and code(after) == "NOT_CONFIGURED"
+        ) or [removed, code(after)]  # fmt: skip
+    finally:
+        if d.proc is not None and d.proc.poll() is None:
+            d.stop()
+    return out
+
+
 WA_GROUP = "Y2FwaV9ncm91cDpTTU9LRTEyMzQ1Njc4OQ"  # a Meta-shaped (opaque) group id
 SMOKE_PHONE = "61400000077"
 

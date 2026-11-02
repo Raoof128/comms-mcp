@@ -21,6 +21,12 @@ _INSTAGRAM = {
     "instagram_comment": ("instagram_objects", "provider_identity"),
     "instagram_person": ("instagram_objects", "provider_identity"),
 }
+_PINTEREST = {  # proposed A50
+    "pinterest_account": ("pinterest_accounts", "user_id"),
+    "pinterest_board": ("pinterest_objects", "provider_identity"),
+    "pinterest_pin": ("pinterest_objects", "provider_identity"),
+    "pinterest_media": ("pinterest_media", "media_id"),
+}
 
 
 def identities_of(conn: Any, ref: str) -> list[dict[str, str]]:
@@ -53,10 +59,11 @@ def identities_of(conn: Any, ref: str) -> list[dict[str, str]]:
             (ref,),
         ).fetchall()
         return [{"transport": t, "identity": i} for t, i in rows]
-    elif kind in _INSTAGRAM:  # proposed A49: an account, a container or an object
-        table, column = _INSTAGRAM[kind]
+    elif kind in _INSTAGRAM or kind in _PINTEREST:  # A49, A50: an account or an object
+        transport = "instagram" if kind in _INSTAGRAM else "pinterest"
+        table, column = {**_INSTAGRAM, **_PINTEREST}[kind]
         rows = [
-            ("instagram", str(r[0]))
+            (transport, str(r[0]))
             for r in conn.execute(f"SELECT {column} FROM {table} WHERE ref = ?", (ref,))
         ]
     elif kind in _OBJECTS:

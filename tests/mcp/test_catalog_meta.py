@@ -18,6 +18,10 @@ FLAGGED = {
     "comms_instagram_comment_reply",
     "comms_instagram_comment_delete",
     "comms_instagram_message_send",
+    # proposed A50 (D-P3): the public and the irreversible Pinterest writes
+    "comms_pinterest_board_create",
+    "comms_pinterest_pin_create",
+    "comms_pinterest_pin_delete",
 }
 META = {"anthropic/requiresUserInteraction": True}
 

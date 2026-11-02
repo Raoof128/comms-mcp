@@ -66,21 +66,35 @@ _INSTAGRAM_VALUES: Mapping[str, Any] = {
 }  # fmt: skip
 
 
+# Proposed A50: the same for Pinterest, whose accounts the selftest daemon's sweep does not add.
+PINTEREST_REFUSAL = ("NOT_CONFIGURED", "the selftest daemon has no Pinterest account")
+_PINTEREST_VALUES: Mapping[str, Any] = {
+    "account": "main", "board": "pnb_" + "a" * 26, "pin": "pnp_" + "a" * 26,
+    "media": "pnv_" + "a" * 26, "upload": "upl_" + "a" * 26, "kind": "image",
+    "url": "https://cdn.example.com/sweep.jpg", "name": "Sweep",
+    "start_date": "2026-10-01", "end_date": "2026-10-02",
+}  # fmt: skip
+
+
 def _expected(name: str) -> tuple[str, str] | None:
     if name.startswith("comms_instagram_"):
         return INSTAGRAM_REFUSAL
+    if name.startswith("comms_pinterest_"):
+        return PINTEREST_REFUSAL
     return EXPECTED_REFUSALS.get(name)
 
 
 def _instagram_arguments(spec: Any) -> dict[str, Any]:
-    """Schema-valid arguments for an Instagram tool: its required keys, nothing more."""
+    """Schema-valid arguments for an Instagram or Pinterest tool: its required keys, nothing
+    more."""
+    values = _PINTEREST_VALUES if spec.name.startswith("comms_pinterest_") else _INSTAGRAM_VALUES
     props, out = spec.input_schema.get("properties", {}), {}
     for key in spec.input_schema.get("required", ()):
         schema = props.get(key, {})
         if key == "request_id":
             continue
-        if key in _INSTAGRAM_VALUES:
-            out[key] = _INSTAGRAM_VALUES[key]
+        if key in values:
+            out[key] = values[key]
         elif "enum" in schema:
             out[key] = schema["enum"][0]
         elif "enum" in schema.get("items", {}):
@@ -200,7 +214,7 @@ def sweep(call: Callable[[str, dict[str, Any]], dict[str, Any]], grp: str) -> di
     for spec in sorted(TOOL_CATALOG, key=lambda s: _order(s.name)):
         props = spec.input_schema.get("properties", {})
         arguments = {}
-        if spec.name.startswith("comms_instagram_"):
+        if spec.name.startswith(("comms_instagram_", "comms_pinterest_")):
             arguments = _instagram_arguments(spec)
             if spec.requires_request_id:
                 arguments["request_id"] = refs.mint("request")

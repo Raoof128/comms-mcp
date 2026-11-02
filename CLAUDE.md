@@ -102,6 +102,11 @@ request or frame (32 KiB raw per chunk, slice or inline file). Exit: `tests/secu
 - **The tools.** 24 `comms_instagram_*` tools (16 reads, 8 writes; 154 in the catalog; Story reads R-IG11). Every id is a ref (`igk_`, `igm_`, `igc_`, `igp_`); captions, comments and DMs only in `untrusted_text`. Publishing (posts, Reels, carousels and Stories) is three single-effect CREATEs on the `igk_` ledger (the 400-a-day budget); four tools carry `requires_user_interaction`.
 - **Evidence:** rulings R-IG1 to R-IG11 in `docs/verification/comms-v0.3-rulings.md`; live gates GI-1 to GI-8 in `docs/runbooks/live-acceptance-instagram.md` (owner-run).
 - **Exit test:** `tests/security/test_instagram_exit.py`.
+**Pinterest, proposed A50** (branch `comms-pinterest`; spec `docs/pinterest-spec-v0.1.md`; plan `docs/superpowers/plans/2026-11-02-comms-pinterest.md`; not adopted until ruling R-PN0):
+- **The actor.** `pinterest`, one per account (`pna_`), over Pinterest REST API v5 pinned in `transports/pinterest/http.py` (`api.pinterest.com`, or the sandbox host for an account marked `sandbox`). Accounts live in `comms.json` (`pinterest`: `app_id`, `redirect_uri`, `daily_pin_budget`, `accounts` with label, `writes`, `sandbox`) and in four tables of their own (schema v12). OAuth: `comms credential set pinterest-app-secret`, `comms transport pinterest auth-url <alias>`, then the code at the hidden prompt with `comms transport pinterest account add <alias>`; two staged secrets per account (`pinterest-access-token.<alias>`, 30 days; `pinterest-refresh-token.<alias>`, 60 days, `comms transport pinterest token refresh`).
+- **The tools.** 18 `comms_pinterest_*` tools (13 reads, 5 writes; 172 in the catalog). Every id is a ref (`pnb_`, `pnp_`, `pnv_`); titles, descriptions and board names only under `untrusted` or `untrusted_text`. A Pin is one CREATE on the `pnp_` ledger (the comms-side daily budget, default 50); a video is one upload of a staged `upl_` (16 MiB) to Pinterest's signed URL under `amazonaws.com`, then a Pin once `media_status` is `succeeded`. Three tools carry `requires_user_interaction`. Pinterest's Trial access shows API-created Pins only to their creator; Standard access needs Pinterest's review.
+- **Evidence:** rulings R-PN1 and R-PN2 in `docs/verification/comms-v0.3-rulings.md`; live gates GP-1 to GP-7 in `docs/runbooks/live-acceptance-pinterest.md` (owner-run).
+- **Exit test:** `tests/security/test_pinterest_exit.py`.
 **Renamed to `comms-mcp`** (2026-10-05): the GitHub repository and the Python distribution
 (`pyproject.toml`, `uv.lock`). Everything frozen keeps its name: the `telegram-mcp` console script,
 the Keychain service, `/private/var/run/telegram-mcp`, logger names and every wire. The public
@@ -187,6 +192,7 @@ CLI forwarder.
 | Operator commands (repo root) | `src/comms/runtime/operator/` |
 | `comms` CLI (repo root) | `src/comms/cli.py`, `src/comms/cli_commands/` |
 | Instagram actor, proposed A49 (repo root): Graph client, accounts, ledger, publishing, classifier | `src/comms/transports/instagram/`; service `src/comms/runtime/instagram.py`; operator `src/comms/runtime/operator/instagram.py` |
+| Pinterest actor, proposed A50 (repo root): v5 client and OAuth exchange, the video upload, accounts, ledgers, publishing, classifier | `src/comms/transports/pinterest/`; service `src/comms/runtime/pinterest.py`; operator `src/comms/runtime/operator/pinterest.py`; metric tables `src/comms/core/providers/pinterest_analytics.py` |
 | Evidence, gates, deviations | `docs/verification/` |
 
 ## Frozen wires — changing these breaks both halves

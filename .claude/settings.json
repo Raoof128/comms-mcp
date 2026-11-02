@@ -61,7 +61,12 @@
       "mcp__comms__comms_instagram_comment_hide",
       "mcp__comms__comms_instagram_comments_enabled_set",
       "mcp__comms__comms_instagram_comment_delete",
-      "mcp__comms__comms_instagram_message_send"
+      "mcp__comms__comms_instagram_message_send",
+      "mcp__comms__comms_pinterest_board_create",
+      "mcp__comms__comms_pinterest_video_upload",
+      "mcp__comms__comms_pinterest_pin_create",
+      "mcp__comms__comms_pinterest_pin_update",
+      "mcp__comms__comms_pinterest_pin_delete"
     ]
   }
 }

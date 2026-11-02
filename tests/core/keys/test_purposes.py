@@ -39,6 +39,7 @@ DESIGN = {
     "consent-transport-key": ("p256", "refused", True, "owner_runbook"),
     "relay-age-key": ("x25519", "new_id", False, "at_rotation"),  # A48
     "relay-pull-key": ("hmac", "new_id", False, "at_rotation"),  # A48
+    "pinterest-app-secret": ("opaque", "staged", False, "at_rotation"),  # proposed A50
 }
 
 

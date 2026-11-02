@@ -19,7 +19,7 @@ from comms.mcp.catalog import TOOL_CATALOG
 
 ROOT = Path(__file__).resolve().parents[3]
 MATRIX = ROOT / "docs" / "verification" / "comms-v0.3-actor-matrix.md"
-ACTORS = ("telegram_bot", "telegram_user", "whatsapp_cloud", "instagram")  # instagram: A49
+ACTORS = ("telegram_bot", "telegram_user", "whatsapp_cloud", "instagram", "pinterest")  # A49, A50
 KIND = re.compile(r"^(A done|A todo:G\d+[a-z]?|B\b|— :)")
 CATALOG = {spec.name for spec in TOOL_CATALOG}
 

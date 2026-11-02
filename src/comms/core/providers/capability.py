@@ -122,3 +122,13 @@ class Capability(StrEnum):
     COMMENT_HIDE = "comment.hide"
     COMMENT_DELETE = "comment.delete"
     MEDIA_COMMENTS_TOGGLE = "media.comments_toggle"
+    # Proposed A50 (Pinterest, docs/pinterest-spec-v0.1.md section 5.3): the pinterest actor
+    BOARD_LIST = "board.list"
+    BOARD_GET = "board.get"
+    BOARD_CREATE = "board.create"
+    PIN_LIST = "pin.list"
+    PIN_GET = "pin.get"
+    PIN_CREATE = "pin.create"
+    PIN_UPDATE = "pin.update"
+    PIN_DELETE = "pin.delete"
+    MEDIA_STATUS_READ = "media.status_read"

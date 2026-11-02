@@ -21,6 +21,7 @@ from comms.runtime.operator.cutover import CUTOVER_HANDLERS
 from comms.runtime.operator.instagram import INSTAGRAM_HANDLERS
 from comms.runtime.operator.keys import KEY_HANDLERS
 from comms.runtime.operator.maintenance import MAINTENANCE_HANDLERS, PROTOCOL_STEPS
+from comms.runtime.operator.pinterest import PINTEREST_HANDLERS
 
 __all__ = [
     "OPERATOR_HANDLERS",
@@ -38,6 +39,7 @@ OPERATOR_HANDLERS: Mapping[tuple[str, ...], OperatorHandler] = {
     **CREDENTIAL_HANDLERS,
     **MAINTENANCE_HANDLERS,
     **INSTAGRAM_HANDLERS,  # proposed A49
+    **PINTEREST_HANDLERS,  # proposed A50
 }
 
 

@@ -31,6 +31,7 @@ from comms.runtime.hello import hello_handler
 from comms.runtime.instagram import InstagramService
 from comms.runtime.listeners import Listeners, RemoteListener, build_listeners
 from comms.runtime.operator import LegacySide, OperatorContext, operator_handler
+from comms.runtime.pinterest import PinterestService
 from comms.runtime.tool_calls import tool_call_handler
 from comms.services.account import AccountService
 from comms.services.campaigns import CampaignService
@@ -193,6 +194,11 @@ def build_comms_runtime(
             clock=clock,
             executor=executor,
             publisher=adapters.publisher,
+        ),
+        pinterest=None  # proposed A50
+        if adapters.pinterest is None
+        else PinterestService(
+            conn, adapters.pinterest, capability, handles, clock=clock, executor=executor
         ),
     )
     dispatcher = Dispatcher(build_registry(services))

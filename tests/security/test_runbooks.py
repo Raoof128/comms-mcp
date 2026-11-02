@@ -33,6 +33,7 @@ EXPECTED = {
     "clients-chatgpt",  # comms v0.3 D38
     "whatsapp-relay",  # comms v0.3 A48
     "live-acceptance-instagram",  # proposed A49 (IG-6)
+    "live-acceptance-pinterest",  # proposed A50 (PN-4)
 }
 
 

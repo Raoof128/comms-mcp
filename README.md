@@ -16,9 +16,14 @@ and WhatsApp through a single MCP server, with every write audited. It runs on t
   window to write. Design and history:
   [`Raoof128/Instagram-MCP`](https://github.com/Raoof128/Instagram-MCP); specification:
   `docs/instagram-spec-v0.6.md`.
-- **One MCP catalog of 130 tools** (154 with the 24 Instagram tools): messages, media, groups
-  and their admin, a directory of people, locations and audiences, campaigns, context reads, and
-  account status.
+- **Pinterest (proposed amendment A50):** one or more business accounts through Pinterest REST
+  API v5 with OAuth 2.0 (continuous refresh): boards, Pins and analytics to read; boards, image,
+  carousel and video Pins to publish, Pins to edit and delete. A comms-side daily Pin budget, the
+  same opaque refs, audit chain and host prompts as everything else. Specification:
+  `docs/pinterest-spec-v0.1.md`; live gates in `docs/runbooks/live-acceptance-pinterest.md`.
+- **One MCP catalog of 130 tools** (154 with the 24 Instagram tools, 172 with the 18 Pinterest
+  tools): messages, media, groups and their admin, a directory of people, locations and
+  audiences, campaigns, context reads, and account status.
 - **Authority:** an owner command is the authorization (comms spec v0.3, `owner_full_admin`).
   The MCP host's own permission prompts are the only confirmation layer. Every consequential
   write goes on a signed, anchored audit chain, and a repeated `request_id` never repeats an
@@ -30,7 +35,10 @@ runs live on the owner's Mac, under the owner's user: the bot and the user accou
 in, and the relay is deployed. Owner-run live acceptance (D39-B) is still open, and there is no
 production claim until Gates A–R pass for the exact artifact. The Instagram actor is implemented
 and gated against a scripted Graph API; its live gates (GI-1 to GI-8) are still to run, and it is
-adopted only by ruling R-IG0.
+adopted only by ruling R-IG0. The Pinterest actor (A50) is implemented and gated against scripted
+Pinterest hosts; its live gates (GP-1 to GP-7) need a Pinterest app with Trial access, and under
+Trial access Pinterest shows API-created Pins only to their creator until Standard access is
+granted after Pinterest's review.
 
 ## Requirements
 
@@ -80,6 +88,7 @@ uv run pytest tests/formal -q -s       # the bounded formal models
 | `src/comms/transports/telegram/` | The Telegram bot and user adapters; the only Telethon importer |
 | `src/comms/transports/whatsapp/` | The WhatsApp Cloud API, webhooks and relay client |
 | `src/comms/transports/instagram/` | The Instagram actor (proposed A49): the pinned Graph client, accounts, the publishing ledger and the outcome table |
+| `src/comms/transports/pinterest/` | The Pinterest actor (proposed A50): the pinned v5 client and OAuth exchange, the one video upload, accounts, the Pin ledger and the status table |
 | `transports/whatsapp/` | WhatsVault, imported with its history (`docs/provenance/whatsvault.md`) |
 | `relay/` | The Cloudflare Worker relay (TypeScript) |
 | `formal/` | Bounded executable models of the safety rules (`formal/README.md`) |
@@ -90,7 +99,8 @@ uv run pytest tests/formal -q -s       # the bounded formal models
 
 - **Specifications:** `docs/comms-spec-v0.3.md` (current). It says which parts of
   `docs/comms-spec-v0.2.md` and the frozen `telegram-mcp-v0.1.10-final-engineering-spec.md`
-  still apply. The proposed Instagram amendment is `docs/instagram-spec-v0.6.md`.
+  still apply. The proposed Instagram amendment is `docs/instagram-spec-v0.6.md`; the proposed
+  Pinterest amendment is `docs/pinterest-spec-v0.1.md`.
 - **Evidence and rulings:** `docs/verification/` (`comms-v0.3.md`, `comms-v0.3-rulings.md`,
   `comms-relay.md`, the actor matrix and the Telegram RPC review).
 - **Runbooks:** `docs/runbooks/`.

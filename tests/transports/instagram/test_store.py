@@ -30,7 +30,7 @@ def _add(conn, alias="main", user=USER):
 
 
 def test_migration_v10_adds_tables_and_checks(conn):
-    assert conn.execute("SELECT max(version) FROM schema_version").fetchone()[0] == 11
+    assert conn.execute("SELECT max(version) FROM schema_version").fetchone()[0] == 12  # v12: A50
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert {"instagram_accounts", "instagram_containers", "instagram_objects"} <= tables
     for transport_table in ("delivery_identities", "contact_points", "destinations"):
@@ -123,7 +123,7 @@ def test_migration_v11_keeps_every_v10_container_and_admits_a_story(tmp_path):
     kept = store.record_container(db, account.id, "image", "1790001", now=NOW)
     with pytest.raises(CommsError):  # v10's ledger has no Story kind
         store.record_container(db, account.id, "story_unknown", "1790002", now=NOW)
-    assert migrate(db) == 11
+    assert migrate(db) == 12  # v11 then A50's v12, which leaves every Instagram table alone
     box = store.container(db, kept, account.id)
     assert (box.kind, box.creation_id) == ("image", "1790001")
     story = store.record_container(db, account.id, "story", "1790003", now=NOW)

@@ -19,7 +19,8 @@ Schema::
      "instagram": {"api_version": "v25.0", "default": "main", "dm_disclosure": null,
                    "accounts": {"main": {"label": "…", "writes": false, "dms": false}}}}
 
-The ``instagram`` section is proposed A49 (``comms.transports.instagram.config``).
+The ``instagram`` section is proposed A49 (``comms.transports.instagram.config``); the
+``pinterest`` section is proposed A50 (``comms.transports.pinterest.config``).
 """
 
 from __future__ import annotations
@@ -36,6 +37,7 @@ from comms.core.strict_json import strict_json_loads
 from comms.mcp.oauth.server import OAuthSettings
 from comms.runtime.adapters import AdapterSettings
 from comms.transports.instagram.config import parse_instagram
+from comms.transports.pinterest.config import parse_pinterest
 
 __all__ = ["HOST", "DaemonSettings", "RemoteSettings", "SettingsError", "load_settings"]
 
@@ -54,6 +56,7 @@ _TOP = {
     "backup_recipient",
     "relay",  # A48: {"url": "https://comms-relay.<subdomain>.workers.dev"}
     "instagram",  # proposed A49
+    "pinterest",  # proposed A50
 }
 _META = {"phone_number_id", "waba_id"}
 _REMOTE = {"issuer", "port", "client", "client_id", "redirect_uris", "owner"}
@@ -198,6 +201,7 @@ def load_settings(path: Path) -> DaemonSettings:
     if relay is not None and top.get("webhook_port") is not None:
         raise SettingsError("comms.json: with a relay, the local webhook listener is not served")
     instagram = None if top.get("instagram") is None else parse_instagram(top["instagram"], _refuse)
+    pinterest = None if top.get("pinterest") is None else parse_pinterest(top["pinterest"], _refuse)
     retention = _object(top.get("retention", {}), set(RETENTION_DEFAULTS), "retention")
     for name, value in retention.items():
         if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 3650:
@@ -217,6 +221,7 @@ def load_settings(path: Path) -> DaemonSettings:
             else _text(meta["waba_id"], _DIGITS, "meta.waba_id"),
             relay_url=relay,
             instagram=instagram,
+            pinterest=pinterest,
         ),
         remote=None if top.get("remote") is None else _remote(top["remote"]),
         backup_recipient=None

@@ -34,6 +34,7 @@ from comms.core.providers.protocols import ProviderTarget
 from comms.mcp.catalog import TOOL_CATALOG
 from comms.mcp.dispatch import AuthenticatedClient
 from comms.runtime.instagram import InstagramService
+from comms.runtime.pinterest import PinterestService
 from comms.services.account import AccountService
 from comms.services.campaigns import CampaignService
 from comms.services.capability import CapabilityService
@@ -77,6 +78,7 @@ class Services:
     actors: tuple[str, ...]
     account_target: ProviderTarget | None = None
     instagram: InstagramService | None = None  # proposed A49 (R-IG4)
+    pinterest: PinterestService | None = None  # proposed A50
 
 
 def group_targets(conn: Any, group: str, actors: tuple[str, ...]) -> dict[str, ProviderTarget]:
@@ -561,6 +563,20 @@ class _Facades:
             raise CommsError("NOT_CONFIGURED")
         return self.s.instagram
 
+    def pinterest(self) -> PinterestService:
+        if self.s.pinterest is None:
+            raise CommsError("NOT_CONFIGURED")
+        return self.s.pinterest
+
+    def pinterest_video_upload(
+        self, client: AuthenticatedClient, a: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Proposed A50 (D-P8): the staged file is taken only once the account and its ceiling
+        are known to the service (a refused call leaves the upload usable)."""
+        service = self.pinterest()
+        data, mime = self.staged.take(client.client_ref, a["upload"], a["request_id"])
+        return service.video_upload(client.client_ref, a, data, mime)
+
     def account_target(self) -> ProviderTarget:
         if self.s.account_target is None:
             raise CommsError("NOT_CONFIGURED")
@@ -727,12 +743,32 @@ class _Facades:
             "instagram.comments_enabled_set": lambda cl, a: self.instagram().comments_enabled_set(cl.client_ref, a),
             "instagram.comment_delete": lambda cl, a: self.instagram().comment_delete(cl.client_ref, a),
             "instagram.message_send": lambda cl, a: self.instagram().message_send(cl.client_ref, a),
+            # proposed A50: the Pinterest tools (the service lives in runtime, as Instagram's)
+            "pinterest.account_list": lambda cl, a: self.pinterest().account_list(),
+            "pinterest.whoami": lambda cl, a: self.pinterest().whoami(a),
+            "pinterest.profile_get": lambda cl, a: self.pinterest().profile(a),
+            "pinterest.board_list": lambda cl, a: self.pinterest().board_list(cl.client_ref, a),
+            "pinterest.board_get": lambda cl, a: self.pinterest().board_get(a),
+            "pinterest.board_pins": lambda cl, a: self.pinterest().board_pins(cl.client_ref, a),
+            "pinterest.pin_list": lambda cl, a: self.pinterest().pin_list(cl.client_ref, a),
+            "pinterest.pin_get": lambda cl, a: self.pinterest().pin_get(a),
+            "pinterest.pin_analytics": lambda cl, a: self.pinterest().pin_analytics(a),
+            "pinterest.account_analytics": lambda cl, a: self.pinterest().account_analytics(a),
+            "pinterest.media_status": lambda cl, a: self.pinterest().media_status(a),
+            "pinterest.publish_quota": lambda cl, a: self.pinterest().publish_quota(a),
+            "pinterest.pin_preview": lambda cl, a: self.pinterest().pin_preview(a),
+            "pinterest.board_create": lambda cl, a: self.pinterest().board_create(cl.client_ref, a),
+            "pinterest.video_upload": self.pinterest_video_upload,
+            "pinterest.pin_create": lambda cl, a: self.pinterest().pin_create(cl.client_ref, a),
+            "pinterest.pin_update": lambda cl, a: self.pinterest().pin_update(cl.client_ref, a),
+            "pinterest.pin_delete": lambda cl, a: self.pinterest().pin_delete(cl.client_ref, a),
         }  # fmt: skip
 
 
 def _transport(actor: str) -> str:
-    """An actor's transport: ``telegram_*``, ``whatsapp_*``, or ``instagram`` (proposed A49)."""
-    return actor if actor == "instagram" else actor.split("_", 1)[0]
+    """An actor's transport: ``telegram_*``, ``whatsapp_*``, ``instagram`` (A49) or ``pinterest``
+    (A50)."""
+    return actor if actor in ("instagram", "pinterest") else actor.split("_", 1)[0]
 
 
 def _instant(text: str) -> datetime:

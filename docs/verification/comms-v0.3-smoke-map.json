@@ -122,6 +122,15 @@
     "phase_v03_daemon::instagram: both doctors report the account healthy",
     "phase_v03_daemon::instagram: token refresh rotates the token and the account keeps working",
     "phase_v03_daemon::instagram: the audit chain verifies after every Instagram write",
-    "phase_v03_daemon::instagram: account remove revokes the token and the tools answer NOT_CONFIGURED again"
+    "phase_v03_daemon::instagram: account remove revokes the token and the tools answer NOT_CONFIGURED again",
+    "phase_v03_daemon::pinterest: before an account is added, every Pinterest tool answers NOT_CONFIGURED",
+    "phase_v03_daemon::pinterest: the app secret and the OAuth code are read at a hidden prompt on a real terminal, exchanged, proved, and nothing secret is echoed",
+    "phase_v03_daemon::pinterest: account list shows the account registered and configured",
+    "phase_v03_daemon::pinterest: all 18 tools succeed over HTTP with schema-valid results against the scripted hosts, a video Pin included",
+    "phase_v03_daemon::pinterest: a replayed pin_create answers its record, makes no second Pin, and the budget ledger counts each Pin once",
+    "phase_v03_daemon::pinterest: both doctors report the account healthy",
+    "phase_v03_daemon::pinterest: token refresh rotates the tokens and the account keeps working",
+    "phase_v03_daemon::pinterest: the audit chain verifies after every Pinterest write",
+    "phase_v03_daemon::pinterest: account remove revokes both tokens and the tools answer NOT_CONFIGURED again"
   ]
 }

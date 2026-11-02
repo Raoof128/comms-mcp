@@ -20,7 +20,11 @@ from datetime import datetime
 from typing import Any
 
 from comms.core.doctor import Finding, doctor
-from comms.core.keys.purposes import instagram_token_purpose
+from comms.core.keys.purposes import (
+    PINTEREST_APP_SECRET,
+    instagram_token_purpose,
+    pinterest_token_purposes,
+)
 from comms.core.keys.secrets import FileSecretStore, SecretStoreError
 from comms.core.keys.slots import KeySlotStore, active_version
 from comms.core.storage.db import CommsDbKeyError, open_comms_db
@@ -31,10 +35,24 @@ from comms.runtime.settings import SettingsError, load_settings
 from comms.runtime.state import bootstrap_state
 from comms.transports.instagram import store as instagram_store
 from comms.transports.instagram.doctor import findings as instagram_findings
+from comms.transports.pinterest import store as pinterest_store
+from comms.transports.pinterest.doctor import findings as pinterest_findings
 
 __all__ = ["open_read_only", "run_doctor"]
 
-_ACCEPTABLE = frozenset({"CREDENTIAL_NOT_CONFIGURED", "IG_TOKEN_EXPIRING"})
+_ACCEPTABLE = frozenset(
+    {"CREDENTIAL_NOT_CONFIGURED", "IG_TOKEN_EXPIRING", "PN_TOKEN_EXPIRING", "PN_REFRESH_EXPIRING"}
+)
+_PINTEREST_DETAIL = {  # proposed A50
+    "PN_ACCOUNT_UNREGISTERED": "in comms.json but never added (comms transport pinterest account add)",
+    "PN_ACCOUNT_UNCONFIGURED": "added but missing from comms.json",
+    "PN_TOKEN_MISSING": "no active access token",
+    "PN_TOKEN_EXPIRED": "the access token has expired (comms transport pinterest token refresh)",
+    "PN_TOKEN_EXPIRING": "the access token expires within ten days (comms transport pinterest token refresh)",
+    "PN_REFRESH_EXPIRED": "the refresh token has expired: add the account again",
+    "PN_REFRESH_EXPIRING": "the refresh token expires within ten days (comms transport pinterest token refresh)",
+    "PN_APP_SECRET_MISSING": "no app secret (comms credential set pinterest-app-secret)",
+}
 _INSTAGRAM_DETAIL = {
     "IG_ACCOUNT_UNREGISTERED": "in comms.json but never added (comms transport instagram account add)",
     "IG_ACCOUNT_UNCONFIGURED": "added but missing from comms.json",
@@ -95,6 +113,28 @@ def _instagram(paths: CommsPaths, conn: Any, now: datetime) -> list[Finding]:
     ]
 
 
+def _pinterest(paths: CommsPaths, conn: Any, now: datetime) -> list[Finding]:
+    """Proposed A50: each account's offline findings; metadata only, no network."""
+    try:
+        settings = load_settings(paths.settings).adapter.pinterest
+    except SettingsError:
+        return []  # reported once, by the Instagram pass
+    if settings is None:
+        return []
+    live = {
+        row.alias: (row, active_version(conn, pinterest_token_purposes(row.alias)[0]) is not None)
+        for row in pinterest_store.live_accounts(conn)
+    }
+    has_secret = active_version(conn, PINTEREST_APP_SECRET) is not None
+    return [
+        Finding(code, report["alias"], _PINTEREST_DETAIL[code])
+        for report in pinterest_findings(
+            sorted(settings.accounts), live, None, now=now, app_secret=has_secret
+        )
+        for code in report["codes"]
+    ]
+
+
 def run_doctor(paths: CommsPaths, *, now: datetime) -> dict[str, Any]:
     if not paths.db.exists() or not paths.db_key_pointer.exists():
         return _report(
@@ -131,6 +171,7 @@ def run_doctor(paths: CommsPaths, *, now: datetime) -> dict[str, Any]:
             telegram_session=_telegram_session(paths),
         )
         findings += _instagram(paths, conn, now)
+        findings += _pinterest(paths, conn, now)
         return _report(bootstrap_state(conn, store, paths), findings)
     finally:
         conn.close()

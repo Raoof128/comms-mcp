@@ -65,6 +65,20 @@ since 2026-09-27), skip step 1 and give every command the same directories:
    comms transport instagram token refresh --all
    ```
 
+   Pinterest (proposed A50) is per account too: describe the app (`app_id`, `redirect_uri`) and
+   each account in `comms.json` under `pinterest` (alias, label, `writes`, `sandbox`; no secret
+   and no ids), store the app secret, then add the account with the OAuth code. The secret and
+   the code are typed at the hidden prompt. The access token lasts 30 days and the refresh token
+   60: refresh before `comms doctor` reports `PN_TOKEN_EXPIRING`.
+
+   ```bash
+   comms credential set pinterest-app-secret
+   comms transport pinterest auth-url sarabi
+   comms transport pinterest account add sarabi
+   comms transport pinterest doctor
+   comms transport pinterest token refresh --all
+   ```
+
 5. Add each MCP client. Its `cml1` seed goes to that client's helper only.
 
    ```bash

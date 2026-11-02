@@ -23,7 +23,7 @@ from comms.core.credentials import (
     record_confirmed,
 )
 from comms.core.delivery.transport import DeliveryTransport
-from comms.core.keys.purposes import instagram_token_purpose
+from comms.core.keys.purposes import instagram_token_purpose, pinterest_token_purposes
 from comms.core.keys.secrets import SecretStore
 from comms.core.providers.protocols import ProviderTarget
 from comms.runtime.relay import Collector
@@ -34,6 +34,13 @@ from comms.transports.instagram.capability import InstagramCapability
 from comms.transports.instagram.config import InstagramSettings
 from comms.transports.instagram.http import GraphIgApi
 from comms.transports.instagram.publish import Publisher
+from comms.transports.pinterest import store as pinterest_store
+from comms.transports.pinterest.accounts import AccountRuntime as PinterestRuntime
+from comms.transports.pinterest.accounts import PinterestAccounts
+from comms.transports.pinterest.admin import PinterestAdmin
+from comms.transports.pinterest.capability import PinterestCapability
+from comms.transports.pinterest.config import PinterestSettings
+from comms.transports.pinterest.http import PinterestApi
 from comms.transports.profiles import bot_profile, user_profile, whatsapp_profile
 from comms.transports.telegram.bot.admin import BotAdmin
 from comms.transports.telegram.bot.capability import BotCapability
@@ -74,6 +81,7 @@ class AdapterSettings:
     meta_waba_id: str | None = None
     relay_url: str | None = None  # A48: WhatsApp webhooks arrive through the relay
     instagram: InstagramSettings | None = None  # proposed A49
+    pinterest: PinterestSettings | None = None  # proposed A50
 
 
 @dataclass(frozen=True)
@@ -116,6 +124,10 @@ class Adapters:
     # proposed A49: the Graph transport every Instagram client uses; None is the network
     # (production). ``comms selftest-daemon`` injects a scripted one, as it does for the bot.
     instagram_transport: Any = None
+    pinterest: PinterestAccounts | None = None  # proposed A50: configured Pinterest accounts
+    # proposed A50: the transport every Pinterest client and the upload client use; None is the
+    # network (production). ``comms selftest-daemon`` injects a scripted one.
+    pinterest_transport: Any = None
 
     def __repr__(self) -> str:
         return (
@@ -177,6 +189,8 @@ def build_adapters(
         _webhooks(adapters, conn, secrets, clock, monotonic, archive)
     if settings.instagram is not None:
         instagram_adapters(adapters, conn, secrets, settings.instagram, clock)
+    if settings.pinterest is not None:
+        pinterest_adapters(adapters, conn, secrets, settings.pinterest, clock)
     if adapters.graph is not None:  # G8: group reads live, messages from the archive (if any)
         adapters.context["whatsapp_cloud"] = WhatsAppContext(
             adapters.context.get("whatsapp_cloud"), adapters.graph, clock=clock
@@ -282,6 +296,37 @@ def instagram_adapters(
         adapters.publisher = Publisher(conn, clock=clock)
         adapters.publisher.register(admin)
         adapters.admin["instagram"] = admin
+
+
+def pinterest_adapters(
+    adapters: Adapters,
+    conn: Any,
+    secrets: SecretStore,
+    settings: PinterestSettings,
+    clock: Callable[[], datetime],
+    *,
+    transport: Any = None,
+) -> None:
+    """Proposed A50: one ``PinterestApi`` per alias configured in comms.json, registered
+    (``pna_``) and holding an active access token. No network here: the identity check is lazy."""
+    runtimes: dict[str, PinterestRuntime] = {}
+    for alias, policy in settings.accounts.items():
+        row = pinterest_store.account_by_alias(conn, alias)
+        purpose = pinterest_token_purposes(alias)[0]
+        version = _configured(conn, secrets, purpose)
+        if row is None or version is None:
+            continue
+        api = PinterestApi(
+            secrets, purpose=purpose, version=version, sandbox=policy.sandbox, transport=transport
+        )
+        runtimes[alias] = PinterestRuntime(alias, row.ref, row.id, policy, api, row.user_id)
+    accounts = PinterestAccounts(conn, settings, runtimes, clock=clock)
+    adapters.pinterest, adapters.pinterest_transport = accounts, transport
+    adapters.capability["pinterest"] = PinterestCapability(accounts, clock=clock)
+    if runtimes:
+        adapters.admin["pinterest"] = PinterestAdmin(
+            accounts, conn, clock=clock, transport=transport
+        )
 
 
 def _confirmer(conn: Any, versions: dict[str, int]) -> Callable[[str], None]:

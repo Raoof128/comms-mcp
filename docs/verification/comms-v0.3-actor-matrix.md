@@ -146,9 +146,29 @@ The Instagram API with Instagram Login (`graph.instagram.com`, `docs/instagram-s
 | `comms_instagram_comment_delete` | A done [comment.delete]: `DELETE /{comment-id}` |
 | `comms_instagram_message_send` | A done [message.reply]: `POST /{ig-id}/messages` (inside the 24-hour window, read live first) |
 
+## Pinterest (proposed A50)
+
+Pinterest REST API v5 (`api.pinterest.com`, `docs/pinterest-spec-v0.1.md`). One actor, `pinterest`, addressed by account (`pna_`), never by group, so these rows have their own column. Each row is proved by `tests/runtime/test_pinterest_reads.py` and `tests/runtime/test_pinterest_writes.py`.
+
+| Tool | pinterest |
+|---|---|
+| `comms_pinterest_whoami` / `comms_pinterest_profile_get` | A done [profile.read]: `GET /v5/user_account` |
+| `comms_pinterest_board_list` | A done [board.list]: `GET /v5/boards` |
+| `comms_pinterest_board_get` | A done [board.get]: `GET /v5/boards/{board_id}` |
+| `comms_pinterest_board_pins` / `comms_pinterest_pin_list` | A done [pin.list]: `GET /v5/boards/{board_id}/pins`, `GET /v5/pins` |
+| `comms_pinterest_pin_get` | A done [pin.get]: `GET /v5/pins/{pin_id}` |
+| `comms_pinterest_pin_analytics` / `comms_pinterest_account_analytics` | A done [insights.read]: `GET /v5/pins/{pin_id}/analytics`, `GET /v5/user_account/analytics` |
+| `comms_pinterest_media_status` | A done [media.status_read]: `GET /v5/media/{media_id}` |
+| `comms_pinterest_publish_quota` / `comms_pinterest_pin_preview` | A done [publishing.quota_read]: the local publication ledger (a video's `GET /v5/media/{media_id}` for the preview) |
+| `comms_pinterest_board_create` | A done [board.create]: `POST /v5/boards` |
+| `comms_pinterest_video_upload` | A done [media.upload]: `POST /v5/media`, then one multipart POST to the signed upload URL |
+| `comms_pinterest_pin_create` | A done [pin.create]: (`GET /v5/media/{media_id}` for a video,) `POST /v5/pins` (a `pnp_` and a publication row) |
+| `comms_pinterest_pin_update` | A done [pin.update]: `PATCH /v5/pins/{pin_id}` |
+| `comms_pinterest_pin_delete` | A done [pin.delete]: `DELETE /v5/pins/{pin_id}` |
+
 ## Local tools (no provider actor)
 
-`comms_capability_list`, `comms_group_list`, `comms_group_get`, every `comms_campaign_*`, `comms_location_*` and `comms_audience_*` tool, `comms_admin_identity_inspect`, the `comms_directory_*` tools G2–G4 add, `comms_location_member_*`, `comms_media_stage_*` (staging a file in memory, G8), and `comms_instagram_account_list` (the configured accounts, proposed A49). These read or write `comms.db` only. A campaign's delivery goes through the transports' delivery adapters, not these tools.
+`comms_capability_list`, `comms_group_list`, `comms_group_get`, every `comms_campaign_*`, `comms_location_*` and `comms_audience_*` tool, `comms_admin_identity_inspect`, the `comms_directory_*` tools G2–G4 add, `comms_location_member_*`, `comms_media_stage_*` (staging a file in memory, G8), `comms_instagram_account_list` (the configured accounts, proposed A49), and `comms_pinterest_account_list` (proposed A50). These read or write `comms.db` only. A campaign's delivery goes through the transports' delivery adapters, not these tools.
 
 ## Checked against the 2026 developer docs (2026-09-26)
 

@@ -22,6 +22,7 @@ from comms.runtime.adapters import Adapters, RelayKeys
 from comms.runtime.comms_runtime import CommsRuntime, RemoteConfig, build_comms_runtime
 from comms.runtime.operator import LegacySide
 from comms.runtime.operator.instagram import InstagramOperator
+from comms.runtime.operator.pinterest import PinterestOperator
 from comms.runtime.proofs import build_proofs
 from comms.runtime.settings import DaemonSettings
 from comms.runtime.state import CommsState
@@ -98,6 +99,9 @@ def assemble_runtime(
     instagram = InstagramOperator(  # proposed A49: the adapters' Graph transport (None: network)
         state.conn, settings.adapter.instagram, transport=adapters.instagram_transport
     )
+    pinterest = PinterestOperator(  # proposed A50: the same seam for the Pinterest hosts
+        state.conn, settings.adapter.pinterest, transport=adapters.pinterest_transport
+    )
     remote = None
     if settings.remote is not None:
         remote = RemoteConfig(
@@ -123,8 +127,10 @@ def assemble_runtime(
             else {
                 **build_proofs(phone_number_id=settings.adapter.meta_phone_number_id),
                 **instagram.proofs(),  # proposed A49
+                **pinterest.proofs(),  # proposed A50
             },
             "instagram": instagram,
+            "pinterest": pinterest,
             "reload": reload,
             "transfers": TransferRegistry(),
             "staged": StagedImports(),

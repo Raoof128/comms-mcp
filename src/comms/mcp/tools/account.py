@@ -384,8 +384,8 @@ ACCOUNT_TOOLS: tuple[ToolSpec, ...] = (
         "comms_admin_identity_inspect",
         "Inspect identities",
         "Owner troubleshooting only: the provider identities behind one ref — a group, "
-        "destination, recipient, contact point, provider object or Instagram ref. The only tool "
-        "that returns them; nothing else ever does.",
+        "destination, recipient, contact point, provider object, Instagram or Pinterest ref. The "
+        "only tool that returns them; nothing else ever does.",
         "admin.identity_inspect",
         {
             "ref": ref(
@@ -403,6 +403,10 @@ ACCOUNT_TOOLS: tuple[ToolSpec, ...] = (
                 "instagram_media",
                 "instagram_comment",
                 "instagram_person",
+                "pinterest_account",  # proposed A50
+                "pinterest_board",
+                "pinterest_pin",
+                "pinterest_media",
             )
         },
         ["ref"],
@@ -412,7 +416,7 @@ ACCOUNT_TOOLS: tuple[ToolSpec, ...] = (
                 "identities": array(
                     obj(
                         {
-                            "transport": enum((*_TRANSPORTS, "instagram")),
+                            "transport": enum((*_TRANSPORTS, "instagram", "pinterest")),
                             "identity": string(1, 256),
                         },
                         ["transport", "identity"],

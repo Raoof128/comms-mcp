@@ -3,7 +3,14 @@
 from comms.core.providers.capability import Capability as C
 from comms.core.providers.semantics import READS, SEMANTICS, SUPPORT, is_write
 
-ACTORS = ("telegram_bot", "telegram_user", "whatsapp_cloud", "whatsapp_webhooks", "instagram")
+ACTORS = (
+    "telegram_bot",
+    "telegram_user",
+    "whatsapp_cloud",
+    "whatsapp_webhooks",
+    "instagram",
+    "pinterest",  # proposed A50
+)
 
 
 def test_every_write_capability_has_semantics_for_every_supporting_actor():

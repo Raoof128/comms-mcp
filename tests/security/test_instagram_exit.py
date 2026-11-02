@@ -53,14 +53,15 @@ PROMPTED = {
     "comms_instagram_comment_delete",
     "comms_instagram_message_send",
 }
-CATALOG_DIGEST = "ce65f29fdffec3968140994814c0c224e40115b6d4ae4"  # a prefix of the pin (R-IG11)
 
 
 def test_the_24_tools_in_order_and_the_catalog_digest():
     names = [s.name for s in TOOL_CATALOG]
     assert tuple(n for n in names if n.startswith("comms_instagram_")) == TOOLS
-    assert len(TOOL_CATALOG) == PIN["count"] == 154
-    assert catalog_digest() == PIN["catalog"] and PIN["catalog"].startswith(CATALOG_DIGEST)
+    # 154 with A49's 24; proposed A50 appends 18 after them (R-PN2), pinned by its own exit test
+    assert len([n for n in names if not n.startswith("comms_pinterest_")]) == 154
+    assert len(TOOL_CATALOG) == PIN["count"]
+    assert catalog_digest() == PIN["catalog"]  # the pin itself moves with A50 (R-PN2)
     assert PENDING_A49 == {}  # every A49 capability has its tool
 
 
@@ -90,7 +91,8 @@ def test_egress_classes():
 
 def test_meta_on_exactly_the_four_prompted_tools():
     flagged = {e["name"] for e in tools_list_payload() if "_meta" in e}
-    assert flagged == PROMPTED
+    # proposed A50 flags three Pinterest tools too (R-PN2); its exit test pins those
+    assert {n for n in flagged if n.startswith("comms_instagram_")} == PROMPTED
 
 
 def test_actor_contracts_prefixes_enums_and_schema():
@@ -105,4 +107,4 @@ def test_actor_contracts_prefixes_enums_and_schema():
     }
     assert "instagram" in AUDIT_ACTORS and "instagram" in MCP_ACTORS
     assert "instagram" in _TRANSPORT["enum"]
-    assert MIGRATIONS[-1].version == 11  # v11: a Story in the ledger (R-IG10)
+    assert MIGRATIONS[10].version == 11  # v11: a Story in the ledger (R-IG10); v12 is A50's

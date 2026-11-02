@@ -56,6 +56,14 @@ def _instagram_ids() -> set[str]:
     return set(re.findall(r"capability `([a-z_.]+)`", section))
 
 
+def _pinterest_ids() -> set[str]:
+    """The capabilities proposed A50 names in section 5.3 of its specification."""
+    spec = (PROPOSAL.parents[1] / "pinterest-spec-v0.1.md").read_text(encoding="utf-8")
+    start = spec.index("### 5.3 Capabilities and semantics")
+    section = spec[start : spec.index("\n## ", start)]
+    return set(re.findall(r"capability `([a-z_.]+)`", section))
+
+
 def test_capability_ids_match_p_sections():
     expected = _section_ids(11) | _section_ids(14) | _section_ids(16)
     assert len(expected) > 60
@@ -65,7 +73,9 @@ def test_capability_ids_match_p_sections():
     assert a47 == {"message.mark_read", "message.send_media"}  # mark_read was already P §14's
     a49 = _instagram_ids()  # proposed A49: section 5.3 names them, new and reused alike
     assert len(a49) == 16 and {"history.read", "message.reply"} <= a49 <= expected | a49
-    assert {c.value for c in Capability} <= expected | a46 | a47 | a49
+    a50 = _pinterest_ids()  # proposed A50: nine new, four reused (A49's three and media.upload)
+    assert len(a50) == 13 and {"media.upload", "profile.read", "insights.read"} <= a50
+    assert {c.value for c in Capability} <= expected | a46 | a47 | a49 | a50
     assert expected <= {c.value for c in Capability}
     # an amendment's capabilities arrive with the task that builds them (A46: G7, G8; A47: H4)
     assert all(c.name == c.value.upper().replace(".", "_") for c in Capability)
@@ -78,6 +88,7 @@ def test_adapter_contracts_match_a18():
         "whatsapp_cloud": frozenset({"delivery", "capability", "admin"}),
         "whatsapp_webhooks": frozenset({"inbound_context", "provider_updates"}),
         "instagram": frozenset({"capability", "admin", "context"}),  # proposed A49 (D-I1; R-IG3)
+        "pinterest": frozenset({"capability", "admin"}),  # proposed A50 (D-P1)
     }
 
 

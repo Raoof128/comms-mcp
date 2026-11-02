@@ -37,6 +37,7 @@ ADAPTER_CONTRACTS: Mapping[str, frozenset[str]] = {
     "whatsapp_cloud": frozenset({"delivery", "capability", "admin"}),
     "whatsapp_webhooks": frozenset({"inbound_context", "provider_updates"}),
     "instagram": frozenset({"capability", "admin", "context"}),  # proposed A49 (D-I1; R-IG3)
+    "pinterest": frozenset({"capability", "admin"}),  # proposed A50 (D-P1)
 }
 
 

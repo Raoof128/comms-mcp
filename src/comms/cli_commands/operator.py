@@ -78,6 +78,16 @@ OPERATOR_COMMANDS: Mapping[tuple[str, ...], Sequence[Arg]] = {
         ("--all", "switch"),
     ),
     ("transport", "instagram", "doctor"): (),
+    # proposed A50: Pinterest accounts; the OAuth code is typed at the hidden prompt
+    ("transport", "pinterest", "auth-url"): (("alias", "positional"),),
+    ("transport", "pinterest", "account", "add"): (("alias", "positional"),),
+    ("transport", "pinterest", "account", "list"): (),
+    ("transport", "pinterest", "account", "remove"): (("alias", "positional"),),
+    ("transport", "pinterest", "token", "refresh"): (
+        ("--alias", "optional"),
+        ("--all", "switch"),
+    ),
+    ("transport", "pinterest", "doctor"): (),
 }
 OPERATOR_GROUPS = tuple(sorted({words[0] for words in OPERATOR_COMMANDS}))
 LOCAL_GROUPS = frozenset({"daemon", "doctor", "relay"})  # run by the local operator CLI
@@ -94,7 +104,12 @@ CLI_FLOWS: dict[tuple[str, ...], str] = {
     ("transport", "telegram", "revoke-session"): "auth revoke-this-session",
 }
 _VALUE_FROM_STDIN = frozenset(
-    {("credential", "set"), ("credential", "rotate"), ("transport", "instagram", "account", "add")}
+    {
+        ("credential", "set"),
+        ("credential", "rotate"),
+        ("transport", "instagram", "account", "add"),
+        ("transport", "pinterest", "account", "add"),  # proposed A50: the OAuth code
+    }
 )
 
 
