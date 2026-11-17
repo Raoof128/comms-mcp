@@ -755,7 +755,7 @@ The sweep also found two tools that could answer an error they didn't declare (`
 ## Live operation (2026-09-27 to 2026-09-28)
 
 The owner's Mac runs comms under the owner's own user: no service accounts (see `CLAUDE.md`, Host state). Each step and its evidence is in `AGENT.md`:
-- **WhatsApp:** the relay is deployed (`https://comms-relay.raoof-r12.workers.dev`), Meta's callback verification passed, and a Meta test webhook was pulled, verified and archived. The W-Vault app is published, with its privacy policy at `https://raoof128.github.io/telegram-mcp/privacy/` (`site/`).
+- **WhatsApp:** the relay is deployed (`https://comms-relay.<account>.workers.dev`), Meta's callback verification passed, and a Meta test webhook was pulled, verified and archived. The W-Vault app is published, with its privacy policy at `https://raoof128.github.io/telegram-mcp/privacy/` (`site/`).
 - **Telegram:** the bot and the owner's account are logged in. Two live end-to-end runs drove the tools over HTTP `/mcp`: 49 tools in the owner's Saved Messages, and 68 tools as both actors in a throwaway group, deleted afterwards. Four sets of defects that no fake could show were fixed under rulings R-TG1 to R-TG4.
 
 These runs are evidence, not the D39-B records: the P §88 rows above stay `PENDING OWNER` until the runbooks' records are filled in.
