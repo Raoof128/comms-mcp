@@ -10,7 +10,7 @@ and WhatsApp through a single MCP server, with every write audited. It runs on t
 - **Telegram:** a bot (Bot API) and the owner's own account (MTProto, through Telethon).
 - **WhatsApp:** the Cloud API for sending. Meta's webhooks reach the Mac through a Cloudflare
   Worker relay that holds them encrypted while the Mac is off (`relay/`).
-- **Instagram (proposed amendment A49, this branch):** one or more professional accounts through
+- **Instagram (proposed amendment A49):** one or more professional accounts through
   the Instagram API with Instagram Login: posts, insights, comments and DMs to read; publishing
   posts, Reels, carousels and Stories, reading your live Stories and their insights, comment moderation, and DM replies inside Meta's 24-hour
   window to write. Design and history:

@@ -870,7 +870,7 @@
   - **Host:** the service-account install is not runnable yet: the `comms` binary sits under `~/Desktop`, which other users cannot reach, and there is no launchd job for `comms daemon`. The owner chose to run comms under their own user.
     - State: `~/Library/Application Support/comms/state`; runtime: `…/comms/run`, both 0700.
     - Keys provisioned; cutover COMPLETE; the daemon runs with `relay.url` set.
-  - **Worker:** deployed to `https://comms-relay.raoof-r12.workers.dev` on the owner's Cloudflare account. The pull key and recipient went from `comms relay` into a transient 0600 secrets file that was removed at once. The path token and verify token are kept in `…/comms/relay-meta.env` (0600), because they are also typed into Meta.
+  - **Worker:** deployed to `https://comms-relay.<account>.workers.dev` on the owner's Cloudflare account. The pull key and recipient went from `comms relay` into a transient 0600 secrets file that was removed at once. The path token and verify token are kept in `…/comms/relay-meta.env` (0600), because they are also typed into Meta.
   - **Live probes:** 404 on unknown paths and on a wrong token, the handshake echoes, a signed pull returns 200, and a forged pull returns 401.
   - **Meta:** W-Vault's callback URL was verified and saved by Meta's own handshake. The subscribed fields are `messages`, `group_lifecycle_update`, `group_participants_update`, `group_settings_update` and `group_status_update`. Meta's dashboard test message reached the relay, encrypted (mailbox depth 1).
 - **Files changed:** `AGENT.md` and `CHANGELOG.md` only. Nothing secret is in the repo.
@@ -905,7 +905,7 @@
 - **Verification:** the live URL probes, Meta's confirmation, and the settings read back.
 - **Follow-ups (owner):**
   - type Meta's app secret with `comms credential set meta-app-secret`, so the daemon verifies and collects what the relay holds;
-  - the app's contact email is still the older `titanfall.1380@gmail.com`;
+  - the app's contact email is still an older address;
   - the Terms of Service URL is Meta's placeholder `https://www.facebook.com/`.
 
 ### 2026-09-28 (Australia/Sydney)
@@ -923,7 +923,7 @@
 **Raouf:**
 - **Scope:** WhatsApp pricing, which number is in use, and group announcements. Research and decisions only; no code.
 - **Summary:**
-  - **Current number:** the live install uses Meta's test number +1 555 200 6424 (phone number id `1236981939507514`, WABA `2507089659791632`). It can message only verified test recipients, and there are none. The owner's personal number (0402 310 686) is not connected; the owner decided to leave it for now.
+  - **Current number:** the live install uses Meta's test number +1 555 200 6424 (phone number id and WABA id withheld). It can message only verified test recipients, and there are none. The owner's personal number is not connected; the owner decided to leave it for now.
   - **Pricing (Meta docs, 2026):**
     - Receiving is free.
     - Until 1 October 2026, replies inside the 24-hour customer service window are free.
@@ -942,12 +942,12 @@
 **Raouf:**
 - **Scope:** Telegram set up on the live install: the bot and the owner's user account (owner-authorised; the owner logged into Telegram Web in the controlled browser).
 - **Summary:**
-  - **Bot:** @raouf_comms_bot ("Raouf Comms") was created through the verified @BotFather (id 93372553; an impostor "BotFather", 7836447530, was avoided). Its token went browser → 0600 file → a pty at `comms credential set telegram-bot-token` (version 1, proved live, reloaded) → deleted. The token never entered the transcript.
+  - **Bot:** The comms bot was created through the verified @BotFather (id 93372553; an impostor "BotFather", 7836447530, was avoided). Its token went browser → 0600 file → a pty at `comms credential set telegram-bot-token` (version 1, proved live, reloaded) → deleted. The token never entered the transcript.
   - **User account:**
-    - A my.telegram.org app, "Raouf Comms", api_id 35628079 (not secret), was created.
+    - A my.telegram.org app was created (its api_id is not secret and is not recorded here).
     - Its `api_hash` went browser → file → `security -i` on stdin (never in argv) into the login Keychain as `telegram-mcp`/`api_hash`, and `read_api_hash()` reads it back.
     - `telegram_api_id` was set in `comms.json` and the daemon restarted.
-    - `comms transport telegram login` ran with the phone and the code read from Telegram's service chat (777000). Two-step verification is off on the account. The result is `authorized: true`, account ref `tga_…`, and the session is `state/telegram/primary.session` (0600).
+    - `comms transport telegram login` ran with the phone and the code read from Telegram's service chat (777000).  The result is `authorized: true`, account ref `tga_…`, and the session is `state/telegram/primary.session` (0600).
   - **The first login attempt** got `MALFORMED_REQUEST` because it hit the daemon before its background Telegram reconnect had finished ("Telegram unreachable at start"). A bare Telethon connect took 4.8 s. A retry worked.
   - **MCP client:** `claude-code` was added (`cli_algtfvgpaq53qhy4ntohhapzfv`, seed at `~/.config/comms/claude-code.seed`, 0600).
   - **Account profile over HTTP `/mcp`:** `telegram_bot` and `telegram_user` are configured and reachable; `whatsapp_cloud` is not configured (no access token).
@@ -980,7 +980,7 @@
     - the daemon log no longer says "unreachable at start";
     - admin requests are answered steadily, about every 2 s, with no 10 s stalls;
     - doctor no longer reports `telegram-session`;
-    - a `/start` sent to @raouf_comms_bot from the owner's account was retained within seconds (1 update, offset advanced).
+    - a `/start` sent to the bot from the owner's account was retained within seconds (1 update, offset advanced).
 - **Follow-ups:** the owner confirms the new "raoufcomms" login in Telegram ("Yes, it's me"); other worker steps (relay pull, delivery) still make short synchronous calls on the loop, bounded by their timeouts.
 
 ### 2026-09-28 (Australia/Sydney)
@@ -1001,11 +1001,11 @@
 
 ### 2026-09-28 (Australia/Sydney)
 **Raouf:**
-- **Scope:** The owner's Friends group message, and the defect it exposed (branch `telegram-creator-rights`, ruling R-TG2).
+- **Scope:** A group message the owner asked for, and the defect it exposed (branch `telegram-creator-rights`, ruling R-TG2).
 - **Summary:**
-  - **The message:** the owner asked for a cute Persian "good morning, please confirm numbers for Cafe Cat on Sunday so I can call and book" in their Friends group. The MCP send was refused (`CAPABILITY_UNAVAILABLE`), so the message was sent from the owner's own Telegram Web session (read back at 08:04). Nothing was sent twice.
+  - **The message:** the owner asked for a short message to be sent to one of their own groups. The MCP send was refused (`CAPABILITY_UNAVAILABLE`), so the message was sent from the owner's own Telegram Web session (read back at 08:04). Nothing was sent twice.
   - **Causes:**
-    - I first entered Telegram Web's id (`-4331185481`); comms wants `-1004331185481`. That destination is disabled and the correct one added.
+    - I first entered Telegram Web's form of the chat id; comms wants the `-100…` form. That destination is disabled and the correct one added.
     - v0.3 has no dialog discovery, so the session's entity cache was empty. It was filled once through the adapter's reviewed `admin.discover` read, with the daemon stopped.
     - **The defect:** Telegram's `getParticipant` answer for the creator omitted the channel from `chats`, and comms read that as not authorized for every right. `self_rights` now makes one `messages.getPeerDialogs` read (already reviewed; added to `cap.member.get` and to the review document) when the channel is missing; `channels.getChannels` stays absent.
 - **Files changed:** `src/comms/transports/telegram/telegram/telethon_adapter.py`, `docs/verification/telegram-rpc-review.md`, `tests/transports/telegram_user/test_self_rights.py`, the rulings (R-TG2), `AGENT.md`, `CHANGELOG.md`.
@@ -1044,7 +1044,7 @@
 **Raouf:**
 - **Scope:** A live end-to-end run of every Telegram group tool in a throwaway private supergroup, and the defects it found (branch `telegram-group-e2e-fixes`, ruling R-TG4).
 - **Summary:**
-  - **The run:** the owner's account created "comms e2e test" (a forum), added @raouf_comms_bot, restricted and unrestricted it, promoted it, updated its rights and tagged it. Then 83 calls covered 68 distinct tools as both actors: send, reply, edit, pin, forward, delete; photo and document sends (the R-TG3 fix held); reads, search, summary, media inspect and download; permissions, title, description and photo; invites and join requests; topics; demote, remove, ban, unban; migrate (refused, since only a basic group migrates); a broadcast channel created, posted to and deleted; then the group deleted. 78 passed first time, and two apparent failures were the test's own wrong expectations.
+  - **The run:** the owner's account created "comms e2e test" (a forum), added the bot, restricted and unrestricted it, promoted it, updated its rights and tagged it. Then 83 calls covered 68 distinct tools as both actors: send, reply, edit, pin, forward, delete; photo and document sends (the R-TG3 fix held); reads, search, summary, media inspect and download; permissions, title, description and photo; invites and join requests; topics; demote, remove, ban, unban; migrate (refused, since only a basic group migrates); a broadcast channel created, posted to and deleted; then the group deleted. 78 passed first time, and two apparent failures were the test's own wrong expectations.
   - **Defects fixed:**
     1. `comms_group_permissions_get` answered NOT_AUTHORIZED: `default_permissions` still expected the channel in `getParticipant` (R-TG2's defect in a second function). One helper, `_channel_chats`, now serves both.
     2. `comms_context_thread` was unsupported for the user account although the actor matrix serves it by `messages.getReplies`; the user context now reads threads through `fetch_replies`.
@@ -1343,10 +1343,10 @@
 
 ### 2026-10-05 (Australia/Sydney), Instagram live acceptance, first run
 **Raouf:**
-- **Scope:** The owner renamed the repository, then asked for the Instagram live gates to run on their own account, @punpun.r12, instead of a throwaway.
+- **Scope:** The owner renamed the repository, then asked for the Instagram live gates to run on their own account, <owner-account>, instead of a throwaway.
 - **Summary:**
   - **Host:** clone switched to `Raoof128/comms-mcp`. Both W-Vault URLs now point at `https://raoof128.github.io/comms-mcp/privacy/` (`#deletion` for data deletion). The daemon runs from this checkout on the existing state, backed up first to `state.bak-2026-10-05`. All 25 merged remote branches were deleted, leaving `main`.
-  - **Account:** `comms.json` gains `instagram` (`default` `main`; `main`: label `punpun.r12`, `writes` and `dms` true). punpun.r12 is an Instagram Tester on W-Vault-IG. Its token was added at the hidden prompt in Terminal.app and proved by `GET /me` (`iga_akejch7j6q3tbjh6snuj6n2ftw`, expires 2026-12-04).
+  - **Account:** `comms.json` gains `instagram` (`default` `main`; `main`: label `<owner-account>`, `writes` and `dms` true). <owner-account> is an Instagram Tester on W-Vault-IG. Its token was added at the hidden prompt in Terminal.app and proved by `GET /me` (`iga_akejch7j6q3tbjh6snuj6n2ftw`, expires 2026-12-04).
   - **Gates:** GI-3 and GI-5 pass. GI-1 passes doctor and the comment hide round trip; its refresh needs a 24-hour-old token. GI-4 passes with captions off. Publishing (feed image and Story), comment reply, replay, replies and delete all ran live. The test post was deleted afterwards. The images were served from Pages for the run only (`d79f2c1`, removed in `d41e8ef`).
   - **Findings:** a thread without exactly one counterpart (conversation 25, likely a group) fails the whole `conversation_list` page, so no cursor passes it. `media_get` on a deleted post answers `INVALID_ARGUMENT` (Meta code 100). Both need a ruling; no code changed.
 - **Files changed:** `docs/verification/live-acceptance/2026-10-05-instagram.md` (new), `AGENT.md`, `CHANGELOG.md`. Earlier, on `main`: `site/test/` added and removed.
@@ -1363,7 +1363,7 @@
     - **Codex:** `comms client add --name codex` made `cli_adgyxqose5ba5etojwxamnwjtf` with `~/.config/comms/codex.seed` (0600), and `[mcp_servers.comms]` was added to `~/.codex/config.toml`. A read through the Codex seed answered.
     - **Proxy flags:** both entries pass `--daemon http://127.0.0.1:8866 --runtime-dir ~/Library/Application Support/comms/run`. Each config was backed up as `*.bak-comms-20261005` first.
   - **Second account:**
-    - `comms.json` gains `instagram.accounts.mqps` (label `mqpersiansociety`, `writes` true, `dms` false). @mqpersiansociety is an Instagram Tester on W-Vault-IG.
+    - `comms.json` gains `instagram.accounts.mqps` (label `<second-account>`, `writes` true, `dms` false). <second-account> is an Instagram Tester on W-Vault-IG.
     - Its token was added at the hidden prompt and proved by `GET /me`: `iga_akybk67tcni7nkohuiic7jj664`, expires 2026-12-04.
     - Reads verified live: whoami, profile, quota, account insights, media and Story lists, comments and conversations. An `igm_` from `mqps` read under `main` answers `NOT_FOUND`, so refs stay isolated per account.
     - `publish_preview` answers `writes_allowed: true`.
@@ -1390,3 +1390,15 @@
 - **Files changed:** `AGENT.md`, `CHANGELOG.md`.
 - **Verification:** `zurvan agent prime` reports the index fresh, and a hybrid search for the DM finding returns the new claim first. Documentation only.
 - **Follow-ups (owner):** the token refreshes (GI-1 after 2026-10-06 16:04, GI-2 a day later); GI-6 and GI-7 after restarting Claude Code and Codex; GI-8; rulings on the two findings, then R-IG0; daemon auto-start at login.
+
+### 2026-11-17 (Australia/Sydney), personal identifiers removed from the logs
+**Raouf:**
+- **Scope:** `AGENT.md`, `CHANGELOG.md`, `CLAUDE.md`, three verification records, `README.md`. Documentation only.
+- **Summary:**
+  - **Removed from the working tree:** the owner's personal phone number; a WhatsApp phone number id and WABA id; an older personal email address; the deployed relay's hostname; the Telegram bot's username and the app's api_id; a note on the Telegram account's two-step verification setting; a group's chat id and the text of a personal message; and the handles and follower counts of the two Instagram accounts used for live acceptance. Each is replaced by a placeholder (`<owner-account>`, `<second-account>`, `comms-relay.<account>.workers.dev`) or a neutral phrase.
+  - **Still present, on purpose:** the contact address in `site/` (the published privacy policy needs one), and the society named as the example workflow in the frozen specifications and provenance documents.
+  - **Not removed by this change:** every value above remains in the Git history, and the public branch `comms-pinterest` names a client business in eight files. Only a history rewrite or making the repository private removes those.
+  - **README:** the Instagram actor is on `main`, so "this branch" is dropped. The repository description on GitHub now says what the gateway does (it said "Read-only Telegram MCP gateway").
+- **Files changed:** `AGENT.md`, `CHANGELOG.md`, `CLAUDE.md`, `README.md`, `docs/verification/comms-relay.md`, `docs/verification/comms-v0.3.md`, `docs/verification/live-acceptance/2026-10-05-instagram.md`.
+- **Verification:** `git grep` finds none of the removed values in the tree. No test reads the edited files (two tests name `CLAUDE.md` and `docs/verification/comms-v0.3-actor-matrix.md`; the first is a docstring and the second file is unchanged). No code changed and nothing under `site/` changed, so the Pages workflow does not run.
+- **Follow-ups (owner):** decide whether this repository should be private; if it stays public, rewrite history and remove or rewrite the `comms-pinterest` branch. `CLAUDE.md` no longer carries the relay's real hostname; the daemon takes it from its own settings (`relay_url`), not from this file.

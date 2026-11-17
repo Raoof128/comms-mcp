@@ -7,10 +7,10 @@ Australia/Sydney.
 
 | Field | Value |
 |---|---|
-| Account | @punpun.r12, `MEDIA_CREATOR`, public, 116 followers, 0 posts at start |
+| Account | <owner-account>, `MEDIA_CREATOR`, public, 0 posts at start |
 | Alias and policy | `main`, `writes: true`, `dms: true` (`instagram.default` is `main`) |
 | Account ref | `iga_akejch7j6q3tbjh6snuj6n2ftw` |
-| Meta app | W-Vault (Instagram app W-Vault-IG); punpun.r12 is an Instagram Tester, invite accepted 2026-10-05 |
+| Meta app | W-Vault (Instagram app W-Vault-IG); <owner-account> is an Instagram Tester, invite accepted 2026-10-05 |
 | Scopes added on the app | `instagram_business_basic`, `instagram_business_manage_comments`, `instagram_business_manage_messages` |
 | Token | dashboard token, typed at the hidden prompt in Terminal.app; proved by `GET /me`; expires 2026-12-04T05:04:20Z |
 | comms | `main` at `1f66f3e` plus the audit-trail commit `da2ea47`; daemon run as the owner's user (`--state-dir`/`--runtime-dir` under `~/Library/Application Support/comms`, `local_port` 8866) |
@@ -24,7 +24,7 @@ was not exercised; that is GI-6, still pending.
 **Setup notes.**
 - `comms transport instagram account add` refuses without a TTY ("credential values are entered
   interactively, at a terminal"); Claude Code's `!` prefix is not one. Run it in a real terminal.
-- Meta's "add Instagram tester" box refused punpun.r12 ("Unable to add a user with a role on the
+- Meta's "add Instagram tester" box refused <owner-account> ("Unable to add a user with a role on the
   app's owning business"). The API-setup page's "Add account" flow, signed in to Instagram as the
   account, sent the invite; accepting it under Apps and websites → Tester invites worked.
 
@@ -78,7 +78,7 @@ it; `comment_delete` removed it and `comment_replies` then read empty.
 
 | Field | Value |
 |---|---|
-| Account | @mqpersiansociety, `MEDIA_CREATOR`, 549 followers, 45 posts |
+| Account | <second-account>, `MEDIA_CREATOR` |
 | Alias and policy | `mqps`, `writes: true`, `dms: false` |
 | Account ref | `iga_akybk67tcni7nkohuiic7jj664`; token expires 2026-12-04T08:20:02Z |
 
